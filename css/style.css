@@ -1,0 +1,1057 @@
+/* Enforce 100% Baseline Zoom & DPI Rendering */
+html {
+  zoom: 1.0 !important;
+  -webkit-text-size-adjust: 100% !important;
+  -ms-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  width: 100%;
+  overflow-x: hidden;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+/* Shared public page refinements requested for the marketing site. */
+html,body { height:100%; margin:0; padding:0; }
+body { display:flex!important; flex-direction:column!important; min-height:100vh!important; background-color:#0d1117; }
+main,.main-content,.content-wrapper { flex:1 0 auto!important; width:100%; }
+footer,.site-footer { flex-shrink:0!important; width:100%; margin-top:auto!important; }
+.hero-banner,.page-hero-img,.home-hero-banner,.public-hero { width:100%!important; height:380px!important; min-height:380px!important; object-fit:cover!important; object-position:center!important; }
+.home-hero-banner,.public-hero { flex:none; }
+.navbar-nav .nav-link,
+.nav-tabs .nav-link,
+header a,
+footer a {
+  text-decoration:none!important;
+  color:#fff!important;
+  font-weight:600;
+  transition:color .2s ease;
+}
+.navbar-nav .nav-link:hover,
+.navbar-nav .nav-link.active,
+.public-page .main-nav>a:hover,
+.public-page .main-nav>a.active { color:#38bdf8!important; text-decoration:none!important; }
+.login-nav-text,a.login-link,.nav-item-login a,.auth-nav-container [data-auth-session] { font-size:1rem!important; font-weight:700!important; color:#fff!important; text-decoration:none!important; letter-spacing:.2px!important; }
+a.login-link:hover,.auth-nav-container [data-auth-session]:hover { color:#38bdf8!important; }
+.brand-tagline,.tagline-header,.tagline { font-size:1.5rem!important; font-weight:900!important; font-style:italic!important; letter-spacing:1.5px!important; color:#fff!important; text-transform:uppercase!important; text-align:center!important; }
+.global-tagline-text { font-size:1.5rem!important; font-weight:900!important; font-style:italic!important; text-transform:uppercase!important; letter-spacing:1.5px!important; color:#fff!important; text-align:center!important; }
+.nav-link-login,.auth-nav-container .nav-link-login { font-size:1rem!important; font-weight:700!important; font-style:normal!important; color:#fff!important; text-decoration:none!important; letter-spacing:normal!important; }
+.auth-nav-container .nav-link-login:hover { color:#38bdf8!important; }
+
+body.contact-public .contact-feature { display:flex; flex-direction:column; gap:18px; }
+body.contact-public .contact-locations { width:100%; }
+body.contact-public .branch-map { height:280px; min-width:320px; border-radius:16px; }
+body.contact-public .branch-grid { grid-template-columns:repeat(2,minmax(320px,1fr)); justify-content:center; align-items:center; gap:24px; width:min(100%,960px); margin-inline:auto; }
+body.contact-public .maps-container { justify-content:center; }
+body.contact-public .contact-bottom-row { display:flex; width:100%; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:20px; margin-top:20px; }
+body.contact-public .contact-strip { display:flex; flex:1 1 460px; flex-wrap:wrap; align-items:flex-end; gap:16px 28px; padding:0; }
+body.contact-public .contact-strip article { flex:1 1 180px; }
+body.contact-public .inquiry-cta-container { flex:0 1 auto; margin-left:auto; padding:0; }
+body.contact-public .inquiry-cta-container p { color:#64748b; font-size:.8rem; margin-top:8px; }
+body.contact-public .inquiry-cta-container .inquiry-cta-button { padding:12px 36px; font-weight:800; box-shadow:0 4px 14px rgba(0,0,0,.2); }
+
+.services-page .services-grid-container { display:flex!important; justify-content:center!important; align-items:center!important; gap:32px!important; flex-wrap:wrap!important; }
+.services-page .services-grid-container .package-card { flex:1 1 min(460px,100%); max-width:760px; }
+
+/* Glass panels sit over the package photography, keeping the artwork visible. */
+.services-page .package-card .package-overlay {
+  width:100%!important;
+  max-width:380px!important;
+  margin:0 auto!important;
+  padding:1.25rem 1.5rem!important;
+  background:rgba(11,25,44,.65)!important;
+  -webkit-backdrop-filter:blur(10px)!important;
+  backdrop-filter:blur(10px)!important;
+  border:1px solid rgba(255,255,255,.18)!important;
+  border-radius:20px!important;
+  box-shadow:0 8px 25px rgba(0,0,0,.4)!important;
+  color:#fff!important;
+  transition:transform .25s ease,box-shadow .25s ease;
+}
+.services-page .package-card .package-overlay h3 {
+  margin-bottom:.75rem!important;
+  font-size:1.25rem!important;
+  font-weight:700!important;
+  font-style:italic!important;
+  line-height:1.2!important;
+}
+.services-page .package-card .package-overlay ul {
+  list-style:none!important;
+  padding-left:0!important;
+  margin-bottom:1rem!important;
+}
+.services-page .package-card .package-overlay li {
+  font-size:.85rem!important;
+  font-weight:500!important;
+  color:#f1f5f9!important;
+  margin-bottom:2px!important;
+  line-height:1.3!important;
+}
+.services-page .package-card .package-price { display:block; margin-top:.75rem!important; font-size:.88rem!important; line-height:1.3!important; }
+.services-page .package-card .package-price,
+.services-page .package-card .starting-price-title,
+.services-page .package-card .price-val {
+  color:#38bdf8!important;
+  font-weight:600!important;
+}
+.services-page .package-card .package-overlay:hover {
+  transform:translateY(-3px);
+  box-shadow:0 14px 36px rgba(0,0,0,.4)!important;
+}
+
+body.feedback-public .feedback-fields { grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 18px; }
+body.feedback-public .feedback-fields>div:nth-child(n) { grid-column:auto; grid-row:auto; }
+body.feedback-public .feedback-fields .feedback-description { grid-column:2; grid-row:1 / span 2; }
+body.feedback-public .feedback-fields .feedback-attachment { grid-column:1/-1; }
+body.feedback-public .feedback-form label { display:block; margin:0 0 6px!important; color:#64748b!important; font-size:.9rem!important; font-weight:600!important; }
+body.feedback-public .feedback-form input:not([type=file]),
+body.feedback-public .feedback-form select,
+body.feedback-public .feedback-form textarea { width:100%; min-height:38px; height:38px; padding:8px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; color:#0f172a; }
+body.feedback-public .feedback-form textarea { height:auto; min-height:130px; resize:vertical; }
+body.feedback-public .feedback-form input[type=file] { height:auto; color:#fff; }
+
+.register-public .form-page.auth-page { display:grid; grid-template-columns:minmax(0,1fr) minmax(360px,460px); grid-template-rows:auto 1fr; align-items:center; justify-items:stretch; gap:0 clamp(28px,6vw,88px); }
+.register-public .register-hero-title { grid-column:1; grid-row:1; align-self:end; margin:0 0 20px; color:#38bdf8; font-size:2.2rem; font-weight:900; font-style:italic; }
+.register-public .form-page.auth-page::before { grid-column:1; grid-row:2; align-self:start; }
+.register-public .auth-card { grid-column:2; grid-row:1 / span 2; }
+.register-public .auth-card .auth-submit { margin-top:24px; padding:12px; border-radius:9999px; }
+
+.login-public .unified-login-card .login-title { margin:0 0 16px; color:#fff; text-align:center; font-size:2.5rem; font-weight:900; }
+.login-public .unified-login-card .login-btn { height:44px; min-height:44px; margin-top:20px; border-radius:9999px; }
+
+/* Keep the registration message visually connected to its form card. */
+.register-public .form-page.auth-page { display:block; min-height:520px; padding:0 24px; }
+.register-public .register-layout-container { display:flex; align-items:center; justify-content:center; gap:48px; width:100%; max-width:1100px; min-height:520px; margin:0 auto; padding:40px 20px; }
+.register-public .register-hero-text { flex:1 1 480px; max-width:480px; }
+.register-public .register-hero-text .register-hero-title { margin:0 0 16px; color:#38bdf8; font-size:2.5rem; font-weight:900; font-style:italic; line-height:1.2; }
+.register-public .register-hero-text p { color:rgba(255,255,255,.75); font-size:.95rem; line-height:1.5; }
+.register-public .register-card-wrapper { flex:0 1 460px; width:100%; }
+.register-public .register-card-wrapper .auth-card { width:100%; }
+.register-public .register-public-spacer,.register-public .form-page.auth-page::before { display:none; }
+
+/* The contact details remain a left aligned vertical stack beside the CTA. */
+body.contact-public .contact-footer-wrapper { align-items:flex-end; justify-content:space-between; width:100%; margin-top:40px; padding:0 20px; }
+body.contact-public .contact-strip { display:flex; flex:0 1 auto; flex-direction:column; align-items:flex-start; gap:12px; }
+body.contact-public .contact-strip article { display:block; flex:none; color:#64748b!important; font-size:.9rem; font-weight:700!important; }
+body.contact-public .contact-strip article>a { color:#64748b!important; font-weight:700!important; }
+body.contact-public .contact-strip small { margin-left:32px; color:#64748b!important; font-weight:600; }
+body.contact-public .contact-details-stacked a,body.contact-public .contact-details-stacked span { text-decoration:none!important; color:#0f172a!important; font-weight:600; }
+body.contact-public .inquiry-cta-block { margin-left:auto; }
+body.contact-public .inquiry-cta-container p { color:#64748b!important; font-size:.875rem!important; font-weight:400!important; margin-top:8px; margin-bottom:0; }
+
+/* Package artwork reaches the viewport edges without the old centered gutters. */
+.services-container-wrapper { width:100%!important; max-width:none!important; margin:0!important; padding:0!important; overflow:hidden!important; }
+.services-page .service-section-bg,.services-page .package-card-bg { width:100%!important; min-height:100%!important; background-size:cover!important; background-position:center!important; background-repeat:no-repeat!important; margin:0!important; padding:0!important; }
+.services-page .service-section-bg { display:flex!important; justify-content:center!important; align-items:stretch!important; gap:0!important; flex-wrap:wrap!important; }
+.services-page .service-section-bg .package-card-bg { flex:1 1 50%; max-width:none; min-height:460px; }
+.services-container-wrapper {
+  min-height:85vh!important;
+  padding:0!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+}
+.services-container-wrapper .service-section-bg {
+  width:100%!important;
+  min-height:85vh!important;
+  padding:0!important;
+}
+.services-container-wrapper .service-section-bg .package-card-bg {
+  min-height:85vh!important;
+  background-size:cover!important;
+  background-position:center center!important;
+  background-repeat:no-repeat!important;
+}
+
+@media(max-width:760px) {
+  body.contact-public .branch-grid { grid-template-columns:minmax(0,1fr); }
+  body.contact-public .branch-map { min-width:0; height:240px; }
+  body.contact-public .inquiry-cta-container { width:100%; text-align:center!important; }
+  .register-public .register-layout-container { flex-direction:column; align-items:stretch; gap:24px; min-height:0; padding:32px 12px; }
+  .register-public .register-hero-text,.register-public .register-card-wrapper { flex:1 1 auto; max-width:none; }
+  .register-public .register-hero-text .register-hero-title { font-size:2rem; }
+  .services-page .service-section-bg .package-card-bg { flex-basis:100%; }
+}
+@media(max-width:620px) {
+  body.feedback-public .feedback-fields { grid-template-columns:minmax(0,1fr); }
+  body.feedback-public .feedback-fields>div:nth-child(n),body.feedback-public .feedback-fields .feedback-description,body.feedback-public .feedback-fields .feedback-attachment { grid-column:1; grid-row:auto; }
+}
+
+/* OTP verification page */
+body.otp-page-body { background:url('../assets/images/background2.png') center/cover no-repeat fixed!important; }
+.otp-wrapper-section { display:flex!important; align-items:center; justify-content:center; min-height:100vh!important; background:url('../assets/images/background2.png') center/cover no-repeat fixed!important; }
+.otp-card-container { width:100%!important; max-width:440px!important; padding:36px!important; border-radius:16px!important; background:rgba(255,255,255,.95)!important; backdrop-filter:blur(12px)!important; box-shadow:0 10px 30px rgba(0,0,0,.15)!important; }
+@media(max-width:520px) { .otp-card-container { padding:26px 20px!important; } }
+
+
+.login-public .login-page.auth-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 60px 20px;
+}
+
+.register-public .form-page.auth-page {
+  padding: 60px 20px;
+}
+
+.register-public .register-layout-container {
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+}
+
+
+.register-card-body h2,
+.register-card-body .sub-heading,
+.register-card-body img.card-subbanner,
+.register-card-body svg.card-subbanner {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Overview dashboard card interaction */
+.overview-card {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 12px;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.3s ease,
+              box-shadow 0.3s ease !important;
+}
+
+.overview-card:hover {
+  transform: translateY(-4px) !important;
+  border-color: rgba(56, 189, 248, 0.5) !important;
+  box-shadow: 0 10px 28px rgba(56, 189, 248, 0.15), 0 0 12px rgba(56, 189, 248, 0.1) !important;
+}
+
+.overview-scrollable-body::-webkit-scrollbar { width: 3px !important; }
+.overview-scrollable-body::-webkit-scrollbar-track { background: transparent !important; }
+.overview-scrollable-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-radius: 10px !important;
+  transition: background 0.2s ease !important;
+}
+.overview-scrollable-body:hover::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.4) !important; }
+.overview-scrollable-body { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent; }
+/* Hide scrollbars globally across all overview containers while preserving scroll functionality */
+.overview-scrollable-body,
+.overview-card,
+.dashboard-container,
+.table-responsive,
+div[style*="overflow"] {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+.overview-scrollable-body::-webkit-scrollbar,
+.overview-card::-webkit-scrollbar,
+.dashboard-container::-webkit-scrollbar,
+.table-responsive::-webkit-scrollbar,
+div[style*="overflow"]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+.master-overview-grid .overview-card h3,
+.overview-section-title {
+  font-weight: 400 !important;
+}
+.overview-analytics-header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.overview-metric-control { position:relative; flex:0 0 auto; }
+.overview-metric-toggle { padding:7px 12px; border:1px solid #38bdf8; border-radius:8px; background:transparent; color:#38bdf8; font:inherit; font-size:.8rem; cursor:pointer; transition:background .2s ease, box-shadow .2s ease; }
+.overview-metric-toggle:hover,
+.overview-metric-toggle[aria-expanded="true"] { background:rgba(56,189,248,.1); box-shadow:0 0 14px rgba(56,189,248,.16); }
+.overview-metric-toggle:focus-visible { outline:2px solid rgba(56,189,248,.65); outline-offset:2px; }
+.overview-metric-menu { position:absolute; z-index:30; top:calc(100% + 7px); right:0; display:grid; min-width:210px; padding:5px; border:1px solid rgba(56,189,248,.28); border-radius:10px; background:#0c1732; box-shadow:0 12px 30px rgba(0,0,0,.32); }
+.overview-metric-menu[hidden] { display:none !important; }
+.overview-metric-menu .metric-opt { width:100%; padding:9px 10px; border:0; border-radius:6px; background:transparent; color:#fff; font:inherit; font-size:.82rem; text-align:left; cursor:pointer; }
+.overview-metric-menu .metric-opt:hover,
+.overview-metric-menu .metric-opt:focus-visible { outline:none; background:rgba(56,189,248,.14); color:#7dd3fc; }
+.master-overview-grid .overview-reports-card { overflow:visible; }
+@media(max-width:520px) {
+  .overview-analytics-header { align-items:flex-start; flex-direction:column; }
+  .overview-metric-menu { right:auto; left:0; }
+}
+
+/* Solid white dashboard header with public navigation hidden. */
+.admin-dashboard-body .dashboard-auth-header,
+.super-dashboard-body .dashboard-auth-header,
+.admin-dashboard-body .dashboard-auth-brand,
+.super-dashboard-body .dashboard-auth-brand,
+.admin-dashboard-body .dashboard-auth-nav,
+.super-dashboard-body .dashboard-auth-nav {
+  background: #fff !important;
+  background-color: #fff !important;
+}
+.admin-dashboard-body .dashboard-auth-header,
+.super-dashboard-body .dashboard-auth-header {
+  color: #0f172a !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .08) !important;
+}
+.admin-dashboard-body .dashboard-auth-brand { background-image: none !important; }
+.super-dashboard-body .dashboard-auth-brand { background-image: none !important; }
+.admin-dashboard-body .dashboard-auth-brand .tagline,
+.super-dashboard-body .dashboard-auth-brand .tagline,
+.admin-dashboard-body .dashboard-auth-nav a,
+.super-dashboard-body .dashboard-auth-nav a,
+.admin-dashboard-body .dashboard-auth-nav .btn-logout,
+.super-dashboard-body .dashboard-auth-nav .btn-logout {
+  color: #0f172a !important;
+}
+.admin-dashboard-body .dashboard-auth-brand .header-logo,
+.super-dashboard-body .dashboard-auth-brand .header-logo,
+.admin-dashboard-body .dashboard-auth-brand .brand-logo-image,
+.super-dashboard-body .dashboard-auth-brand .brand-logo-image {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+.admin-dashboard-body .dashboard-auth-nav .public-nav-tabs,
+.super-dashboard-body .dashboard-auth-nav .public-nav-tabs,
+.admin-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="home"],
+.super-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="home"],
+.admin-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="about"],
+.super-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="about"],
+.admin-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="services"],
+.super-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="services"],
+.admin-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="contact"],
+.super-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="contact"],
+.admin-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="feedback"],
+.super-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="feedback"] {
+  display: none !important;
+}
+.admin-dashboard-body .dashboard-auth-nav .nav-links-right,
+.super-dashboard-body .dashboard-auth-nav .nav-links-right { margin-left: auto; }
+.admin-dashboard-body .dashboard-auth-nav .btn-logout,
+.super-dashboard-body .dashboard-auth-nav .btn-logout { border-color: rgba(15, 23, 42, .28) !important; }
+/* Hide every dashboard scrollbar while keeping wheel and touch scrolling available. */
+.admin-dashboard-body *,
+.super-dashboard-body *,
+.overview-recent-reports {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+.admin-dashboard-body *::-webkit-scrollbar,
+.super-dashboard-body *::-webkit-scrollbar,
+.overview-recent-reports::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+/* Final dashboard overview surface, label, and status refinements */
+.overview-card {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.overview-card:hover {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  transform: translateY(-2px) !important;
+}
+.overview-status,
+.overview-status.status-confirmed {
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: none !important;
+  font-weight: 700 !important;
+}
+.overview-status.status-pending { color: #f97316 !important; }
+.overview-status.status-confirmed { color: #38bdf8 !important; }
+.overview-services-card .overview-item-value { color: #ffffff !important; font-weight: 700 !important; }
+.overview-inquiries-card .inquiry-date-text,
+.overview-inquiries-card .overview-inquiry-item .date-label { color: #ffffff !important; opacity: .9 !important; }
+/* Unified Glassmorphism Card & Container Styling for Admin & Super Admin */
+.admin-dashboard-body .card,
+.super-dashboard-body .card,
+.admin-dashboard-body .panel,
+.super-dashboard-body .panel,
+.admin-dashboard-body .service-card,
+.super-dashboard-body .service-card,
+.admin-dashboard-body .tool-card,
+.super-dashboard-body .tool-card,
+.admin-dashboard-body .booking-card,
+.super-dashboard-body .booking-card,
+.admin-dashboard-body .booking-item-row,
+.super-dashboard-body .booking-item-row,
+.admin-dashboard-body .customer-card,
+.super-dashboard-body .customer-card,
+.admin-dashboard-body .customer-records-card-container,
+.super-dashboard-body .customer-records-card-container,
+.admin-dashboard-body .report-card,
+.super-dashboard-body .report-card,
+.admin-dashboard-body .reports-card-container,
+.super-dashboard-body .reports-card-container,
+.admin-dashboard-body .pos-card,
+.super-dashboard-body .pos-card,
+.admin-dashboard-body .pos-card-container,
+.super-dashboard-body .pos-card-container,
+.admin-dashboard-body .notification-card,
+.super-dashboard-body .notification-card,
+.admin-dashboard-body .notifications-card-container,
+.super-dashboard-body .notifications-card-container,
+.admin-dashboard-body .inquiries-card-container,
+.super-dashboard-body .inquiries-card-container,
+.admin-dashboard-body .system-card-container,
+.super-dashboard-body .system-card-container,
+.admin-dashboard-body .dashboard-module-box,
+.super-dashboard-body .dashboard-module-box,
+.admin-dashboard-body .table-responsive-container,
+.super-dashboard-body .table-responsive-container,
+.admin-dashboard-body .table-scroll,
+.super-dashboard-body .table-scroll,
+.admin-dashboard-body .report-history-scroll-wrapper,
+.super-dashboard-body .report-history-scroll-wrapper,
+.admin-dashboard-body .master-overview-grid .overview-card,
+.super-dashboard-body .master-overview-grid .overview-card {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease, border-color 0.35s ease !important;
+  border-radius: 12px;
+}
+
+/* Unified Ambient Neon Glow on Hover */
+.admin-dashboard-body .card:hover,
+.super-dashboard-body .card:hover,
+.admin-dashboard-body .panel:hover,
+.super-dashboard-body .panel:hover,
+.admin-dashboard-body .service-card:hover,
+.super-dashboard-body .service-card:hover,
+.admin-dashboard-body .tool-card:hover,
+.super-dashboard-body .tool-card:hover,
+.admin-dashboard-body .booking-card:hover,
+.super-dashboard-body .booking-card:hover,
+.admin-dashboard-body .booking-item-row:hover,
+.super-dashboard-body .booking-item-row:hover,
+.admin-dashboard-body .customer-card:hover,
+.super-dashboard-body .customer-card:hover,
+.admin-dashboard-body .customer-records-card-container:hover,
+.super-dashboard-body .customer-records-card-container:hover,
+.admin-dashboard-body .report-card:hover,
+.super-dashboard-body .report-card:hover,
+.admin-dashboard-body .reports-card-container:hover,
+.super-dashboard-body .reports-card-container:hover,
+.admin-dashboard-body .pos-card:hover,
+.super-dashboard-body .pos-card:hover,
+.admin-dashboard-body .pos-card-container:hover,
+.super-dashboard-body .pos-card-container:hover,
+.admin-dashboard-body .notification-card:hover,
+.super-dashboard-body .notification-card:hover,
+.admin-dashboard-body .notifications-card-container:hover,
+.super-dashboard-body .notifications-card-container:hover,
+.admin-dashboard-body .inquiries-card-container:hover,
+.super-dashboard-body .inquiries-card-container:hover,
+.admin-dashboard-body .system-card-container:hover,
+.super-dashboard-body .system-card-container:hover,
+.admin-dashboard-body .dashboard-module-box:hover,
+.super-dashboard-body .dashboard-module-box:hover,
+.admin-dashboard-body .table-responsive-container:hover,
+.super-dashboard-body .table-responsive-container:hover,
+.admin-dashboard-body .table-scroll:hover,
+.super-dashboard-body .table-scroll:hover,
+.admin-dashboard-body .master-overview-grid .overview-card:hover,
+.super-dashboard-body .master-overview-grid .overview-card:hover {
+  transform: translateY(-3px) !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.22), 0 0 10px rgba(56, 189, 248, 0.12) !important;
+}
+/* Completely remove fills, outlines, and borders from dashboard module containers */
+.admin-dashboard-body .card, .super-dashboard-body .card,
+.admin-dashboard-body .service-card, .super-dashboard-body .service-card,
+.admin-dashboard-body .booking-card, .super-dashboard-body .booking-card,
+.admin-dashboard-body .customer-card, .super-dashboard-body .customer-card,
+.admin-dashboard-body .report-card, .super-dashboard-body .report-card,
+.admin-dashboard-body .pos-card, .super-dashboard-body .pos-card,
+.admin-dashboard-body .notification-card, .super-dashboard-body .notification-card,
+.admin-dashboard-body .dashboard-module-box, .super-dashboard-body .dashboard-module-box,
+.admin-dashboard-body .table-responsive, .super-dashboard-body .table-responsive,
+.admin-dashboard-body .table-responsive-container, .super-dashboard-body .table-responsive-container,
+.admin-dashboard-body .overview-card, .super-dashboard-body .overview-card,
+.admin-dashboard-body .filter-card, .super-dashboard-body .filter-card,
+.admin-dashboard-body .panel-container, .super-dashboard-body .panel-container,
+.admin-dashboard-body .panel, .super-dashboard-body .panel,
+.admin-dashboard-body .tool-card, .super-dashboard-body .tool-card,
+.admin-dashboard-body .admin-card-container, .super-dashboard-body .admin-card-container,
+.admin-dashboard-body .inquiries-card-container, .super-dashboard-body .inquiries-card-container,
+.admin-dashboard-body .customer-records-card-container, .super-dashboard-body .customer-records-card-container,
+.admin-dashboard-body .reports-card-container, .super-dashboard-body .reports-card-container,
+.admin-dashboard-body .pos-card-container, .super-dashboard-body .pos-card-container,
+.admin-dashboard-body .notifications-card-container, .super-dashboard-body .notifications-card-container,
+.admin-dashboard-body .system-card-container, .super-dashboard-body .system-card-container,
+.admin-dashboard-body .table-scroll, .super-dashboard-body .table-scroll,
+.admin-dashboard-body .report-history-scroll-wrapper, .super-dashboard-body .report-history-scroll-wrapper,
+.admin-dashboard-body .booking-item-row, .super-dashboard-body .booking-item-row,
+.admin-dashboard-body .pos-main-row, .super-dashboard-body .pos-main-row,
+.admin-dashboard-body .notification-list-item, .super-dashboard-body .notification-list-item {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Keep the subtle lift and ambient blue glow, without adding solid borders. */
+.admin-dashboard-body .card:hover, .super-dashboard-body .card:hover,
+.admin-dashboard-body .service-card:hover, .super-dashboard-body .service-card:hover,
+.admin-dashboard-body .booking-card:hover, .super-dashboard-body .booking-card:hover,
+.admin-dashboard-body .customer-card:hover, .super-dashboard-body .customer-card:hover,
+.admin-dashboard-body .report-card:hover, .super-dashboard-body .report-card:hover,
+.admin-dashboard-body .pos-card:hover, .super-dashboard-body .pos-card:hover,
+.admin-dashboard-body .notification-card:hover, .super-dashboard-body .notification-card:hover,
+.admin-dashboard-body .dashboard-module-box:hover, .super-dashboard-body .dashboard-module-box:hover,
+.admin-dashboard-body .overview-card:hover, .super-dashboard-body .overview-card:hover,
+.admin-dashboard-body .panel:hover, .super-dashboard-body .panel:hover,
+.admin-dashboard-body .tool-card:hover, .super-dashboard-body .tool-card:hover,
+.admin-dashboard-body .admin-card-container:hover, .super-dashboard-body .admin-card-container:hover,
+.admin-dashboard-body .inquiries-card-container:hover, .super-dashboard-body .inquiries-card-container:hover,
+.admin-dashboard-body .customer-records-card-container:hover, .super-dashboard-body .customer-records-card-container:hover,
+.admin-dashboard-body .reports-card-container:hover, .super-dashboard-body .reports-card-container:hover,
+.admin-dashboard-body .pos-card-container:hover, .super-dashboard-body .pos-card-container:hover,
+.admin-dashboard-body .notifications-card-container:hover, .super-dashboard-body .notifications-card-container:hover,
+.admin-dashboard-body .system-card-container:hover, .super-dashboard-body .system-card-container:hover,
+.admin-dashboard-body .table-scroll:hover, .super-dashboard-body .table-scroll:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  transform: translateY(-3px) !important;
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.22), 0 0 10px rgba(56, 189, 248, 0.12) !important;
+}
+/* Prevent white outline flashing on hover/focus across dashboard containers */
+.admin-dashboard-body .overview-card, .super-dashboard-body .overview-card,
+.admin-dashboard-body .card, .super-dashboard-body .card,
+.admin-dashboard-body .service-card, .super-dashboard-body .service-card,
+.admin-dashboard-body .tool-card, .super-dashboard-body .tool-card,
+.admin-dashboard-body .booking-card, .super-dashboard-body .booking-card,
+.admin-dashboard-body .booking-item-row, .super-dashboard-body .booking-item-row,
+.admin-dashboard-body .customer-card, .super-dashboard-body .customer-card,
+.admin-dashboard-body .customer-records-card-container, .super-dashboard-body .customer-records-card-container,
+.admin-dashboard-body .report-card, .super-dashboard-body .report-card,
+.admin-dashboard-body .reports-card-container, .super-dashboard-body .reports-card-container,
+.admin-dashboard-body .pos-card, .super-dashboard-body .pos-card,
+.admin-dashboard-body .pos-card-container, .super-dashboard-body .pos-card-container,
+.admin-dashboard-body .notification-card, .super-dashboard-body .notification-card,
+.admin-dashboard-body .notifications-card-container, .super-dashboard-body .notifications-card-container,
+.admin-dashboard-body .inquiries-card-container, .super-dashboard-body .inquiries-card-container,
+.admin-dashboard-body .system-card-container, .super-dashboard-body .system-card-container,
+.admin-dashboard-body .dashboard-module-box, .super-dashboard-body .dashboard-module-box,
+.admin-dashboard-body .panel, .super-dashboard-body .panel,
+.admin-dashboard-body .panel-container, .super-dashboard-body .panel-container,
+.admin-dashboard-body .admin-card-container, .super-dashboard-body .admin-card-container,
+.admin-dashboard-body .table-responsive, .super-dashboard-body .table-responsive,
+.admin-dashboard-body .table-responsive-container, .super-dashboard-body .table-responsive-container,
+.admin-dashboard-body .table-scroll, .super-dashboard-body .table-scroll,
+.admin-dashboard-body .report-history-scroll-wrapper, .super-dashboard-body .report-history-scroll-wrapper,
+.admin-dashboard-body .filter-card, .super-dashboard-body .filter-card {
+  outline: none !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.admin-dashboard-body .overview-card:hover, .super-dashboard-body .overview-card:hover,
+.admin-dashboard-body .overview-card:focus, .super-dashboard-body .overview-card:focus,
+.admin-dashboard-body .overview-card:active, .super-dashboard-body .overview-card:active,
+.admin-dashboard-body .card:hover, .super-dashboard-body .card:hover,
+.admin-dashboard-body .card:focus, .super-dashboard-body .card:focus,
+.admin-dashboard-body .card:active, .super-dashboard-body .card:active,
+.admin-dashboard-body .service-card:hover, .super-dashboard-body .service-card:hover,
+.admin-dashboard-body .service-card:focus, .super-dashboard-body .service-card:focus,
+.admin-dashboard-body .service-card:active, .super-dashboard-body .service-card:active,
+.admin-dashboard-body .tool-card:hover, .super-dashboard-body .tool-card:hover,
+.admin-dashboard-body .tool-card:focus, .super-dashboard-body .tool-card:focus,
+.admin-dashboard-body .tool-card:active, .super-dashboard-body .tool-card:active,
+.admin-dashboard-body .booking-card:hover, .super-dashboard-body .booking-card:hover,
+.admin-dashboard-body .booking-item-row:hover, .super-dashboard-body .booking-item-row:hover,
+.admin-dashboard-body .booking-item-row:focus, .super-dashboard-body .booking-item-row:focus,
+.admin-dashboard-body .booking-item-row:active, .super-dashboard-body .booking-item-row:active,
+.admin-dashboard-body .customer-card:hover, .super-dashboard-body .customer-card:hover,
+.admin-dashboard-body .report-card:hover, .super-dashboard-body .report-card:hover,
+.admin-dashboard-body .pos-card:hover, .super-dashboard-body .pos-card:hover,
+.admin-dashboard-body .notification-card:hover, .super-dashboard-body .notification-card:hover,
+.admin-dashboard-body .dashboard-module-box:hover, .super-dashboard-body .dashboard-module-box:hover,
+.admin-dashboard-body .panel:hover, .super-dashboard-body .panel:hover,
+.admin-dashboard-body .panel:focus, .super-dashboard-body .panel:focus,
+.admin-dashboard-body .panel:active, .super-dashboard-body .panel:active,
+.admin-dashboard-body .admin-card-container:hover, .super-dashboard-body .admin-card-container:hover,
+.admin-dashboard-body .table-responsive:hover, .super-dashboard-body .table-responsive:hover,
+.admin-dashboard-body .table-responsive-container:hover, .super-dashboard-body .table-responsive-container:hover,
+.admin-dashboard-body .table-scroll:hover, .super-dashboard-body .table-scroll:hover,
+.admin-dashboard-body .report-history-scroll-wrapper:hover, .super-dashboard-body .report-history-scroll-wrapper:hover,
+.admin-dashboard-body .booking-item-row:focus-visible, .super-dashboard-body .booking-item-row:focus-visible,
+.admin-dashboard-body .account-summary-row:focus-visible, .super-dashboard-body .account-summary-row:focus-visible {
+  outline: none !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.25) !important;
+}
+/* Global Flash Fix for Overview Widgets */
+.overview-card,
+.overview-card * {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+.overview-card {
+  background: transparent !important;
+  border: 0px solid transparent !important;
+  outline: 0px solid transparent !important;
+  box-shadow: none !important;
+  transition: transform 0.25s ease, box-shadow 0.25s ease !important;
+}
+.overview-card:hover,
+.overview-card:focus,
+.overview-card:active,
+.overview-card:focus-visible {
+  background: transparent !important;
+  border: 0px solid transparent !important;
+  outline: 0px solid transparent !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.25) !important;
+}
+/* Final transparent surfaces for all dashboard sub-pages and module contents */
+.admin-dashboard-body #services-section, .super-dashboard-body #services-section,
+.admin-dashboard-body #bookings-section, .super-dashboard-body #bookings-section,
+.admin-dashboard-body #inquiries-section, .super-dashboard-body #inquiries-section,
+.admin-dashboard-body #customers-section, .super-dashboard-body #customers-section,
+.admin-dashboard-body #reports-section, .super-dashboard-body #reports-section,
+.admin-dashboard-body #pos-section, .super-dashboard-body #pos-section,
+.admin-dashboard-body #notifications-section, .super-dashboard-body #notifications-section,
+.admin-dashboard-body #services-view, .super-dashboard-body #services-view,
+.admin-dashboard-body #bookings-view, .super-dashboard-body #bookings-view,
+.admin-dashboard-body #customers-view, .super-dashboard-body #customers-view,
+.admin-dashboard-body #reports-view, .super-dashboard-body #reports-view,
+.admin-dashboard-body #pos-transactions-view, .super-dashboard-body #pos-transactions-view,
+.admin-dashboard-body #notifications-view, .super-dashboard-body #notifications-view,
+.admin-dashboard-body .main-content-wrapper, .super-dashboard-body .main-content-wrapper,
+.admin-dashboard-body .section-container, .super-dashboard-body .section-container,
+.admin-dashboard-body .main-content-card, .super-dashboard-body .main-content-card,
+.admin-dashboard-body .subpage-container, .super-dashboard-body .subpage-container,
+.admin-dashboard-body .panel, .super-dashboard-body .panel,
+.admin-dashboard-body .panel-container, .super-dashboard-body .panel-container,
+.admin-dashboard-body .services-container-card, .super-dashboard-body .services-container-card,
+.admin-dashboard-body .super-booking-panel, .super-dashboard-body .super-booking-panel,
+.admin-dashboard-body .inquiries-card-container, .super-dashboard-body .inquiries-card-container,
+.admin-dashboard-body .customer-records-card-container, .super-dashboard-body .customer-records-card-container,
+.admin-dashboard-body .reports-card-container, .super-dashboard-body .reports-card-container,
+.admin-dashboard-body .pos-card-container, .super-dashboard-body .pos-card-container,
+.admin-dashboard-body .notifications-card-container, .super-dashboard-body .notifications-card-container,
+.admin-dashboard-body .system-card-container, .super-dashboard-body .system-card-container,
+.admin-dashboard-body .card, .super-dashboard-body .card,
+.admin-dashboard-body .service-card, .super-dashboard-body .service-card,
+.admin-dashboard-body .tool-card, .super-dashboard-body .tool-card,
+.admin-dashboard-body .service-card-item, .super-dashboard-body .service-card-item,
+.admin-dashboard-body .booking-card, .super-dashboard-body .booking-card,
+.admin-dashboard-body .booking-item-row, .super-dashboard-body .booking-item-row,
+.admin-dashboard-body .customer-card, .super-dashboard-body .customer-card,
+.admin-dashboard-body .report-card, .super-dashboard-body .report-card,
+.admin-dashboard-body .pos-card, .super-dashboard-body .pos-card,
+.admin-dashboard-body .notification-card, .super-dashboard-body .notification-card,
+.admin-dashboard-body .dashboard-module-box, .super-dashboard-body .dashboard-module-box,
+.admin-dashboard-body .filter-card, .super-dashboard-body .filter-card,
+.admin-dashboard-body .table-responsive, .super-dashboard-body .table-responsive,
+.admin-dashboard-body .table-responsive-container, .super-dashboard-body .table-responsive-container,
+.admin-dashboard-body .table-scroll, .super-dashboard-body .table-scroll,
+.admin-dashboard-body .report-history-scroll-wrapper, .super-dashboard-body .report-history-scroll-wrapper,
+.admin-dashboard-body .overview-card, .super-dashboard-body .overview-card,
+.admin-dashboard-body .report-history-row-item, .super-dashboard-body .report-history-row-item,
+.admin-dashboard-body .notification-list-item, .super-dashboard-body .notification-list-item,
+.admin-dashboard-body .pos-main-row, .super-dashboard-body .pos-main-row,
+.admin-dashboard-body .pos-accordion-panel, .super-dashboard-body .pos-accordion-panel,
+.admin-dashboard-body #inquiryResults tr, .super-dashboard-body #inquiryResults tr,
+.admin-dashboard-body #customerResults tr, .super-dashboard-body #customerResults tr,
+.admin-dashboard-body #posMonitoring .pos-main-row > td, .super-dashboard-body #posMonitoring .pos-main-row > td {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-body #services-section:hover, .super-dashboard-body #services-section:hover,
+.admin-dashboard-body #bookings-section:hover, .super-dashboard-body #bookings-section:hover,
+.admin-dashboard-body #inquiries-section:hover, .super-dashboard-body #inquiries-section:hover,
+.admin-dashboard-body #customers-section:hover, .super-dashboard-body #customers-section:hover,
+.admin-dashboard-body #reports-section:hover, .super-dashboard-body #reports-section:hover,
+.admin-dashboard-body #pos-section:hover, .super-dashboard-body #pos-section:hover,
+.admin-dashboard-body #notifications-section:hover, .super-dashboard-body #notifications-section:hover,
+.admin-dashboard-body .section-container:hover, .super-dashboard-body .section-container:hover,
+.admin-dashboard-body .panel:hover, .super-dashboard-body .panel:hover,
+.admin-dashboard-body .tool-card:hover, .super-dashboard-body .tool-card:hover,
+.admin-dashboard-body .service-card-item:hover, .super-dashboard-body .service-card-item:hover,
+.admin-dashboard-body .booking-item-row:hover, .super-dashboard-body .booking-item-row:hover,
+.admin-dashboard-body .customer-records-card-container:hover, .super-dashboard-body .customer-records-card-container:hover,
+.admin-dashboard-body .inquiries-card-container:hover, .super-dashboard-body .inquiries-card-container:hover,
+.admin-dashboard-body .reports-card-container:hover, .super-dashboard-body .reports-card-container:hover,
+.admin-dashboard-body .pos-card-container:hover, .super-dashboard-body .pos-card-container:hover,
+.admin-dashboard-body .notifications-card-container:hover, .super-dashboard-body .notifications-card-container:hover,
+.admin-dashboard-body .overview-card:hover, .super-dashboard-body .overview-card:hover,
+.admin-dashboard-body .pos-main-row:hover, .super-dashboard-body .pos-main-row:hover,
+.admin-dashboard-body .notification-list-item:hover, .super-dashboard-body .notification-list-item:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, .18) !important;
+}
+/* High-specificity transparency overrides for the actual dashboard sub-page modules */
+body.admin-dashboard-body #services-view .services-container-card,
+body.super-dashboard-body #services-view .services-container-card,
+body.admin-dashboard-body #bookings-view #bookingManagement,
+body.super-dashboard-body #bookings-view #bookingManagement,
+body.admin-dashboard-body #customers-view #inquiryManagement,
+body.super-dashboard-body #customers-view #inquiryManagement,
+body.admin-dashboard-body #customers-view #customerManagement,
+body.super-dashboard-body #customers-view #customerManagement,
+body.admin-dashboard-body #reports-view #reportManagement,
+body.super-dashboard-body #reports-view #reportManagement,
+body.admin-dashboard-body #pos-transactions-view #posMonitoring,
+body.super-dashboard-body #pos-transactions-view #posMonitoring,
+body.admin-dashboard-body #notifications-view .notifications-card-container,
+body.super-dashboard-body #notifications-view .notifications-card-container,
+body.admin-dashboard-body .admin-dashboard-view > .panel,
+body.super-dashboard-body .super-dashboard-view > .panel {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+body.admin-dashboard-body #services-view .tool-card,
+body.admin-dashboard-body #services-view .service-card-item,
+body.super-dashboard-body #services-view .tool-card,
+body.super-dashboard-body #services-view .service-card-item {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid rgba(255, 255, 255, .08) !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: transform .25s ease, box-shadow .25s ease !important;
+}
+body.admin-dashboard-body #services-view .tool-card:hover,
+body.admin-dashboard-body #services-view .service-card-item:hover,
+body.super-dashboard-body #services-view .tool-card:hover,
+body.super-dashboard-body #services-view .service-card-item:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  outline: none !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, .25) !important;
+}
+
+body.admin-dashboard-body #bookings-view #bookingResults,
+body.super-dashboard-body #bookings-view #bookingResults,
+body.admin-dashboard-body #customers-view .table-scroll,
+body.super-dashboard-body #customers-view .table-scroll,
+body.admin-dashboard-body #customers-view .inquiries-card-container table,
+body.super-dashboard-body #customers-view .inquiries-card-container table,
+body.admin-dashboard-body #reports-view #reportHistory,
+body.super-dashboard-body #reports-view #reportHistory,
+body.admin-dashboard-body #reports-view .report-history-scroll-wrapper,
+body.super-dashboard-body #reports-view .report-history-scroll-wrapper,
+body.admin-dashboard-body #pos-transactions-view .pos-table-scroll,
+body.super-dashboard-body #pos-transactions-view .pos-table-scroll,
+body.admin-dashboard-body #notifications-view .notification-list,
+body.super-dashboard-body #notifications-view .notification-list,
+body.admin-dashboard-body #notifications-view .notification-list-item,
+body.super-dashboard-body #notifications-view .notification-list-item {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Keep the real dashboard module panels transparent in every state. */
+body.admin-dashboard-body #serviceManagement,
+body.super-dashboard-body #serviceManagement,
+body.admin-dashboard-body #bookingManagement,
+body.super-dashboard-body #bookingManagement,
+body.admin-dashboard-body #inquiryManagement,
+body.super-dashboard-body #inquiryManagement,
+body.admin-dashboard-body #customerManagement,
+body.super-dashboard-body #customerManagement,
+body.admin-dashboard-body #reportManagement,
+body.super-dashboard-body #reportManagement,
+body.admin-dashboard-body #posMonitoring,
+body.super-dashboard-body #posMonitoring,
+body.admin-dashboard-body #notifications-view .notifications-card-container,
+body.super-dashboard-body #notifications-view .notifications-card-container {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: transform .25s ease, box-shadow .25s ease !important;
+}
+
+body.admin-dashboard-body #serviceManagement:hover,
+body.super-dashboard-body #serviceManagement:hover,
+body.admin-dashboard-body #bookingManagement:hover,
+body.super-dashboard-body #bookingManagement:hover,
+body.admin-dashboard-body #inquiryManagement:hover,
+body.super-dashboard-body #inquiryManagement:hover,
+body.admin-dashboard-body #customerManagement:hover,
+body.super-dashboard-body #customerManagement:hover,
+body.admin-dashboard-body #reportManagement:hover,
+body.super-dashboard-body #reportManagement:hover,
+body.admin-dashboard-body #posMonitoring:hover,
+body.super-dashboard-body #posMonitoring:hover,
+body.admin-dashboard-body #notifications-view .notifications-card-container:hover,
+body.super-dashboard-body #notifications-view .notifications-card-container:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, .25) !important;
+}
+
+body.admin-dashboard-body #bookingResults,
+body.super-dashboard-body #bookingResults,
+body.admin-dashboard-body #inquiryManagement .table-scroll,
+body.super-dashboard-body #inquiryManagement .table-scroll,
+body.admin-dashboard-body #customerManagement .table-scroll,
+body.super-dashboard-body #customerManagement .table-scroll,
+body.admin-dashboard-body #reportManagement #reportHistory,
+body.super-dashboard-body #reportManagement #reportHistory,
+body.admin-dashboard-body #posMonitoring .table-scroll,
+body.super-dashboard-body #posMonitoring .table-scroll,
+body.admin-dashboard-body #notificationResults,
+body.super-dashboard-body #notificationResults,
+body.admin-dashboard-body #inquiryManagement table,
+body.super-dashboard-body #inquiryManagement table,
+body.admin-dashboard-body #customerManagement table,
+body.super-dashboard-body #customerManagement table,
+body.admin-dashboard-body #posMonitoring table,
+body.super-dashboard-body #posMonitoring table {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Consistent spacing and separators for overview service rows. */
+.overview-service-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100%;
+  box-sizing: border-box;
+  padding-block: 12px !important;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, .1) !important;
+}
+
+/* Reveal service management actions when a service card is hovered. */
+.service-card .service-actions,
+.service-card .btn-edit-service,
+.service-card .btn-remove-service,
+.service-item-card .card-actions,
+.service-card-item .service-card-actions,
+.service-card-item .btn-service-toggle-edit,
+.service-card-item .btn-service-remove {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity .25s ease, visibility .25s ease !important;
+}
+
+.service-card:hover .service-actions,
+.service-card:hover .btn-edit-service,
+.service-card:hover .btn-remove-service,
+.service-item-card:hover .card-actions,
+.service-card-item:hover .service-card-actions,
+.service-card-item:hover .btn-service-toggle-edit,
+.service-card-item:hover .btn-service-remove {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+@media (hover: none) {
+  .service-card .service-actions,
+  .service-card .btn-edit-service,
+  .service-card .btn-remove-service,
+  .service-item-card .card-actions,
+  .service-card-item .service-card-actions,
+  .service-card-item .btn-service-toggle-edit,
+  .service-card-item .btn-service-remove {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+}
+
+/* Clickable, text-only notification rows and their booking detail dialog. */
+.overview-notification-row { cursor: pointer; }
+.overview-notification-row:focus-visible { outline: none !important; box-shadow: 0 0 20px rgba(56,189,248,.25) !important; }
+.notification-detail-modal {
+  width: min(680px, calc(100vw - 32px)); max-height: min(80vh, 760px); overflow-y: auto;
+  padding: 24px; border: 1px solid rgba(255,255,255,.16); border-radius: 16px;
+  background: #0b1530; color: #fff; box-shadow: 0 18px 60px rgba(0,0,0,.45);
+}
+.notification-detail-modal::backdrop { background: rgba(2,6,23,.72); }
+.notification-detail-modal h2 { margin: 4px 0 20px; color: #fff; font-size: 1.2rem; }
+.notification-detail-modal dl { display: grid; grid-template-columns: minmax(150px,.7fr) minmax(0,1.3fr); gap: 10px 18px; margin: 0; }
+.notification-detail-modal dt { color: rgba(255,255,255,.65); }
+.notification-detail-modal dd { margin: 0; color: #fff; overflow-wrap: anywhere; }
+.notification-detail-close { display: block; margin-left: auto; padding: 7px 14px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: transparent; color: #fff; cursor: pointer; }
+@media (max-width: 560px) {
+  .notification-detail-modal dl { grid-template-columns: 1fr; gap: 4px; }
+  .notification-detail-modal dd { margin-bottom: 10px; }
+}
+
+/* Customer dashboard surfaces and scrolling utilities (also mirrored in its loaded stylesheet). */
+body.customer-dashboard-page .customer-card,
+body.customer-dashboard-page .customer-summary-card,
+body.customer-dashboard-page .bills-card-wrapper,
+body.customer-dashboard-page .bookings-card-wrapper,
+body.customer-dashboard-page .customer-bills > .form-card,
+body.customer-dashboard-page .customer-bookings-card {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: transform .25s ease, box-shadow .25s ease !important;
+}
+
+body.customer-dashboard-page .customer-summary-card:hover,
+body.customer-dashboard-page .bills-card-wrapper:hover,
+body.customer-dashboard-page .bookings-card-wrapper:hover,
+body.customer-dashboard-page .customer-bills > .form-card:hover,
+body.customer-dashboard-page .customer-bookings-card:hover {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, .25) !important;
+}
+
+body.customer-dashboard-page .expanded-bill-box,
+body.customer-dashboard-page .expanded-bill-details,
+body.customer-dashboard-page .bill-breakdown-panel,
+body.customer-dashboard-page .booking-details-panel {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+body.customer-dashboard-page .customer-container,
+body.customer-dashboard-page .customer-card,
+body.customer-dashboard-page .customer-dashboard-content,
+body.customer-dashboard-page .customer-summary-list,
+body.customer-dashboard-page .bills-list-container,
+body.customer-dashboard-page .bookings-list-container,
+body.customer-dashboard-page .customer-bookings-list,
+body.customer-dashboard-page .customer-notification-list,
+body.customer-dashboard-page .running-bills-container,
+body.customer-dashboard-page .expanded-bill-details,
+body.customer-dashboard-page .bill-breakdown-panel,
+body.customer-dashboard-page div[style*="overflow"] {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+body.customer-dashboard-page .customer-container::-webkit-scrollbar,
+body.customer-dashboard-page .customer-card::-webkit-scrollbar,
+body.customer-dashboard-page .customer-dashboard-content::-webkit-scrollbar,
+body.customer-dashboard-page .customer-summary-list::-webkit-scrollbar,
+body.customer-dashboard-page .bills-list-container::-webkit-scrollbar,
+body.customer-dashboard-page .bookings-list-container::-webkit-scrollbar,
+body.customer-dashboard-page .customer-bookings-list::-webkit-scrollbar,
+body.customer-dashboard-page .customer-notification-list::-webkit-scrollbar,
+body.customer-dashboard-page .running-bills-container::-webkit-scrollbar,
+body.customer-dashboard-page .expanded-bill-details::-webkit-scrollbar,
+body.customer-dashboard-page .bill-breakdown-panel::-webkit-scrollbar,
+body.customer-dashboard-page div[style*="overflow"]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+.pagination-bottom-right-wrapper {
+  display: flex !important;
+  justify-content: flex-end !important;
+  align-items: center !important;
+  width: 100% !important;
+  float: none !important;
+  box-sizing: border-box;
+}
+
+#notifications-pagination,
+#account-pagination {
+  display: block !important;
+  width: 100% !important;
+}
+
+.pagination-bottom-right-wrapper .pagination-circle-btn {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  flex: 0 0 32px !important;
+  box-sizing: border-box !important;
+  border-radius: 50% !important;
+  line-height: 1 !important;
+}
+
+.pagination-bottom-right-wrapper .pagination-circle-btn > span {
+  display: inline-block;
+  line-height: 1 !important;
+  overflow: visible;
+}
+
+/* Glassmorphic Login and Registration cards */
+.login-public .login-card,
+.login-public .auth-card,
+.register-public .auth-card {
+  background:rgba(11,25,44,.65)!important;
+  backdrop-filter:blur(12px)!important;
+  -webkit-backdrop-filter:blur(12px)!important;
+  border:1px solid rgba(255,255,255,.18)!important;
+  border-radius:24px!important;
+  padding:2.5rem!important;
+  box-shadow:0 10px 30px rgba(0,0,0,.45),inset 0 0 15px rgba(255,255,255,.05)!important;
+  color:#fff!important;
+  transition:all .3s ease!important;
+}
+.login-public .auth-card input,
+.register-public .auth-card input,
+.login-public .auth-card .form-control,
+.register-public .auth-card .form-control {
+  background:rgba(240,246,255,.92)!important;
+  border:1px solid rgba(255,255,255,.3)!important;
+  color:#0b1329!important;
+  font-weight:500!important;
+}
+.login-public .auth-card input:focus,
+.register-public .auth-card input:focus,
+.login-public .auth-card .form-control:focus,
+.register-public .auth-card .form-control:focus {
+  background:#fff!important;
+  border-color:#38bdf8!important;
+  box-shadow:0 0 12px rgba(56,189,248,.4)!important;
+}

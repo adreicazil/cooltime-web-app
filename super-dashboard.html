@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>CoolTime | Super Admin Dashboard</title>
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/admin-tools.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <script src="js/toast.js"></script>
+  <script src="js/security-validator.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&amp;display=swap" rel="stylesheet">
+</head>
+<body class="super-dashboard-body" data-required-role="super_admin" data-super-admin-dashboard="true"><div class="dashboard-shell super-dashboard-shell" hidden>
+<header class="dashboard-auth-header top-header" aria-label="CoolTime site navigation">
+      <div class="dashboard-auth-brand"><a class="logo header-logo" href="index.html" aria-label="CoolTime home"><img class="brand-logo-image" src="assets/images/transparentwhite.png" alt="CoolTime"></a><p class="tagline header-tagline">"WE KEEP YOU COOL ON THE ROAD"</p></div>
+            <nav class="dashboard-auth-nav" aria-label="Main navigation">
+        <div class="nav-links-left public-nav-tabs">
+          <a href="index.html">Home</a>
+          <a href="about.html">About Us</a>
+          <a href="services.html">Services</a>
+          <a href="contact.html">Contact Us</a>
+          <a href="feedback.html">Feedback/Report</a>
+        </div>
+        <div class="nav-links-right">
+          <a href="super-dashboard.html#home" class="active">My Dashboard</a>
+          <button class="btn-logout" type="button" data-dashboard-header-logout>Log out</button>
+        </div>
+      </nav>
+    </header>
+    <aside class="sidebar super-admin-sidebar">
+      <p class="super-sidebar-section-title">Main</p>
+      <nav class="side-nav super-side-nav" aria-label="Super admin navigation" role="tablist" aria-orientation="vertical">
+        <a class="active" href="#home" data-dashboard-view-link="home" role="tab" aria-selected="true" aria-controls="view-home"><img src="assets/images/homesymbol3_2.png" alt="">Home</a>
+        <a href="#services" data-dashboard-view-link="services" role="tab" aria-selected="false" aria-controls="services-view"><img src="assets/images/service3_2.png" alt="">Services</a>
+        <a href="#bookings" data-dashboard-view-link="bookings" role="tab" aria-selected="false" aria-controls="bookings-view"><img src="assets/images/bookings3_2.png" alt="">Bookings</a>
+        <a href="#customers" data-dashboard-view-link="customers" role="tab" aria-selected="false" aria-controls="customers-view"><img src="assets/images/customers.png" alt="Customers and Admins">Customers and Admins</a>
+        <a href="#reports" data-dashboard-view-link="reports" role="tab" aria-selected="false" aria-controls="reports-view"><img src="assets/images/report3_2.png" alt="">Reports</a>
+        <a href="#pos-transactions" data-dashboard-view-link="pos-transactions" role="tab" aria-selected="false" aria-controls="pos-transactions-view"><img src="assets/images/pos3_2.png" alt="">POS Transactions</a>
+        <a href="#notifications" data-dashboard-view-link="notifications" role="tab" aria-selected="false" aria-controls="notifications-view"><img src="assets/images/notifications_2.png" alt="">Notifications</a>
+        <a href="#system-view" id="nav-system" data-dashboard-view-link="system-view" role="tab" aria-selected="false" aria-controls="system-view"><img src="assets/images/icons/system.png" alt="" class="nav-icon">System</a>
+      </nav>
+      <div class="super-sidebar-bottom">
+        <a id="logoutBtn" href="super-admin.html"><img src="assets/images/logout3_2.png" alt="">Log out</a>
+        <small>&copy; 2026 CoolTime. All rights reserved.</small>
+      </div>
+    </aside>
+    <main class="dashboard-main super-dashboard-main" id="superDashboardMain">
+      <section class="super-dashboard-view is-active" id="view-home" data-dashboard-view="home" role="tabpanel" aria-label="Dashboard overview">
+        <div class="dashboard-greeting">
+          <div class="dashboard-greeting-label">SUPER ADMIN</div>
+          <h1>Hello <span id="superadmin-username-display">User</span></h1>
+        </div>
+        <div class="metric-grid super-metrics" aria-label="Dashboard overview">
+          <article class="metric-card superadmin-metric-card"><span>Total Bookings</span><strong class="superadmin-metric-value" data-metric="bookings">Loading...</strong><small>All appointment records</small></article>
+          <article class="metric-card superadmin-metric-card"><span>Total Customers</span><strong class="superadmin-metric-value" data-metric="customers">Loading...</strong><small>Customer accounts</small></article>
+          <article class="metric-card superadmin-metric-card"><span>Total Accounts</span><strong class="superadmin-metric-value" data-metric="accounts">Loading...</strong><small>Registered users</small></article>
+          <article class="metric-card superadmin-metric-card"><span>Vehicles</span><strong class="superadmin-metric-value" data-metric="vehicles">Loading...</strong><small>Customer vehicles</small></article>
+          <article class="metric-card superadmin-metric-card"><span>Today's Sales</span><strong class="superadmin-metric-value" data-metric="todaySales">PHP 0.00</strong><small>Payments received today</small></article>
+          <article class="metric-card superadmin-metric-card"><span>Branches</span><strong class="superadmin-metric-value">2</strong><small>Cabuyao and Santa Rosa</small></article>
+        </div>
+        <!-- MASTER DASHBOARD MONITORING OVERVIEW -->
+        <section class="master-overview-container" aria-labelledby="masterOverviewTitle">
+          <h3 class="overview-section-title mb-4" id="masterOverviewTitle" style="color: #ffffff; font-weight: 400 !important; font-size: 1.35rem; letter-spacing: 0.5px;">Overview</h3>
+          <div class="master-overview-grid">
+            <article class="overview-card overview-reports-card">
+              <header class="overview-analytics-header">
+                <h5 class="overview-card-label m-0">Analytics &amp; Reports Summary</h5>
+                <div class="overview-metric-control">
+                  <button class="overview-metric-toggle" type="button" id="changeMetricBtn" aria-expanded="false" aria-controls="overviewMetricMenu">Change Analytics View</button>
+                  <div class="overview-metric-menu" id="overviewMetricMenu" role="menu" hidden>
+                    <button type="button" class="metric-opt" role="menuitem" data-metric="bookings">Bookings Analytics</button>
+                    <button type="button" class="metric-opt" role="menuitem" data-metric="inquiries">Customer Inquiries</button>
+                    <button type="button" class="metric-opt" role="menuitem" data-metric="feedback">Customer Feedback</button>
+                    <button type="button" class="metric-opt" role="menuitem" data-metric="sales">Sales Analytics (PHP)</button>
+                  </div>
+                </div>
+              </header>
+              <div class="overview-report-layout">
+                <div class="overview-report-chart">
+                  <div class="overview-report-visual"><canvas id="overviewMiniChart" role="img" aria-label="Bookings created each day over the past seven days"></canvas></div>
+                </div>
+                <div class="overview-report-history">
+                  <div id="overview-recent-reports-log" class="overview-scrollable-body overview-recent-reports" role="region" aria-label="Recent generated reports" aria-live="polite"><p class="overview-empty">Loading report history…</p></div>
+                </div>
+              </div>
+            </article>
+            <article class="overview-card overview-bookings-card">
+              <header><h5 class="overview-card-label">Recent Bookings</h5></header>
+              <div class="overview-scrollable-body" id="overview-bookings-list" aria-live="polite"><p class="overview-empty">Loading bookings…</p></div>
+            </article>
+            <article class="overview-card overview-services-card">
+              <header><h5 class="overview-card-label">Active Services</h5></header>
+              <div class="overview-scrollable-body" id="overview-services-list" aria-live="polite"><p class="overview-empty">Loading services…</p></div>
+            </article>
+            <article class="overview-card overview-inquiries-card">
+              <header><h5 class="overview-card-label">Recent Inquiries</h5></header>
+              <div class="overview-scrollable-body" id="overview-inquiries-list" aria-live="polite"><p class="overview-empty">Loading inquiries…</p></div>
+            </article>
+            <article class="overview-card overview-notifications-card">
+              <header><h5 class="overview-card-label">Notifications &amp; Activity</h5></header>
+              <div class="overview-scrollable-body" id="overview-notifications-list" aria-live="polite"><p class="overview-empty">Loading notifications…</p></div>
+            </article>
+          </div>
+        </section>
+      </section>
+      <section class="super-dashboard-view" id="services-view" data-dashboard-view="services" role="tabpanel" aria-label="Dashboard view" hidden>
+        <section class="panel services-container-card super-admin-services-card" id="serviceManagement"><div class="services-header"><div class="section-header-block" style="margin-bottom:20px"><h2 style="font-size:1.75rem;font-weight:800;color:#ffffff;margin:0;line-height:1.2">Services management</h2><p id="services-subtitle-text" style="font-size:0.875rem !important;font-weight:400 !important;color:rgba(255, 255, 255, 0.75) !important;margin-top:6px !important;margin-bottom:0 !important;line-height:1.4 !important;opacity:0.9 !important">Edit, add or remove your services</p></div><button id="createServiceToggle" class="btn-trigger-create-service" type="button" aria-expanded="false" aria-controls="createServiceAccordion">Create a new service</button></div><div id="createServiceAccordion" class="create-service-accordion"><form id="serviceForm" class="tool-form"><div class="create-service-form-body"><div class="create-service-left-inputs"><input name="id" placeholder="ID (blank to create)"><input name="name" placeholder="Service name" required><input name="price" type="number" min="0.01" step="0.01" placeholder="PHP 0.00" required><input name="duration" placeholder="Duration"></div><div class="create-service-right-inputs"><textarea class="service-description-field" name="description" placeholder="Description"></textarea></div></div><div class="create-service-actions-row"><button id="cancelServiceEdit" class="btn-cancel-service" type="button">Cancel</button><button class="btn-save-service" type="submit">Save service</button></div><output></output></form></div><div class="services-search-bar"><input type="text" id="service-search-input" placeholder="Search service..." class="form-control"></div><div id="serviceResults" class="tool-cards services-cards-grid"></div></section>
+      </section>
+      <section class="super-dashboard-view" id="bookings-view" data-dashboard-view="bookings" role="tabpanel" aria-label="Dashboard view" hidden>
+        <section class="panel super-booking-panel super-admin-bookings-card" id="bookingManagement"><h2>Bookings and cancellation requests</h2><p>All booking statuses are listed. Cancelling a booking expires an active checkout and releases its slot.</p><div class="booking-filter-group" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><input type="text" id="booking-search-input" class="form-control" placeholder="Name or email"><span class="filter-label">From</span><input type="date" id="booking-start-date" class="form-control" style="width:140px"><span class="filter-label">To</span><input type="date" id="booking-end-date" class="form-control" style="width:140px"><select id="booking-status-filter" class="form-select"><option value="">All statuses</option><option value="pending">Pending</option><option value="confirmed">Confirmed</option><option value="cancelled">Cancelled</option><option value="payment overdue">Payment Overdue</option><option value="completed">Completed</option></select></div><div id="bookingResults" class="booking-list" aria-live="polite"><p>Loading bookingsï¿½</p></div><div class="table-pagination-footer"><button type="button" class="btn-pagination-chevron btn-prev-page" title="Previous Page" aria-label="Previous page">&lt;</button><span class="pagination-page-display">Page <span class="current-page-num" title="Click to jump to page">1</span> of <span class="total-pages-num">1</span></span><button type="button" class="btn-pagination-chevron btn-next-page" title="Next Page" aria-label="Next page">&gt;</button></div><form id="verificationReply" class="tool-form"><h3>Reply to an unverified cancellation request</h3><div class="cancellation-reply-inputs"><input name="email" type="email" placeholder="Customer email" required><input name="subject" placeholder="Subject" required></div><textarea name="message" placeholder="Verification reply" required></textarea><button class="btn-send-cancellation-email" type="submit">Send email</button><output></output></form></section>
+      </section>
+      <section class="super-dashboard-view" id="customers-view" data-dashboard-view="customers" role="tabpanel" aria-label="Dashboard view" hidden>
+        <section class="panel inquiries-card-container" id="inquiryManagement"><h2>Inquiries, feedback and manual requests</h2><div class="table-scroll"><table><thead><tr><th>Ticket ID</th><th>Type</th><th>Customer Info</th><th>Branch &amp; Date/Time</th></tr></thead><tbody id="inquiryResults"><tr><td colspan="4">Loading submissions?</td></tr></tbody></table></div><div class="table-pagination-footer"><button type="button" class="btn-pagination-chevron btn-prev-page" title="Previous Page" aria-label="Previous page">&lt;</button><span class="pagination-page-display">Page <span class="current-page-num" title="Click to jump to page">1</span> of <span class="total-pages-num">1</span></span><button type="button" class="btn-pagination-chevron btn-next-page" title="Next Page" aria-label="Next page">&gt;</button></div></section>
+        <section class="panel customer-records-card-container" id="customerManagement"><div class="customer-records-header"><div class="customer-records-heading-actions"><h2>Customer records and backup</h2><input type="file" id="import-db-csv-input" accept=".csv" hidden><button id="import-db-csv-trigger" class="btn-import-db-csv" type="button">📁 Import database</button></div><button id="exportBackup" class="btn-export-csv-backup" type="button">Export database backup CSV</button></div><div class="tool-filters customer-records-filters"><input id="customerSearch" placeholder="Search name or email" aria-label="Search customer name or email"></div><div class="table-scroll"><table><tbody id="customerResults"><tr><td colspan="5">Loading customers?</td></tr></tbody></table></div><div class="table-pagination-footer"><button type="button" class="btn-pagination-chevron btn-prev-page" title="Previous Page" aria-label="Previous page">&lt;</button><span class="pagination-page-display">Page <span class="current-page-num" title="Click to jump to page">1</span> of <span class="total-pages-num">1</span></span><button type="button" class="btn-pagination-chevron btn-next-page" title="Next Page" aria-label="Next page">&gt;</button></div></section>
+        <section class="panel super-only user-accounts-card-container" id="accountManagement" hidden>
+          <div class="user-accounts-header"><div class="user-accounts-heading"><h2>User and admin accounts</h2><p class="user-accounts-subtitle">Manage all accounts and create administrative accounts.</p><div class="account-filter-row"><input type="text" id="account-search-input" placeholder="Search email or username" aria-label="Search email or username"><select id="account-role-filter" aria-label="Filter accounts by role"><option value="">All roles</option><option value="customer">Customer</option><option value="admin">Admin</option><option value="super admin">Super Admin</option></select></div></div><button id="createAccountToggle" class="btn-create-account" type="button" aria-expanded="false" aria-controls="accountCreateAccordion">Create account</button></div>
+          <div id="accountCreateAccordion" class="account-create-accordion" inert><form id="accountForm" class="account-create-form"><div class="account-create-fields"><input name="uid" placeholder="UID (blank to create)" aria-label="UID (blank to create)"><input name="name" placeholder="Username" aria-label="Username" required><input name="email" type="email" placeholder="Email" aria-label="Email" required><input name="password" type="password" placeholder="Password" aria-label="Password" required><select name="role" aria-label="Role"><option value="admin">Admin</option><option value="super_admin">Super Admin</option></select></div><div class="account-form-actions"><button class="btn-save-account" type="submit">Save account</button><button id="cancelCreateAccount" class="btn-cancel-account-action" type="button">Cancel</button></div><output></output></form></div>
+          <div class="table-scroll"><table><tbody id="accountResults"></tbody></table></div><div id="account-pagination"></div>
+        </section>
+      </section>
+      <section class="super-dashboard-view" id="reports-view" data-dashboard-view="reports" role="tabpanel" aria-label="Dashboard view" hidden>
+        <section class="panel reports-card-container" id="reportManagement"><h2>Reports</h2><form id="reportForm" class="tool-filters"><select name="type" required><option value="">Report type</option><option value="bookings">Bookings</option><option value="inquiries">Customer inquiries</option><option value="feedback">Customer feedback</option><option value="sales">Sales</option></select><select name="period" required><option value="">Period</option><option value="daily">Daily</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select><span class="filter-label">From</span><input id="report-start-date" name="start" class="form-control" type="date" required><span class="filter-label">To</span><input id="report-end-date" name="end" class="form-control" type="date" required><select name="format"><option value="csv">CSV</option><option value="chart">Chart</option><option value="pdf">PDF / Print</option></select><button class="btn-generate-report">Generate</button></form><div id="reportOutput"></div><h3>Report history</h3><div id="reportHistory"><div id="report-history-list" class="report-history-scroll-wrapper" aria-live="polite"><div class="report-history-dual-flow"><div id="report-history-left-block"></div><div id="report-history-right-block"></div></div></div></div></section>
+      </section>
+      <section class="super-dashboard-view" id="pos-transactions-view" data-dashboard-view="pos-transactions" role="tabpanel" aria-label="Dashboard view" hidden>
+        <section class="panel pos-card-container" id="posMonitoring"><h2>POS transaction and audit trails monitor</h2><div class="pos-filter-group" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><input type="text" id="pos-cashier-search" class="form-control" placeholder="Cashier name" style="width:180px"><select id="pos-method-filter" class="form-select" style="width:150px"><option value="">All methods</option><option value="cash">Cash</option><option value="gcash">GCash</option><option value="card">Card</option></select><span class="filter-label">From</span><input type="date" id="pos-start-date" class="form-control" style="width:150px"><span class="filter-label">To</span><input type="date" id="pos-end-date" class="form-control" style="width:150px"><select id="pos-status-filter" class="form-select" style="width:150px"><option value="">All statuses</option><option value="paid">Paid</option><option value="voided">Voided</option></select></div><div class="table-scroll pos-table-scroll"><table class="pos-transaction-table"><tbody id="posResults"><tr><td colspan="7">Loading POS transactionsâ€¦</td></tr></tbody></table></div><div class="table-pagination-footer"><button type="button" class="btn-pagination-chevron btn-prev-page" title="Previous Page" aria-label="Previous page">&lt;</button><span class="pagination-page-display">Page <span class="current-page-num" title="Click to jump to page">1</span> of <span class="total-pages-num">1</span></span><button type="button" class="btn-pagination-chevron btn-next-page" title="Next Page" aria-label="Next page">&gt;</button></div></section>
+      </section>
+      <section class="super-dashboard-view" id="notifications-view" data-dashboard-view="notifications" role="tabpanel" aria-label="Dashboard view" hidden>
+        <section class="panel notifications-card-container"><h2>Notifications</h2><div id="notificationResults" class="notification-list" aria-live="polite"><div class="notification-list-empty">Loading notifications…</div></div><div id="notifications-pagination"></div></section>
+      </section>
+      <section class="super-dashboard-view" id="system-view" data-dashboard-view="system-view" role="tabpanel" aria-label="System settings and logs" hidden>
+        <div id="settings-section" class="settings-section px-3">
+          <h3 class="overview-section-title mb-4" style="color: #ffffff; font-weight: 400 !important; font-size: 1.35rem;">System Settings</h3>
+          <div class="row g-4 settings-grid">
+            <div class="col-lg-6">
+              <section class="overview-card settings-card p-4 rounded-3" aria-labelledby="bookingSettingsTitle">
+                <h5 id="bookingSettingsTitle" class="text-white mb-3">Booking Settings</h5>
+                <form id="form-booking-settings" class="settings-form">
+                  <div><label class="form-label" for="setting-daily-slots">Daily Slot Capacity per Branch</label><input type="number" min="1" max="500" id="setting-daily-slots" class="form-control" value="10" required></div>
+                  <div><label class="form-label" for="setting-field-plate">Vehicle Plate Number Field</label><select id="setting-field-plate" class="form-select"><option value="required">Required</option><option value="optional">Optional</option><option value="hidden">Hidden</option></select></div>
+                  <div><label class="form-label" for="setting-field-vehicle">Vehicle Year/Model Field</label><select id="setting-field-vehicle" class="form-select"><option value="required">Required</option><option value="optional">Optional</option></select></div>
+                  <button type="submit" class="settings-save-button">Save Booking Settings</button>
+                  <output aria-live="polite"></output>
+                </form>
+              </section>
+            </div>
+            <div class="col-lg-6">
+              <section class="overview-card settings-card p-4 rounded-3" aria-labelledby="paymongoSettingsTitle">
+                <h5 id="paymongoSettingsTitle" class="text-white mb-3">PayMongo API Credentials</h5>
+                <form id="form-paymongo-settings" class="settings-form">
+                  <fieldset><legend class="form-label">Environment Mode</legend><div class="settings-radio-group">
+                    <label><input type="radio" name="paymongoMode" id="paymongoTest" value="test" checked> Test Mode</label>
+                    <label><input type="radio" name="paymongoMode" id="paymongoLive" value="live"> Live Mode</label>
+                  </div></fieldset>
+                  <div><label class="form-label" for="setting-paymongo-public">PayMongo Public Key</label><input type="text" id="setting-paymongo-public" class="form-control" autocomplete="off" placeholder="pk_test_…"></div>
+                  <div><label class="form-label" for="setting-paymongo-secret">PayMongo Secret Key</label><input type="password" id="setting-paymongo-secret" class="form-control" autocomplete="new-password" placeholder="Configured on the server" disabled></div>
+                  <p class="settings-security-note">Secret keys are managed through the server environment and are not stored in dashboard settings.</p>
+                  <button type="submit" class="settings-save-button">Save PayMongo Settings</button>
+                  <output aria-live="polite"></output>
+                </form>
+              </section>
+            </div>
+            <div class="col-12">
+              <section class="overview-card settings-card p-4 rounded-3" aria-labelledby="templateSettingsTitle">
+                <h5 id="templateSettingsTitle" class="text-white mb-3">Notification &amp; Email Templates</h5>
+                <form id="form-template-settings" class="settings-form">
+                  <div class="settings-template-heading">
+                    <div><label class="form-label" for="template-type-select">Select Template</label><select id="template-type-select" class="form-select"><option value="confirmation">Booking Confirmation</option><option value="cancellation">Appointment Cancellation</option><option value="reschedule">Reschedule Success</option><option value="reminder">Same-Day Reminder</option><option value="overdue">Payment Overdue</option></select></div>
+                    <div><label class="form-label" for="setting-template-subject">Email Subject Line</label><input type="text" id="setting-template-subject" class="form-control" value="Booking Confirmation - {{customer_name}}" required></div>
+                  </div>
+                  <div><label class="form-label" for="setting-template-body">Message Template Body</label><textarea id="setting-template-body" class="form-control" rows="4" required>Hello {{customer_name}}, your service appointment for {{service_name}} is set on {{scheduled_date}} at {{scheduled_time}}.</textarea><small class="settings-security-note">Available tags: {{customer_name}}, {{service_name}}, {{scheduled_date}}, {{scheduled_time}}, {{branch_location}}, {{total_price}}</small></div>
+                  <div><button type="submit" class="settings-save-button">Save Template</button><output aria-live="polite"></output></div>
+                </form>
+              </section>
+            </div>
+          </div>
+          <section class="settings-saved-values" aria-labelledby="savedSettingsTitle"><h4 id="savedSettingsTitle">Saved settings</h4><div id="settingsResults" class="system-settings-list" aria-live="polite"></div></section>
+        </div>
+        <section class="panel system-card-container" aria-labelledby="systemLogsTitle"><h2 id="systemLogsTitle">System logs</h2><div class="system-logs-scroll-wrapper"><div class="system-logs-dual-flow"><div class="system-log-block"><div class="system-log-row-item system-log-header"><div>Time</div><div>Event</div><div>Details</div></div><div id="system-logs-left-block" class="system-logs-list" aria-live="polite"><div class="system-log-empty">Loading system logs...</div></div></div><div class="system-log-block"><div class="system-log-row-item system-log-header"><div>Time</div><div>Event</div><div>Details</div></div><div id="system-logs-right-block" class="system-logs-list" aria-live="polite"></div></div></div></div></section>
+      </section>
+    </main>
+  </div>
+  <dialog id="detailDialog"><button id="closeDialog" class="action-btn" type="button">Close</button><div id="detailContent"></div></dialog>
+  <dialog id="notificationDetailModal" class="notification-detail-modal" aria-labelledby="notificationDetailTitle"><h2 id="notificationDetailTitle">Notification details</h2><div class="notification-detail-content"></div></dialog>
+  <script type="module" src="js/dashboard.js"></script>
+  <script type="module" src="js/admin-tools.js"></script>
+  <script src="js/super-dashboard.js" defer></script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+

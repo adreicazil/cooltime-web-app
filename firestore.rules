@@ -1,0 +1,72 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() { return request.auth != null; }
+    function mfaSessionPath() { return /databases/$(database)/documents/mfa_sessions/$(request.auth.uid); }
+    function isSignedIn() {
+      return isAuthenticated() && exists(mfaSessionPath())
+        && get(mfaSessionPath()).data.expiresAt > request.time;
+    }
+    function ownsUserDoc(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function userProfilePath() { return /databases/$(database)/documents/users/$(request.auth.uid); }
+    function getUserData() { return get(userProfilePath()).data; }
+    function hasRole(role) {
+      return isSignedIn() && exists(userProfilePath())
+        && getUserData().role == role && getUserData().get('status', 'active') == 'active';
+    }
+    function isAdmin() { return hasRole('admin') || hasRole('super_admin'); }
+    function isSuperAdmin() { return hasRole('super_admin'); }
+
+    match /users/{userId} {
+      allow read: if ownsUserDoc(userId) || isAdmin();
+      // Account registration creates the initial profile before the first OTP login.
+      allow create: if isAuthenticated() && request.auth.uid == userId
+        && request.resource.data.role == 'customer'
+        && request.resource.data.status == 'active';
+      allow update: if isAdmin() || (ownsUserDoc(userId)
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.status == resource.data.status);
+      allow delete: if isSuperAdmin();
+    }
+    match /branches/{branchId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    // Read compatibility for projects seeded with the historical singular collection.
+    match /branch/{branchId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /services/{serviceId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /vehicles/{vehicleId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.customerId == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.customerId == request.auth.uid;
+      allow update: if isAdmin() || (isSignedIn() && resource.data.customerId == request.auth.uid
+        && request.resource.data.customerId == request.auth.uid);
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.customerId == request.auth.uid);
+    }
+    match /bookings/{bookingId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.customerId == request.auth.uid);
+      allow create: if isAdmin() || (isSignedIn() && request.resource.data.customerId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+    match /schedule_slots/{slotId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /invoices/{invoiceId} {
+      allow read: if isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+    match /payments/{paymentId} { allow read, write: if isAdmin(); }
+    match /service_history/{historyId} {
+      allow read: if isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
+      allow write: if isAdmin();
+    }
+    match /staff/{staffId} { allow read, write: if isAdmin(); }
+    match /notifications/{notificationId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.get('userId', '') == request.auth.uid);
+      allow write: if isAdmin();
+    }
+    match /paymongo_intents/{intentId} { allow read, write: if isAdmin(); }
+    match /feedback/{ticketId} { allow read, write: if isAdmin(); }
+    match /inquiries/{ticketId} { allow read, write: if isAdmin(); }
+    match /reports/{reportId} { allow read, write: if isAdmin(); }
+    match /activity_logs/{logId} { allow read, write: if isAdmin(); }
+    match /system_settings/{settingId} { allow read: if isAdmin(); allow write: if isSuperAdmin(); }
+    // The server writes and revokes these short-lived records after OTP checks.
+    match /mfa_sessions/{userId} { allow read, write: if false; }
+  }
+}

@@ -1,0 +1,3849 @@
+.dashboard-shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+  background: #f7f9fc;
+}
+
+/* Shared dark site header and textured canvas for both management portals. */
+.admin-dashboard-body,
+.super-dashboard-body {
+  min-height: 100vh;
+  background: url('../assets/images/texture2.jpg') center / cover no-repeat fixed !important;
+}
+
+.dashboard-auth-header {
+  position: fixed;
+  z-index: 1100;
+  top: 0;
+  left: 0;
+  right: 0;
+  color: #fff;
+  background: #071738;
+  box-shadow: 0 5px 22px rgba(0, 0, 0, 0.24);
+}
+
+.dashboard-auth-brand {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 82px;
+  padding: 8px 16px;
+  background: url('../assets/images/textureheader.png') center 42% / cover no-repeat;
+}
+
+.dashboard-auth-brand .logo {
+  width: 48px;
+  height: 48px;
+}
+
+.dashboard-auth-brand .tagline {
+  color: #fff;
+  font-size: clamp(1rem, 2.1vw, 1.8rem);
+}
+
+.dashboard-auth-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 48px;
+  padding: 0 16px;
+  overflow-x: auto;
+  background: rgba(5, 15, 43, 0.92);
+  white-space: nowrap;
+}
+
+.dashboard-auth-nav .nav-links-left,
+.dashboard-auth-nav .nav-links-right {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.dashboard-auth-nav .nav-links-left { gap: 24px; }
+.dashboard-auth-nav .nav-links-right { gap: 20px; margin-left: auto; }
+
+.dashboard-auth-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 10px;
+  color: #fff;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.dashboard-auth-nav a:hover,
+.dashboard-auth-nav a:focus-visible {
+  color: #56c8ff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.dashboard-auth-nav a.active { color: #56c8ff; }
+
+.dashboard-auth-nav .btn-logout {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dashboard-auth-nav .btn-logout:hover,
+.dashboard-auth-nav .btn-logout:focus-visible { color: #56c8ff; }
+
+/* Clean white header treatment for admin dashboards. */
+.admin-dashboard-body .dashboard-auth-header,
+.super-dashboard-body .dashboard-auth-header,
+.admin-dashboard-body .dashboard-auth-brand,
+.super-dashboard-body .dashboard-auth-brand,
+.admin-dashboard-body .dashboard-auth-nav,
+.super-dashboard-body .dashboard-auth-nav {
+  background: #fff !important;
+  background-color: #fff !important;
+}
+.admin-dashboard-body .dashboard-auth-header,
+.super-dashboard-body .dashboard-auth-header {
+  color: #0f172a !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .08) !important;
+}
+.admin-dashboard-body .dashboard-auth-brand,
+.super-dashboard-body .dashboard-auth-brand {
+  background-image: none !important;
+}
+.admin-dashboard-body .dashboard-auth-brand .tagline,
+.super-dashboard-body .dashboard-auth-brand .tagline,
+.admin-dashboard-body .dashboard-auth-nav a,
+.super-dashboard-body .dashboard-auth-nav a,
+.admin-dashboard-body .dashboard-auth-nav .btn-logout,
+.super-dashboard-body .dashboard-auth-nav .btn-logout {
+  color: #0f172a !important;
+}
+.admin-dashboard-body .dashboard-auth-brand .header-logo,
+.super-dashboard-body .dashboard-auth-brand .header-logo,
+.admin-dashboard-body .dashboard-auth-brand .brand-logo-image,
+.super-dashboard-body .dashboard-auth-brand .brand-logo-image {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+.admin-dashboard-body .dashboard-auth-nav .public-nav-tabs,
+.super-dashboard-body .dashboard-auth-nav .public-nav-tabs,
+.admin-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="home"],
+.super-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="home"],
+.admin-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="about"],
+.super-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="about"],
+.admin-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="services"],
+.super-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="services"],
+.admin-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="contact"],
+.super-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="contact"],
+.admin-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="feedback"],
+.super-dashboard-body .dashboard-auth-nav .nav-links-left a[href*="feedback"] {
+  display: none !important;
+}
+.admin-dashboard-body .dashboard-auth-nav .nav-links-right,
+.super-dashboard-body .dashboard-auth-nav .nav-links-right {
+  margin-left: auto;
+}
+.admin-dashboard-body .dashboard-auth-nav .btn-logout,
+.super-dashboard-body .dashboard-auth-nav .btn-logout {
+  border-color: rgba(15, 23, 42, .28) !important;
+}
+
+.admin-dashboard-main,
+.super-dashboard-main {
+  scroll-behavior: smooth;
+  padding-top: 166px !important;
+  background: transparent;
+}
+
+.sidebar {
+  background: var(--sidebar);
+  color: var(--white);
+  padding: 16px 14px;
+}
+
+.dashboard-brand {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  column-gap: 8px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.dashboard-brand .logo-mark {
+  width: 42px;
+  height: 42px;
+  border: 2px solid var(--white);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 8px;
+  background: var(--black);
+}
+
+.dashboard-brand .brand-logo-image {
+  grid-column:1;
+  grid-row:1 / span 2;
+  width:42px;
+  height:42px;
+  object-fit:contain;
+}
+
+.dashboard-brand strong {
+  color: #2aaef5;
+  font-size: 1.25rem;
+}
+
+.dashboard-brand small {
+  grid-column: 2;
+  margin-top: -10px;
+}
+
+.dashboard-topbar {
+  background-color:#071738;
+  background-image:url('../assets/images/textureheader.png');
+  background-size:cover;
+  background-position:center 42%;
+  color:#fff;
+}
+
+.dashboard-topbar h1 { color:#fff; }
+
+.role-label {
+  margin: 12px 0;
+  color: #8ab3d1;
+  font-size: 0.75rem;
+  font-weight: 900;
+}
+
+.side-nav {
+  display: grid;
+  gap: 4px;
+}
+
+.side-nav a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 5px;
+  padding: 10px 12px;
+  color: #e8f1f8;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.side-nav a.active,
+.side-nav a:hover {
+  background: #0764d8;
+}
+
+/* Super admin's icon sidebar */
+.super-admin-sidebar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100vh;
+  box-sizing: border-box;
+  padding: 24px 16px;
+  background: #fff;
+  color: #1c1c1e;
+  border-right: 1px solid #e5e5ea;
+  overflow: hidden;
+  overflow-y: hidden;
+}
+
+.super-sidebar-section-title {
+  margin: 0 0 12px;
+  padding: 0 8px;
+  color: #8e8e93;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.super-admin-sidebar .super-side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.super-side-nav a,
+.super-sidebar-bottom a {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 42px;
+  box-sizing: border-box;
+  margin: 4px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: #1c1c1e;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.super-side-nav a img,
+.super-sidebar-bottom a img {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+  object-fit: contain;
+}
+
+.super-side-nav a:hover,
+.super-side-nav a.active,
+.super-sidebar-bottom a:hover {
+  background: #eef6ff;
+  color: #007aff;
+}
+
+.super-side-nav a.active {
+  font-weight: 700;
+}
+
+.super-sidebar-bottom {
+  margin-top: auto;
+  padding-top: 18px;
+}
+
+.super-sidebar-bottom a {
+  font-weight: 700;
+}
+
+.super-sidebar-bottom small {
+  display: block;
+  padding: 4px 8px 0;
+  color: #8e8e93;
+  font-size: 0.65rem;
+  line-height: 1.4;
+}
+
+body[data-super-admin-dashboard="true"] .dashboard-shell {
+  display: block;
+  min-height: 100vh;
+}
+
+body[data-super-admin-dashboard="true"] .super-dashboard-shell[hidden] {
+  display: none !important;
+}
+
+body[data-super-admin-dashboard="true"] .super-admin-sidebar {
+  position: fixed;
+  z-index: 1000;
+  top: 0;
+  left: 0;
+  right: auto;
+  bottom: 0;
+  width: 240px;
+  padding: 154px 16px 24px;
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+  overflow-y: hidden;
+}
+
+/* Standard admin uses the same fixed navigation shell as Super Admin. */
+body[data-admin-dashboard="true"] .admin-dashboard-shell {
+  display: block;
+  min-height: 100vh;
+}
+
+body[data-admin-dashboard="true"] .admin-dashboard-shell[hidden] {
+  display: none !important;
+}
+
+body[data-admin-dashboard="true"] .admin-sidebar {
+  position: fixed;
+  z-index: 1000;
+  top: 0;
+  left: 0;
+  right: auto;
+  bottom: 0;
+  width: 240px;
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+  overflow-y: hidden;
+  padding: 154px 16px 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-sizing: border-box;
+  background: #ffffff;
+  color: #1c1c1e;
+  border-right: 1px solid #e5e5ea;
+}
+
+.admin-side-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.admin-side-nav a,
+.admin-sidebar .super-sidebar-bottom a {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 42px;
+  box-sizing: border-box;
+  margin: 4px 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  color: #1c1c1e;
+  font-size: 0.95rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.admin-side-nav a img,
+.admin-sidebar .super-sidebar-bottom a img {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  margin-right: 10px;
+  object-fit: contain;
+}
+
+.admin-side-nav a:hover,
+.admin-side-nav a.active,
+.admin-sidebar .super-sidebar-bottom a:hover {
+  background: #eef6ff;
+  color: #007aff;
+}
+
+.admin-side-nav a.active { font-weight: 700; }
+
+body[data-admin-dashboard="true"] .admin-dashboard-main {
+  height: 100vh;
+  margin-left: 240px;
+  padding: 24px;
+  overflow-x: auto;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.admin-dashboard-view[hidden] { display: none !important; }
+.admin-dashboard-view > section + section { margin-top: 18px; }
+.admin-dashboard-view .panel { background: #fff; border: 1px solid #e5eaf1; border-radius: 12px; box-shadow: 0 5px 18px rgba(15, 23, 42, 0.045); }
+
+body[data-super-admin-dashboard="true"] .super-dashboard-main {
+  height: 100vh;
+  margin-left: 240px;
+  padding: 24px;
+  overflow-x: auto;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.super-dashboard-view[hidden] {
+  display: none !important;
+}
+
+.super-dashboard-view > section + section {
+  margin-top: 18px;
+}
+
+.super-dashboard-view .panel {
+  background: #fff;
+  border: 1px solid #e5eaf1;
+  border-radius: 12px;
+  box-shadow: 0 5px 18px rgba(15, 23, 42, 0.045);
+}
+
+.super-dashboard-view .super-only[hidden] {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  body[data-super-admin-dashboard="true"] .super-dashboard-main {
+    margin-left: 240px;
+  }
+  body[data-admin-dashboard="true"] .admin-dashboard-main { margin-left: 240px; }
+}
+
+@media (max-width: 560px) {
+  body[data-super-admin-dashboard="true"] .super-admin-sidebar {
+    padding-inline: 8px;
+  }
+
+  body[data-super-admin-dashboard="true"] .super-dashboard-main {
+    margin-left: 240px;
+    padding: 16px 12px;
+  }
+
+  body[data-admin-dashboard="true"] .admin-sidebar { padding-inline: 8px; }
+  body[data-admin-dashboard="true"] .admin-dashboard-main { margin-left: 240px; padding: 16px 12px; }
+
+}
+
+.badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--red);
+}
+
+.dashboard-main {
+  padding: 18px;
+  overflow-x: auto;
+}
+
+.dashboard-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  background: var(--white);
+  padding: 12px 18px;
+  border-radius: 8px;
+  box-shadow: 0 1px 5px rgba(15, 23, 42, 0.06);
+}
+
+.dashboard-topbar h1 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.dashboard-topbar p {
+  margin: 3px 0 0;
+  color: var(--muted);
+}
+
+.icon-btn {
+  border: 0;
+  background: transparent;
+  font-size: 1.3rem;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.super-metrics {
+  grid-template-columns: repeat(6, minmax(150px, 1fr));
+}
+
+.metric-card,
+.panel {
+  border: 1px solid #eef1f5;
+  border-radius: 8px;
+  background: var(--white);
+  padding: 16px;
+  box-shadow: 0 3px 14px rgba(15, 23, 42, 0.05);
+}
+
+.metric-card span,
+.metric-card small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.metric-card strong {
+  display: block;
+  margin: 10px 0 6px;
+  font-size: 1.35rem;
+}
+
+.metric-card a,
+.panel a {
+  color: #0764d8;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 16px;
+}
+
+.super-grid {
+  grid-template-columns: 2fr 1.1fr 1.4fr;
+}
+
+.panel.wide {
+  grid-column: span 2;
+}
+
+.panel h2,
+.panel-head h2 {
+  margin: 0 0 12px;
+  font-size: 1rem;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+th,
+td {
+  border-bottom: 1px solid #eef1f5;
+  padding: 10px 8px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.status {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.status.pending {
+  background: #fff7ed;
+  color: var(--orange);
+}
+
+.status.confirmed,
+.status.active {
+  background: #ecfdf3;
+  color: var(--green);
+}
+
+.status.failed {
+  background: #fef2f2;
+  color: var(--red);
+}
+
+.line-chart {
+  min-height: 170px;
+  border-radius: 8px;
+  background:
+    linear-gradient(150deg, transparent 40%, rgba(7, 100, 216, 0.12) 40% 60%, transparent 60%),
+    repeating-linear-gradient(0deg, #f5f8fb 0 32px, #e8eef5 33px 34px);
+  position: relative;
+}
+
+.line-chart::after {
+  content: "";
+  position: absolute;
+  inset: 25% 10% 22%;
+  background: linear-gradient(140deg, transparent 0 18%, #0764d8 18% 21%, transparent 21% 36%, #0764d8 36% 39%, transparent 39% 58%, #0764d8 58% 61%, transparent 61% 74%, #0764d8 74% 77%, transparent 77%);
+}
+
+.line-chart.large {
+  min-height: 220px;
+}
+
+.donut-chart {
+  display: grid;
+  place-items: center;
+  width: 170px;
+  height: 170px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  background: conic-gradient(#0764d8 0 58%, #22c55e 58% 76%, #f59e0b 76% 90%, #ef4444 90% 100%);
+}
+
+.donut-chart span {
+  display: grid;
+  place-items: center;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: var(--white);
+  text-align: center;
+  font-weight: 900;
+}
+
+.legend {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.action-btn {
+  display: block;
+  width: 100%;
+  margin-bottom: 9px;
+  border: 1px solid #dce7f4;
+  border-radius: 6px;
+  background: #f5faff;
+  color: #0764d8;
+  padding: 10px;
+  text-align: left;
+  font-weight: 800;
+}
+
+.progress {
+  height: 8px;
+  border-radius: 999px;
+  background: #e5e7eb;
+  overflow: hidden;
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  background: #0764d8;
+}
+
+.firestore-metrics {
+  margin-bottom: 18px;
+}
+
+.firestore-workspace {
+  overflow-x: auto;
+  overflow-y: visible;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  background: #0f1115;
+  color: #d7dde7;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+}
+
+.firestore-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid #30363d;
+  background: #15171c;
+}
+
+.firestore-kicker {
+  margin: 0 0 4px;
+  color: #7ab3ff;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.firestore-toolbar h2 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 1rem;
+}
+
+.firestore-tabs {
+  display: inline-flex;
+  overflow: visible;
+  flex: 0 0 auto;
+  border: 1px solid #2b313a;
+  border-radius: 999px;
+  background: #101216;
+}
+
+.firestore-tabs span {
+  padding: 9px 15px;
+  color: #a8b3c7;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.firestore-tabs .active {
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.firestore-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 18px;
+  border-bottom: 1px solid #30363d;
+  background: #171a1f;
+  color: #a8b3c7;
+  font-size: 0.86rem;
+}
+
+.firestore-breadcrumb span::after {
+  content: ">";
+  margin-left: 8px;
+  color: #64748b;
+}
+
+.firestore-breadcrumb span:last-child::after {
+  content: "";
+  margin: 0;
+}
+
+.firestore-breadcrumb strong {
+  color: #f8fafc;
+}
+
+.firestore-panel {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.85fr) minmax(260px, 0.9fr) minmax(420px, 1.45fr);
+  min-height: 620px;
+}
+
+.firestore-pane {
+  min-width: 0;
+  border-right: 1px solid #30363d;
+  background: #191c21;
+}
+
+.firestore-pane:last-child {
+  border-right: 0;
+}
+
+.pane-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #30363d;
+  background: #20242b;
+}
+
+.pane-title strong,
+.collection-row strong,
+.document-row strong {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #f8fafc;
+  font-size: 0.9rem;
+}
+
+.pane-title small,
+.collection-row small,
+.document-row small {
+  display: block;
+  margin-top: 2px;
+  color: #8d99ad;
+  font-size: 0.75rem;
+}
+
+.pane-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #365f9d;
+  border-radius: 50%;
+  color: #7ab3ff;
+  font-size: 1.05rem;
+  font-weight: 900;
+}
+
+.collection-list,
+.document-list {
+  margin: 0;
+  padding: 8px;
+}
+
+.collection-list {
+  list-style: none;
+}
+
+.collection-row,
+.document-row {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.collection-row + .collection-row,
+.document-row + .document-row {
+  margin-top: 4px;
+}
+
+.collection-row.active,
+.collection-row:hover,
+.document-row.active,
+.document-row:hover {
+  border-color: #32435d;
+  background: #252a32;
+}
+
+.collection-row.active strong,
+.document-row.active strong {
+  color: #83b9ff;
+}
+
+.fields-pane {
+  background: #15181d;
+}
+
+.field-groups {
+  max-height: 620px;
+  overflow: auto;
+}
+
+.field-group {
+  border-bottom: 1px solid #30363d;
+}
+
+.field-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.field-group summary::-webkit-details-marker {
+  display: none;
+}
+
+.field-group summary strong {
+  color: #f8fafc;
+  font-size: 0.9rem;
+}
+
+.field-group summary span {
+  color: #7ab3ff;
+  font-size: 0.76rem;
+  font-weight: 900;
+  text-align: right;
+}
+
+.field-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0 16px 16px;
+}
+
+.field-list div {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.8fr) minmax(170px, 1.2fr);
+  gap: 12px;
+  padding: 9px 10px;
+  border: 1px solid #29313c;
+  border-radius: 6px;
+  background: #101216;
+}
+
+.field-list dt,
+.field-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 0.8rem;
+}
+
+.field-list dt {
+  color: #facc15;
+  font-weight: 900;
+}
+
+.field-list dd {
+  color: #d7dde7;
+}
+
+@media (max-width: 1180px) {
+  .firestore-panel {
+    grid-template-columns: minmax(220px, 0.85fr) minmax(260px, 1fr);
+  }
+
+  .fields-pane {
+    grid-column: 1 / -1;
+    border-top: 1px solid #30363d;
+  }
+}
+
+@media (max-width: 720px) {
+  .firestore-toolbar,
+  .firestore-breadcrumb,
+  .field-group summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .firestore-tabs {
+    width: 100%;
+  }
+
+  .firestore-tabs span {
+    flex: 1;
+    text-align: center;
+  }
+
+  .firestore-panel {
+    grid-template-columns: 1fr;
+    min-height: auto;
+  }
+
+  .firestore-pane {
+    border-right: 0;
+    border-bottom: 1px solid #30363d;
+  }
+
+  .firestore-pane:last-child {
+    border-bottom: 0;
+  }
+
+  .field-list div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+.dashboard-topbar { background-color:#071738; background-image:url('../assets/images/textureheader.png'); background-size:cover; background-position:center 42%; color:#fff; }
+.dashboard-topbar h1 { color:#fff; }
+
+/* Admin home metrics sit directly on the textured canvas. */
+.admin-dashboard-body {
+  min-height: 100vh;
+  background: url('../assets/images/texture3.jpg') center / cover no-repeat fixed !important;
+}
+
+.admin-dashboard-body .admin-dashboard-main {
+  background: url('../assets/images/texture3.jpg') center / cover no-repeat fixed !important;
+}
+
+.admin-dashboard-body .admin-dashboard-view[data-dashboard-view="home"] .metric-grid {
+  background: transparent;
+}
+
+.dashboard-greeting {
+  margin: 0 0 1.5rem;
+}
+
+.dashboard-greeting-label {
+  margin-bottom: 4px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.dashboard-greeting h1 {
+  margin: 0;
+  color: #fff;
+  font-size: 2.2rem;
+  font-weight: 800;
+}
+
+.admin-dashboard-body .admin-dashboard-view[data-dashboard-view="home"] .metric-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.admin-dashboard-body .admin-dashboard-view[data-dashboard-view="home"] .admin-metric-value {
+  align-self: flex-end;
+  margin-left: auto !important;
+  text-align: right !important;
+}
+
+.admin-dashboard-body .admin-dashboard-view[data-dashboard-view="home"] .metric-card span {
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.admin-dashboard-body .admin-dashboard-view[data-dashboard-view="home"] .metric-card strong {
+  margin: 0;
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.admin-dashboard-body .admin-dashboard-view[data-dashboard-view="home"] .metric-card small {
+  display: none;
+}
+
+@media (max-width: 1100px) {
+  .admin-dashboard-body .admin-dashboard-view[data-dashboard-view="home"] .metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .admin-dashboard-body .admin-dashboard-view[data-dashboard-view="home"] .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.super-dashboard-body {
+  min-height: 100vh;
+  background: url('../assets/images/texture4.jpg') center / cover no-repeat fixed !important;
+}
+
+.super-dashboard-body .super-dashboard-main {
+  background: url('../assets/images/texture4.jpg') center / cover no-repeat fixed !important;
+}
+
+.super-dashboard-body .super-dashboard-view[data-dashboard-view="home"] .metric-grid {
+  background: transparent;
+}
+
+.super-dashboard-body .super-dashboard-view[data-dashboard-view="home"] .superadmin-metric-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 16px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.super-dashboard-body .super-dashboard-view[data-dashboard-view="home"] .superadmin-metric-card span {
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.super-dashboard-body .super-dashboard-view[data-dashboard-view="home"] .superadmin-metric-value {
+  align-self: flex-end;
+  margin: 0 0 0 auto !important;
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 800;
+  text-align: right !important;
+}
+
+.super-dashboard-body .super-dashboard-view[data-dashboard-view="home"] .superadmin-metric-card small {
+  display: none;
+}
+
+.super-dashboard-body .super-admin-bookings-card {
+  padding: 24px;
+  overflow: visible;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.45) !important;
+  color: #fff;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.super-booking-panel > h2 {
+  margin-bottom: 4px !important;
+  color: #fff !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+  line-height: 1.2;
+}
+.super-booking-panel > p {
+  margin-top: 4px;
+  margin-bottom: 20px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 0.9rem !important;
+  font-weight: 400 !important;
+  line-height: 1.4;
+}
+.super-booking-panel .tool-filters {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 24px !important;
+}
+.super-booking-panel .tool-filters > input,
+.super-booking-panel .tool-filters > select {
+  width: auto;
+  min-width: 150px;
+  margin: 0;
+}
+.super-booking-panel .tool-filters > #bookingSearch { flex: 0 1 220px; }
+.super-booking-panel .tool-filters > #bookingDate { flex: 0 1 145px; }
+.super-booking-panel .tool-filters > #bookingStatus { flex: 0 1 165px; }
+.super-booking-panel .booking-list { width: 100%; overflow-x: auto; }
+
+.booking-filter-group input,
+.booking-filter-group select,
+#booking-search-input,
+#booking-start-date,
+#booking-end-date,
+#booking-status-filter {
+  box-sizing: border-box;
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 8px !important;
+  height: 38px !important;
+  padding: 6px 14px !important;
+  font-size: 0.9rem !important;
+  font-weight: 500 !important;
+  outline: none !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.booking-filter-group {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex-wrap: wrap !important;
+}
+
+.booking-filter-group input:focus,
+.booking-filter-group select:focus {
+  border-color: #007aff !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.2) !important;
+}
+
+#booking-search-input { width: 180px !important; }
+#booking-start-date,
+#booking-end-date,
+#booking-status-filter { width: 150px !important; }
+.booking-filter-group .filter-label {
+  color: rgba(255, 255, 255, 0.95) !important;
+  font-size: 0.9rem !important;
+  font-weight: 700 !important;
+  margin: 0 2px !important;
+}
+
+.booking-item-row {
+  width: 100%;
+  min-width: 1012px;
+  box-sizing: border-box;
+  padding: 10px 0 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+  cursor: pointer;
+}
+
+.booking-item-row:focus-visible {
+  outline: 2px solid #56c8ff;
+  outline-offset: 2px;
+}
+
+.booking-item-row .booking-row-summary,
+.super-admin-booking-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1.2fr) minmax(200px, 1.3fr) minmax(140px, 1fr) minmax(100px, 0.8fr) 120px !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 20px !important;
+  width: 100% !important;
+}
+.booking-item-row .booking-actions-dropdown,
+.super-admin-booking-row .actions-dropdown-wrapper { justify-self: end !important; }
+.booking-item-row .booking-actions-none { min-height: 38px; }
+.booking-item-row .booking-row-summary > .booking-status-pill {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  min-width: 100px;
+  margin: 0 !important;
+  text-align: left !important;
+}
+
+.booking-row-customer,
+.booking-row-email,
+.booking-service-info,
+.booking-row-branch { min-width: 0; overflow-wrap: anywhere; }
+.booking-row-customer strong { color: #fff; font-size: 0.9rem; font-weight: 600; }
+.booking-row-email,
+.booking-row-branch { color: rgba(255, 255, 255, 0.82); font-size: 0.84rem; }
+.booking-service-info { display: grid; gap: 5px; }
+.booking-service-info .service-title { display: block; color: #fff; font-size: 1rem !important; font-weight: 700 !important; }
+.booking-service-info .service-datetime { display: block; color: rgba(255, 255, 255, 0.7); font-size: 0.85rem !important; }
+
+.booking-status-pill.status {
+  border: 0 !important;
+  border-radius: 0;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 0.95rem !important;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: capitalize;
+}
+
+.super-booking-panel .booking-status-text,
+.super-booking-panel .booking-status,
+.super-booking-panel .status-text,
+.super-booking-panel .status-badge {
+  border: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 0.95rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.3px;
+}
+
+.booking-status-pill.status.cancelled { color: #ff3b30; }
+.booking-status-pill.status.confirmed { color: #5ac8fa; }
+.booking-status-pill.status.pending { color: #ff9500; }
+.booking-status-pill.status.ongoing,
+.booking-status-pill.status.in-progress { color: #ffcc00; }
+.booking-status-pill.status.completed,
+.booking-status-pill.status.paid { color: #34c759; }
+
+.booking-actions-dropdown { position: relative; cursor: default; }
+.booking-actions-dropdown > summary {
+  list-style: none;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.booking-actions-dropdown > summary::-webkit-details-marker { display: none; }
+.booking-actions-dropdown > summary:hover,
+.booking-actions-dropdown[open] > summary { background: rgba(86, 200, 255, 0.16); }
+
+.actions-dropdown-btn {
+  background: transparent !important;
+  border: 1.5px solid #007aff !important;
+  color: #007aff !important;
+  font-weight: 700;
+  border-radius: 20px !important;
+  padding: 6px 16px !important;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.actions-dropdown-btn:hover {
+  background: rgba(0, 122, 255, 0.15) !important;
+  border-color: #3498db !important;
+  color: #3498db !important;
+}
+
+.super-booking-panel .btn-bookings-search {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  margin: 0;
+  padding: 6px 20px;
+  border: 1.5px solid #007aff !important;
+  border-radius: 20px !important;
+  background: transparent !important;
+  color: #007aff !important;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+
+.super-booking-panel .btn-bookings-search:hover {
+  background: rgba(0, 122, 255, 0.15) !important;
+  border-color: #3498db !important;
+  color: #3498db !important;
+}
+
+.booking-actions-menu {
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 9px;
+  background: #111b32;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+.booking-actions-menu button,
+.booking-actions-menu span {
+  padding: 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+}
+.booking-actions-menu button { cursor: pointer; }
+.booking-actions-menu button:hover { background: rgba(86, 200, 255, 0.15); color: #7bd5ff; }
+
+.booking-details-accordion {
+  max-height: 0;
+  overflow: hidden;
+  padding-top: 0;
+  padding-bottom: 0;
+  transition: max-height 0.4s ease-in-out, padding 0.3s ease;
+  cursor: default;
+}
+
+.booking-item-row.expanded .booking-details-accordion {
+  max-height: 500px;
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.booking-details-grid {
+  display: grid;
+  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1.2fr) minmax(200px, 1.3fr) minmax(140px, 1fr) minmax(100px, 0.8fr) auto;
+  justify-content: space-between;
+  gap: 16px 20px;
+  padding: 20px 0;
+  cursor: text;
+}
+.booking-item-row .booking-details-grid {
+  grid-template-columns: minmax(130px, 1fr) minmax(180px, 1.2fr) minmax(200px, 1.3fr) minmax(140px, 1fr) minmax(100px, 0.8fr) auto !important;
+  gap: 16px 20px !important;
+}
+.booking-detail-field { display: grid; gap: 4px; min-width: 0; }
+.booking-item-row .booking-details-grid > .booking-detail-field:nth-child(odd) { grid-column: 1; }
+.booking-item-row .booking-details-grid > .booking-detail-field:nth-child(even) { grid-column: 2; }
+.booking-detail-field span { color: rgba(255, 255, 255, 0.64); font-size: 0.8rem; }
+.booking-detail-field strong { color: #fff; font-size: 0.9rem; font-weight: 600; overflow-wrap: anywhere; }
+.booking-detail-reason,
+.booking-item-row .booking-details-grid > .booking-detail-reason { grid-column: 1 / -1; color: #a0a0ab; }
+.booking-detail-reason span { font-size: 0.9rem; }
+.booking-detail-reason p { margin: 4px 0 0; color: #a0a0ab; font-size: 0.9rem; white-space: pre-wrap; }
+.booking-empty-state { color: rgba(255, 255, 255, 0.75); }
+
+/* Services uses the same glass panel treatment as the Super Admin bookings. */
+#services-view .services-container-card,
+#services-view .service-card-item,
+#services-view .tool-card {
+  color: #fff !important;
+  background: rgba(15, 23, 42, 0.45) !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+#services-view .services-container-card > h2 {
+  color: #fff !important;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+#services-view .services-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+#services-view .services-header h2 {
+  margin: 0 0 4px !important;
+  color: #fff !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+  line-height: 1.2;
+}
+#services-view .services-header-subtitle {
+  margin-top: 4px;
+  margin-bottom: 20px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 0.9rem !important;
+  font-weight: 400 !important;
+  line-height: 1.4;
+}
+#services-view .services-search-bar { margin: 0 0 24px !important; }
+#services-view .services-search-bar input {
+  display: inline-block;
+  width: 260px;
+  max-width: 100%;
+}
+#services-view #service-search-input {
+  width: 200px !important;
+  height: 38px !important;
+  border-radius: 8px !important;
+  border: 1px solid #d1d5db !important;
+  background-color: #fff !important;
+  color: #1f2937 !important;
+  padding: 6px 12px !important;
+  font-size: 0.9rem !important;
+  box-sizing: border-box !important;
+  outline: none !important;
+}
+#services-view .services-cards-grid {
+  display: grid !important;
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  gap: 16px !important;
+  width: 100%;
+}
+#services-view .services-cards-grid > .service-card-item { min-width: 0; }
+#services-view .services-container-card .btn-trigger-create-service {
+  width: auto;
+  margin: 0;
+  padding: 8px 20px;
+  border: 1.5px solid #007aff !important;
+  border-radius: 20px !important;
+  background: transparent !important;
+  color: #007aff !important;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+#services-view .services-container-card .btn-trigger-create-service:hover {
+  background: rgba(0, 122, 255, 0.15) !important;
+  border-color: #3498db !important;
+  color: #3498db !important;
+}
+#services-view .create-service-accordion {
+  max-height: 0;
+  overflow: hidden;
+  margin: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: max-height 0.4s ease-in-out, margin 0.3s ease, visibility 0s linear 0.4s;
+}
+#services-view .create-service-accordion.expanded {
+  max-height: 600px;
+  margin-top: 20px;
+  margin-bottom: 24px;
+  visibility: visible;
+  pointer-events: auto;
+  transition: max-height 0.4s ease-in-out, margin 0.3s ease, visibility 0s;
+}
+#services-view .create-service-form-body {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 32px;
+  width: 100%;
+  max-width: 780px;
+  margin: 0 auto 24px;
+}
+#services-view .create-service-left-inputs {
+  display: flex;
+  flex: 0 0 260px;
+  flex-direction: column;
+  gap: 12px;
+  width: 260px;
+}
+#services-view .create-service-right-inputs {
+  flex: 0 0 380px;
+  width: 380px;
+}
+#services-view .create-service-left-inputs input,
+#services-view .create-service-right-inputs textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+#services-view .service-description-field {
+  height: 190px;
+  resize: none;
+}
+#services-view .create-service-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding-top: 12px;
+}
+#services-view .services-container-card .create-service-actions-row button { margin: 0; }
+#services-view .services-container-card .btn-cancel-service {
+  width: auto;
+  padding: 8px 24px;
+  border: 1.5px solid #ff3b30 !important;
+  border-radius: 20px !important;
+  background: transparent !important;
+  color: #ff3b30 !important;
+  font-weight: 700;
+  cursor: pointer;
+}
+#services-view .services-container-card .btn-cancel-service:hover {
+  background: rgba(255, 59, 48, 0.12) !important;
+}
+#services-view .services-container-card .btn-save-service {
+  width: auto;
+  padding: 8px 24px;
+  border: none !important;
+  border-radius: 20px !important;
+  background: #007aff !important;
+  color: #fff !important;
+  font-weight: 700;
+  cursor: pointer;
+}
+#services-view .services-container-card .btn-save-service:hover { background: #126ed1 !important; }
+#services-view .service-card-item h3,
+#services-view .service-card-item > strong,
+#services-view .tool-card h3,
+#services-view .tool-card > strong {
+  color: #fff !important;
+  font-weight: 800;
+}
+#services-view .service-card-item p,
+#services-view .tool-card p {
+  color: rgba(255, 255, 255, 0.75) !important;
+}
+#services-view .services-container-card button,
+#services-view .service-card-item button,
+#services-view .tool-card button,
+#services-view .btn-service-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  margin: 0 8px 8px 0;
+  padding: 8px 20px;
+  border: 1.5px solid #007aff !important;
+  border-radius: 20px !important;
+  background: transparent !important;
+  color: #007aff !important;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+#services-view .services-container-card button:hover,
+#services-view .service-card-item button:hover,
+#services-view .tool-card button:hover,
+#services-view .btn-service-action:hover {
+  background: rgba(0, 122, 255, 0.15) !important;
+  border-color: #3498db !important;
+  color: #3498db !important;
+}
+
+#serviceManagement .service-card-item { display: flex; flex-direction: column; gap: 14px; }
+#serviceManagement .service-content-body { flex: 1; min-width: 0; }
+#serviceManagement .service-title { margin: 0 0 8px; color: #fff; font-size: 1.1rem; font-weight: 800; }
+#serviceManagement .service-price { display: block; margin-bottom: 8px; color: #fff; font-size: 1rem; font-weight: 700; }
+#serviceManagement .service-desc,
+#serviceManagement .service-duration { margin: 0 0 4px; color: rgba(255,255,255,.75); font-size: .85rem; }
+#serviceManagement .service-card-actions { display: flex; align-items: center; gap: 8px; }
+#serviceManagement .service-card-actions > button {
+  width: auto !important;
+  margin: 0 !important;
+  padding: 5px 18px !important;
+  border: 1.5px solid #007aff !important;
+  border-radius: 9999px !important;
+  background: transparent !important;
+  color: #007aff !important;
+  font-size: .85rem !important;
+  font-weight: 600 !important;
+  cursor: pointer;
+}
+#serviceManagement .service-card-actions > .btn-service-remove {
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+}
+#serviceManagement .service-card-actions > .btn-service-remove:hover {
+  background: rgba(239,68,68,.12) !important;
+  border-color: #ef4444 !important;
+  color: #ef4444 !important;
+}
+#serviceManagement .service-card-actions > .btn-service-action.btn-cancel-state {
+  border-color: #64748b !important;
+  color: #94a3b8 !important;
+}
+#serviceManagement .service-card-actions > .btn-service-action.btn-save-state {
+  border-color: #22c55e !important;
+  color: #22c55e !important;
+}
+#serviceManagement .service-content-body .service-input-name,
+#serviceManagement .service-content-body .service-input-price,
+#serviceManagement .service-content-body .service-input-desc,
+#serviceManagement .service-content-body .service-input-duration {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #0f172a;
+  font: inherit;
+}
+#serviceManagement .service-content-body .service-input-desc { resize: vertical; }
+
+@media (max-width: 1400px) {
+  #services-view .services-cards-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+.super-booking-panel #verificationReply {
+  display: block;
+}
+.super-booking-panel .cancellation-reply-inputs {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.super-booking-panel .cancellation-reply-inputs input {
+  width: 200px !important;
+  max-width: 200px !important;
+  flex: none !important;
+  min-width: 0;
+  margin: 0;
+}
+.super-booking-panel #verificationReply textarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 20px;
+}
+.super-booking-panel .btn-send-cancellation-email {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto !important;
+  margin: 0;
+  padding: 8px 24px;
+  border: 1.5px solid #007aff !important;
+  border-radius: 20px !important;
+  background: transparent !important;
+  color: #007aff !important;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+}
+.super-booking-panel .btn-send-cancellation-email:hover {
+  background: rgba(0, 122, 255, 0.15) !important;
+  border-color: #3498db !important;
+  color: #3498db !important;
+}
+
+@media (max-width: 640px) {
+  .super-dashboard-body .super-admin-bookings-card { padding: 24px 28px !important; }
+  #services-view .create-service-form-body { flex-direction: column; gap: 12px; max-width: 100%; }
+  #services-view .create-service-left-inputs,
+  #services-view .create-service-right-inputs { flex: 1 1 auto; width: 100%; }
+  #services-view .services-cards-grid { grid-template-columns: 1fr !important; }
+  .booking-actions-dropdown { grid-column: 1 / -1; justify-self: end; }
+  .booking-detail-reason { grid-column: auto; }
+  .super-booking-panel .cancellation-reply-inputs { flex-direction: column; }
+}
+
+.super-admin-bookings-card,
+.super-admin-services-card,
+#services-view .services-container-card {
+  padding: 24px 28px !important;
+  box-sizing: border-box !important;
+}
+
+.super-admin-bookings-card h2,
+.super-admin-services-card h2,
+#services-view h2,
+#services-view .services-header h2 {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  margin-bottom: 4px !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+  color: #fff !important;
+}
+
+.super-admin-bookings-card > p,
+.super-admin-services-card .services-header-subtitle,
+#services-view .services-header-subtitle {
+  margin-top: 4px !important;
+  margin-bottom: 20px !important;
+  font-size: 0.9rem !important;
+  font-weight: 400 !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+}
+
+.super-booking-panel > p,
+#serviceManagement .services-header-subtitle,
+#services-view .services-header-subtitle {
+  font-size: 0.875rem !important;
+  font-weight: 400 !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+  margin-top: 6px !important;
+  margin-bottom: 20px !important;
+  line-height: 1.4 !important;
+  letter-spacing: normal !important;
+}
+
+.inquiries-card-container {
+  background: rgba(15, 23, 42, 0.45) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 16px;
+  padding: 24px 28px !important;
+  box-sizing: border-box !important;
+  color: #fff !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.inquiries-card-container h2 {
+  color: #fff !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+  margin: 0 0 20px !important;
+}
+
+.inquiries-card-container table {
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.inquiries-card-container th,
+.inquiries-card-container td {
+  white-space: normal;
+  vertical-align: top;
+  border-bottom-color: rgba(255, 255, 255, 0.12);
+}
+
+.inquiries-card-container th {
+  color: rgba(255, 255, 255, 0.8);
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+.inquiries-card-container td {
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.inquiry-ticket-row {
+  cursor: pointer;
+}
+
+.inquiry-row-item,
+.inquiry-table-row,
+.inquiry-ticket-row {
+  border-top: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.inquiry-row-item > td,
+.inquiry-table-row > td,
+.inquiry-ticket-row > td {
+  border-top: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  padding: 12px 16px !important;
+}
+
+.inquiry-ticket-row:hover,
+.inquiry-ticket-row:focus-visible {
+  background: rgba(255, 255, 255, 0.045);
+  outline: none;
+}
+
+.inquiry-message-row > td {
+  padding: 0 !important;
+  border-bottom: 0 !important;
+}
+
+.inquiry-message-accordion {
+  max-height: 0;
+  overflow: hidden;
+  padding: 0 16px;
+  color: rgba(255, 255, 255, 0.82);
+  transition: max-height 0.4s ease-in-out, padding 0.3s ease;
+}
+
+.inquiry-message-row.expanded .inquiry-message-accordion {
+  max-height: 10000px;
+  padding: 14px 16px;
+}
+
+.inquiry-message-content p {
+  margin: 6px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.inquiry-decision-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.inquiries-card-container .view-attachment {
+  display: inline-flex;
+  width: auto;
+  margin: 8px 0 0;
+  border: 1.5px solid #007aff;
+  border-radius: 20px;
+  background: transparent;
+  color: #007aff;
+  padding: 6px 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.inquiries-card-container .btn-approve-inquiry,
+.inquiries-card-container .btn-reject-inquiry {
+  display: inline-flex;
+  width: auto;
+  margin: 0;
+  border-radius: 20px !important;
+  padding: 8px 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.inquiries-card-container .btn-approve-inquiry {
+  background: transparent !important;
+  border: 1.5px solid #007aff !important;
+  color: #007aff !important;
+}
+
+.inquiries-card-container .btn-approve-inquiry:hover {
+  background: rgba(0, 122, 255, 0.15) !important;
+}
+
+.inquiries-card-container .btn-reject-inquiry {
+  background: transparent !important;
+  border: 1.5px solid #ff3b30 !important;
+  color: #ff3b30 !important;
+}
+
+.inquiries-card-container .btn-reject-inquiry:hover {
+  background: rgba(255, 59, 48, 0.15) !important;
+}
+
+.customer-records-card-container {
+  background: rgba(15, 23, 42, 0.45) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 16px !important;
+  padding: 24px 28px !important;
+  box-sizing: border-box !important;
+  color: #fff !important;
+}
+
+.customer-records-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.customer-records-heading-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 14px; }
+.customer-records-header .btn-import-db-csv,
+.customer-records-header .btn-export-csv-backup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  margin: 0;
+  padding: 6px 20px;
+  border: 1.5px solid #007aff !important;
+  border-radius: 9999px !important;
+  background: transparent !important;
+  color: #007aff !important;
+  font-size: .85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+.customer-records-header .btn-import-db-csv { border-color: #38bdf8 !important; color: #38bdf8 !important; }
+.customer-records-header .btn-import-db-csv:hover { background: rgba(56,189,248,.12) !important; }
+.customer-records-header .btn-export-csv-backup:hover { background: rgba(0,122,255,.15) !important; }
+
+.customer-records-card-container h2 {
+  color: #fff !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+  margin: 0 !important;
+}
+
+.customer-records-card-container .btn-export-csv-backup {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  margin: 0;
+  background: transparent !important;
+  border: 1.5px solid #007aff !important;
+  color: #007aff !important;
+  font-weight: 700;
+  border-radius: 20px !important;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.customer-records-card-container .btn-export-csv-backup:hover {
+  background: rgba(0, 122, 255, 0.15) !important;
+}
+
+.customer-records-filters {
+  margin-bottom: 16px;
+}
+
+.customer-records-card-container .table-scroll {
+  overflow-x: auto;
+}
+
+.customer-records-card-container table {
+  width: 100%;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.customer-records-card-container tbody tr {
+  border-top: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.customer-records-card-container tbody td {
+  padding: 12px 16px !important;
+  border-top: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.92);
+  white-space: normal;
+}
+
+.customer-records-card-container .customer-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  margin: 0;
+  border-radius: 20px !important;
+  padding: 6px 18px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.customer-records-card-container .btn-disable-customer {
+  background: transparent !important;
+  border: 1.5px solid #ff3b30 !important;
+  color: #ff3b30 !important;
+}
+
+.customer-records-card-container .btn-disable-customer:hover {
+  background: rgba(255, 59, 48, 0.15) !important;
+}
+
+.customer-records-card-container .btn-enable-customer {
+  background: transparent !important;
+  border: 1.5px solid #007aff !important;
+  color: #007aff !important;
+}
+
+.customer-records-card-container .btn-enable-customer:hover {
+  background: rgba(0, 122, 255, 0.15) !important;
+}
+
+@media (max-width: 760px) {
+  .customer-records-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+.user-accounts-card-container {
+  background: rgba(15, 23, 42, 0.45) !important;
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 16px !important;
+  padding: 24px 28px !important;
+  box-sizing: border-box !important;
+  color: #fff !important;
+}
+
+.user-accounts-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.user-accounts-card-container h2 {
+  margin: 0 0 4px !important;
+  color: #fff !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+}
+
+.user-accounts-subtitle {
+  margin: 0 !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 0.9rem;
+}
+
+.user-accounts-card-container .btn-create-account,
+.user-accounts-card-container .btn-save-account,
+.user-accounts-card-container .btn-cancel-account,
+.user-accounts-card-container .btn-cancel-account-action,
+.user-accounts-card-container .btn-cancel-account-edit,
+.user-accounts-card-container .btn-delete-account {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  margin: 0;
+  border-radius: 20px !important;
+  padding: 8px 20px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.user-accounts-card-container .btn-create-account {
+  flex: 0 0 auto;
+  background: transparent !important;
+  border: 1.5px solid #007aff !important;
+  color: #007aff !important;
+}
+
+.user-accounts-card-container .btn-create-account:hover {
+  background: rgba(0, 122, 255, 0.15) !important;
+}
+
+.user-accounts-card-container .btn-save-account {
+  background: #007aff !important;
+  border: 1.5px solid #007aff !important;
+  color: #fff !important;
+}
+
+.user-accounts-card-container .btn-save-account:hover {
+  background: #0069dd !important;
+  border-color: #0069dd !important;
+}
+
+.user-accounts-card-container .btn-cancel-account,
+.user-accounts-card-container .btn-cancel-account-action,
+.user-accounts-card-container .btn-cancel-account-edit {
+  background: transparent !important;
+  border: 1.5px solid #007aff !important;
+  color: #007aff !important;
+}
+
+.user-accounts-card-container .btn-delete-account {
+  background: transparent !important;
+  border: 1.5px solid #ff3b30 !important;
+  color: #ff3b30 !important;
+}
+
+.user-accounts-card-container .btn-cancel-account:hover,
+.user-accounts-card-container .btn-cancel-account-action:hover,
+.user-accounts-card-container .btn-cancel-account-edit:hover {
+  background: rgba(0, 122, 255, 0.15) !important;
+}
+
+.user-accounts-card-container .btn-delete-account:hover {
+  background: rgba(255, 59, 48, 0.15) !important;
+}
+
+.account-filter-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0 24px;
+}
+
+.user-accounts-card-container .account-filter-row input,
+.user-accounts-card-container .account-filter-row select {
+  height: 38px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #1f2937;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+}
+
+.user-accounts-card-container #account-search-input {
+  width: 220px;
+}
+
+.user-accounts-card-container #account-role-filter {
+  width: 160px;
+}
+
+.user-accounts-card-container .account-filter-row input::placeholder {
+  color: #9ca3af;
+}
+
+.account-create-accordion {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.4s ease-in-out, margin 0.3s ease;
+}
+
+.account-create-accordion.expanded {
+  max-height: 500px;
+  margin: 0 0 24px;
+}
+
+.account-create-form,
+.account-edit-form {
+  width: 100%;
+}
+
+.account-create-fields,
+.account-edit-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  width: 100%;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.user-accounts-card-container input,
+.user-accounts-card-container select {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  box-sizing: border-box;
+  border: 1px solid rgba(209, 213, 219, 0.9);
+  border-radius: 8px;
+  background: #fff;
+  color: #1f2937;
+  padding: 9px 12px;
+  font: inherit;
+}
+
+.user-accounts-card-container input::placeholder {
+  color: #9ca3af;
+  opacity: 1;
+}
+
+.account-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+  max-width: 1000px;
+  margin: 16px auto 0;
+}
+
+.user-accounts-card-container output {
+  display: block;
+  width: 100%;
+  max-width: 1000px;
+  margin: 10px auto 0;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.user-accounts-card-container table {
+  width: 100%;
+  color: #fff;
+  font-size: 0.9rem;
+}
+
+.user-accounts-card-container .account-summary-row {
+  cursor: pointer;
+  border-top: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.user-accounts-card-container .account-summary-row:hover,
+.user-accounts-card-container .account-summary-row:focus-visible {
+  background: rgba(255, 255, 255, 0.045);
+  outline: none;
+}
+
+.user-accounts-card-container .account-summary-row > td {
+  padding: 12px 16px !important;
+  border-top: none !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.92);
+  white-space: normal;
+}
+
+.user-accounts-card-container .account-edit-row > td {
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+.account-edit-accordion {
+  max-height: 0;
+  overflow: hidden;
+  padding: 0 16px;
+  transition: max-height 0.4s ease-in-out, padding 0.3s ease;
+}
+
+.account-edit-row.expanded .account-edit-accordion {
+  max-height: 500px;
+  padding: 16px;
+}
+
+.account-edit-form output {
+  margin-top: 10px;
+}
+
+@media (max-width: 760px) {
+  .user-accounts-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .user-accounts-card-container .btn-create-account {
+    align-self: flex-start;
+  }
+}
+
+.inquiry-accordion-details {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.inquiry-accordion-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+/* Super Admin Reports panel */
+.super-dashboard-body #reportManagement.reports-card-container {
+  box-sizing: border-box;
+  margin-bottom: 24px;
+  padding: 24px 28px !important;
+  border: 1px solid rgba(255, 255, 255, .15) !important;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, .45) !important;
+  color: #fff !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.super-dashboard-body #reportManagement.reports-card-container > h2 {
+  margin: 0 0 20px !important;
+  color: #fff !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+}
+.super-dashboard-body #reportManagement.reports-card-container > h3 {
+  margin: 20px 0 8px;
+  color: #fff;
+}
+.super-dashboard-body #reportManagement .tool-filters {
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+.super-dashboard-body #reportManagement .tool-filters > select,
+.super-dashboard-body #reportManagement .tool-filters > input[type="date"] {
+  box-sizing: border-box;
+  height: 38px;
+  min-width: 145px;
+  padding: 0 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .96);
+  color: #172334;
+}
+.super-dashboard-body #reportManagement .tool-filters > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, .9);
+}
+.filter-label {
+  color: rgba(255, 255, 255, .95);
+  font-size: .9rem;
+  font-weight: 600;
+  margin: 0 4px;
+}
+.super-dashboard-body #reportManagement .btn-generate-report {
+  min-height: 38px;
+  padding: 8px 24px;
+  border: 1.5px solid #007aff !important;
+  border-radius: 20px !important;
+  background: transparent !important;
+  color: #007aff !important;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .2s ease, color .2s ease;
+}
+.super-dashboard-body #reportManagement .btn-generate-report:hover {
+  background: rgba(0, 122, 255, .15) !important;
+  color: #007aff !important;
+}
+.super-dashboard-body #reportManagement .report-history-scroll-wrapper {
+  max-height: 550px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+}
+.super-dashboard-body #reportManagement .report-history-dual-flow {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 28px !important;
+  width: 100% !important;
+}
+.super-dashboard-body #reportManagement .report-history-row-item,
+.super-dashboard-body #reportManagement .report-history-empty {
+  padding: 10px 12px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, .08) !important;
+  color: rgba(255, 255, 255, .9) !important;
+  font-size: .9rem !important;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .super-dashboard-body #reportManagement.reports-card-container { padding: 20px 16px !important; }
+  .super-dashboard-body #reportManagement .tool-filters > select,
+  .super-dashboard-body #reportManagement .tool-filters > label,
+  .super-dashboard-body #reportManagement .btn-generate-report { flex: 1 1 100%; }
+  .super-dashboard-body #reportManagement .tool-filters > input[type="date"] { flex: 1; min-width: 0; }
+}
+
+/* Super Admin POS transaction monitor */
+.super-dashboard-body #posMonitoring.pos-card-container {
+  box-sizing: border-box;
+  margin-bottom: 24px;
+  padding: 24px 28px !important;
+  border: 1px solid rgba(255, 255, 255, .15) !important;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, .45) !important;
+  color: #fff !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.super-dashboard-body #posMonitoring .pos-filter-group,
+.admin-dashboard-body #posMonitoring .pos-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+}
+.super-dashboard-body #posMonitoring .pos-filter-group input,
+.super-dashboard-body #posMonitoring .pos-filter-group select,
+.admin-dashboard-body #posMonitoring .pos-filter-group input,
+.admin-dashboard-body #posMonitoring .pos-filter-group select {
+  box-sizing: border-box;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .96);
+  color: #172334;
+}
+.super-dashboard-body #posMonitoring.pos-card-container > h2 {
+  margin: 0 0 20px !important;
+  color: #fff !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+}
+.super-dashboard-body #posMonitoring .tool-filters {
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+.super-dashboard-body #posMonitoring .tool-filters input,
+.super-dashboard-body #posMonitoring .tool-filters select {
+  box-sizing: border-box;
+  height: 38px;
+  min-width: 145px;
+  padding: 0 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .96);
+  color: #172334;
+}
+.super-dashboard-body #posMonitoring .tool-filters label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, .9);
+}
+.super-dashboard-body #posMonitoring .pos-table-scroll { overflow-x: auto; }
+.super-dashboard-body #posMonitoring .pos-transaction-table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.super-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td {
+  padding: 14px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, .13);
+  color: rgba(255, 255, 255, .92);
+  vertical-align: middle;
+}
+.super-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(1) { width: 25%; }
+.super-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(2) { width: 12%; }
+.super-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(3) { width: 17%; }
+.super-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(4) { width: 11%; }
+.super-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(5) { width: 10%; }
+.super-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(6) { width: 12%; }
+.super-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(7) { width: 13%; }
+.super-dashboard-body #posMonitoring .pos-main-row { cursor: pointer; transition: background .18s ease; }
+.super-dashboard-body #posMonitoring .pos-main-row:hover,
+.super-dashboard-body #posMonitoring .pos-main-row:focus-visible,
+.super-dashboard-body #posMonitoring .pos-main-row.is-expanded { background: rgba(255, 255, 255, .055); outline: none; }
+.super-dashboard-body #posMonitoring .pos-invoice-id {
+  display: block;
+  color: #fff;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.super-dashboard-body #posMonitoring .pos-invoice-time {
+  display: block;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, .7);
+  font-size: .85rem;
+}
+.super-dashboard-body #posMonitoring .pos-status-text { font-weight: 800; text-transform: capitalize; }
+.super-dashboard-body #posMonitoring .pos-status-text.paid,
+.super-dashboard-body #posMonitoring .pos-status-text.completed { color: #34c759; }
+.super-dashboard-body #posMonitoring .pos-status-text.pending { color: #ffb547; }
+.super-dashboard-body #posMonitoring .pos-status-text.failed,
+.super-dashboard-body #posMonitoring .pos-status-text.cancelled { color: #ff6961; }
+.super-dashboard-body #posMonitoring .pos-amount { color: #fff !important; font-weight: 700; white-space: nowrap; }
+.super-dashboard-body #posMonitoring .pos-actions-button {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1.5px solid #007aff;
+  border-radius: 20px;
+  background: transparent;
+  color: #1687ff;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background .2s ease;
+}
+.super-dashboard-body #posMonitoring .pos-actions-button:hover,
+.super-dashboard-body #posMonitoring .pos-actions-button:focus-visible { background: rgba(0, 122, 255, .15); outline: none; }
+.super-dashboard-body #posMonitoring .pos-row-action-buttons { display: flex; align-items: center; gap: 8px; }
+.super-dashboard-body #posMonitoring .btn-pos-flag,
+.super-dashboard-body #posMonitoring .btn-pos-void {
+  width: auto;
+  padding: 5px 16px;
+  border: 1.5px solid;
+  border-radius: 9999px;
+  background: transparent;
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+.super-dashboard-body #posMonitoring .btn-pos-flag { color: #3b82f6; border-color: #3b82f6; }
+.super-dashboard-body #posMonitoring .btn-pos-void { color: #ef4444; border-color: #ef4444; }
+.super-dashboard-body #posMonitoring .btn-pos-flag:hover,
+.super-dashboard-body #posMonitoring .btn-pos-flag:focus-visible { background: rgba(59,130,246,.14); outline: none; }
+.super-dashboard-body #posMonitoring .btn-pos-void:hover,
+.super-dashboard-body #posMonitoring .btn-pos-void:focus-visible { background: rgba(239,68,68,.12); outline: none; }
+.super-dashboard-body #posMonitoring .btn-pos-void:disabled { opacity: .45; cursor: not-allowed; }
+.super-dashboard-body #posMonitoring .pos-audit-expanded-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+.super-dashboard-body #posMonitoring .audit-trail-info { color: rgba(255,255,255,.75); font-size: .8rem; line-height: 1.6; }
+.super-dashboard-body #posMonitoring .pos-audit-actions { position: relative; }
+.super-dashboard-body #posMonitoring .pos-audit-actions > summary { list-style: none; }
+.super-dashboard-body #posMonitoring .pos-audit-actions > summary::-webkit-details-marker { display: none; }
+.super-dashboard-body #posMonitoring .btn-super-pos-actions {
+  display: inline-block;
+  padding: 6px 20px;
+  border: 1.5px solid #007aff;
+  border-radius: 9999px;
+  color: #007aff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.super-dashboard-body #posMonitoring .pos-audit-actions-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 10;
+  display: flex;
+  min-width: 190px;
+  flex-direction: column;
+  padding: 6px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 10px;
+  background: #0f172a;
+  box-shadow: 0 8px 24px rgba(0,0,0,.3);
+}
+.super-dashboard-body #posMonitoring .pos-audit-actions-menu button {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+.super-dashboard-body #posMonitoring .pos-audit-actions-menu button:hover { background: rgba(255,255,255,.1); }
+.super-dashboard-body #posMonitoring .pos-audit-actions-menu button:disabled { opacity: .45; cursor: not-allowed; }
+.super-dashboard-body #posMonitoring .pos-audit-actions-menu .audit-action-flag { color: #60a5fa; }
+.super-dashboard-body #posMonitoring .pos-audit-actions-menu .audit-action-void { color: #f87171; }
+.super-dashboard-body #posMonitoring .pos-detail-row > td { padding: 0 !important; border: 0 !important; }
+.super-dashboard-body #posMonitoring .pos-accordion-panel {
+  max-height: 0;
+  overflow: hidden;
+  margin-top: 8px;
+  padding: 0 20px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, .2);
+  transition: max-height .35s ease-in-out, padding .3s ease;
+}
+.super-dashboard-body #posMonitoring .pos-accordion-panel.expanded {
+  max-height: 500px;
+  padding: 16px 20px;
+  border-color: rgba(255, 255, 255, .08);
+}
+.super-dashboard-body #posMonitoring .pos-accordion-summary { margin: 0 0 10px; color: rgba(255, 255, 255, .9); }
+.super-dashboard-body #posMonitoring .pos-detail-table-scroll { overflow-x: auto; }
+.super-dashboard-body #posMonitoring .pos-detail-table { width: 100%; border-collapse: collapse; color: rgba(255, 255, 255, .9); }
+.super-dashboard-body #posMonitoring .pos-detail-table th,
+.super-dashboard-body #posMonitoring .pos-detail-table td {
+  padding: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, .1);
+  color: inherit;
+  text-align: left;
+}
+.super-dashboard-body #posMonitoring .pos-detail-table th { color: rgba(255, 255, 255, .7); font-size: .82rem; }
+.super-dashboard-body #posMonitoring .pos-total-summary { display: block; margin-top: 10px; color: #fff; }
+.super-dashboard-body #posMonitoring .pos-payment-reference { margin: 8px 0 0; color: rgba(255, 255, 255, .65); font-size: .85rem; }
+.super-dashboard-body #posMonitoring .pos-empty-state { padding: 18px 8px; color: rgba(255, 255, 255, .72); }
+@media (max-width: 640px) {
+  .super-dashboard-body #posMonitoring.pos-card-container { padding: 20px 16px !important; }
+  .super-dashboard-body #posMonitoring .tool-filters > input,
+  .super-dashboard-body #posMonitoring .tool-filters > select,
+  .super-dashboard-body #posMonitoring .tool-filters > label { flex: 1 1 100%; }
+  .super-dashboard-body #posMonitoring .tool-filters > label > input { flex: 1; min-width: 0; }
+}
+
+/* Shared pager for Super Admin data lists */
+.super-dashboard-body .table-pagination-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 20px;
+}
+.super-dashboard-body .table-pagination-footer .pagination-page-display {
+  color: #fff;
+  font-size: .9rem;
+  user-select: none;
+}
+.super-dashboard-body .table-pagination-footer .current-page-num {
+  color: #007aff;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.super-dashboard-body .table-pagination-footer .btn-pagination-chevron {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1.5px solid #007aff !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  color: #007aff !important;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+.super-dashboard-body .table-pagination-footer .btn-pagination-chevron:hover:not(:disabled) {
+  background: rgba(0, 122, 255, .15) !important;
+}
+.super-dashboard-body .table-pagination-footer .btn-pagination-chevron:disabled {
+  border-color: rgba(255, 255, 255, .2) !important;
+  color: rgba(255, 255, 255, .3) !important;
+  cursor: not-allowed;
+}
+.super-dashboard-body .table-pagination-footer .report-page-input {
+  box-sizing: border-box;
+  width: 44px;
+  height: 26px;
+  margin: 0 4px;
+  border: 1px solid #007aff;
+  border-radius: 4px;
+  outline: none;
+  background: #fff;
+  color: #0f172a;
+  font-size: .85rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* Super Admin operational notifications */
+.super-dashboard-body #notifications-view .notifications-card-container {
+  box-sizing: border-box;
+  padding: 24px 28px !important;
+  border: 1px solid rgba(255, 255, 255, .15) !important;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, .45) !important;
+  color: #fff !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.super-dashboard-body #notifications-view .notifications-card-container > h2 {
+  margin: 0 0 20px !important;
+  color: #fff !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+}
+.super-dashboard-body #notifications-view .notification-list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  color: rgba(255, 255, 255, .95);
+  font-size: .95rem;
+  line-height: 1.5;
+}
+.super-dashboard-body #notifications-view .notification-list-time {
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, .62);
+  font-size: .82rem;
+  text-align: right;
+}
+.super-dashboard-body #notifications-view .notification-list-empty {
+  padding: 14px 16px;
+  color: rgba(255, 255, 255, .72);
+}
+@media (max-width: 640px) {
+  .super-dashboard-body #notifications-view .notifications-card-container { padding: 20px 16px !important; }
+  .super-dashboard-body #notifications-view .notification-list-item { align-items: flex-start; flex-direction: column; gap: 4px; }
+  .super-dashboard-body #notifications-view .notification-list-time { text-align: left; }
+}
+
+/* Super Admin System settings and audit log */
+.super-dashboard-body #system-view .system-card-container {
+  box-sizing: border-box;
+  margin-bottom: 24px;
+  padding: 24px 28px !important;
+  border: 1px solid rgba(255, 255, 255, .15) !important;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, .45) !important;
+  color: #fff !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.super-dashboard-body #system-view .system-card-container > h2 {
+  margin: 0 0 20px !important;
+  color: #fff !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+}
+.super-dashboard-body #system-view #settingsForm {
+  align-items: center;
+  gap: 10px;
+}
+.super-dashboard-body #system-view #settingsForm select,
+.super-dashboard-body #system-view #settingsForm input {
+  box-sizing: border-box;
+  min-width: 180px;
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 1px solid rgba(255, 255, 255, .2);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .96);
+  color: #172334;
+}
+.super-dashboard-body #system-view #settingsForm button {
+  min-height: 40px;
+  padding: 8px 22px;
+  border: 1.5px solid #007aff !important;
+  border-radius: 20px !important;
+  background: transparent !important;
+  color: #1687ff !important;
+  font-weight: 700;
+  cursor: pointer;
+}
+.super-dashboard-body #system-view #settingsForm button:hover {
+  background: rgba(0, 122, 255, .15) !important;
+}
+.super-dashboard-body #system-view #settingsForm output {
+  flex-basis: 100%;
+  color: rgba(255, 255, 255, .86);
+}
+.super-dashboard-body #system-view .system-settings-list {
+  margin-top: 14px;
+  color: rgba(255, 255, 255, .9);
+}
+.super-dashboard-body #system-view .system-settings-list p {
+  margin: 0;
+  padding: 12px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+  overflow-wrap: anywhere;
+}
+.super-dashboard-body #system-view .system-card-container .table-scroll { overflow-x: auto; }
+.super-dashboard-body #system-view .system-card-container table {
+  width: 100%;
+  border-collapse: collapse;
+  color: rgba(255, 255, 255, .92);
+}
+.super-dashboard-body #system-view .system-card-container th,
+.super-dashboard-body #system-view .system-card-container td {
+  padding: 11px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, .1);
+  color: inherit;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.super-dashboard-body #system-view .system-card-container th {
+  color: rgba(255, 255, 255, .7);
+  font-size: .85rem;
+}
+.super-dashboard-body #system-view .system-logs-scroll-wrapper {
+  max-height: 650px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 8px;
+}
+.super-dashboard-body #system-view .system-logs-dual-flow {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 32px !important;
+  width: 100% !important;
+}
+.super-dashboard-body #system-view .system-log-block { min-width: 0; overflow-x: auto; }
+.super-dashboard-body #system-view .system-log-row-item {
+  display: grid !important;
+  grid-template-columns: 150px 180px 1fr !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding: 8px 10px !important;
+  border-bottom: 1px solid rgba(255, 255, 255, .08) !important;
+}
+.super-dashboard-body #system-view .system-log-header {
+  color: rgba(255, 255, 255, .68);
+  font-size: .85rem;
+  font-weight: 700;
+}
+.super-dashboard-body #system-view .system-log-time {
+  color: rgba(255, 255, 255, .9);
+  font-size: .9rem;
+}
+.super-dashboard-body #system-view .system-log-event {
+  color: #60a5fa;
+  font-size: .9rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.super-dashboard-body #system-view .system-log-details {
+  color: rgba(255, 255, 255, .8);
+  font-size: .85rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.super-dashboard-body #system-view .system-log-empty {
+  padding: 14px 16px;
+  color: rgba(255, 255, 255, .72);
+}
+@media (max-width: 640px) {
+  .super-dashboard-body #system-view .system-card-container { padding: 20px 16px !important; }
+  .super-dashboard-body #system-view .system-logs-dual-flow { gap: 16px !important; }
+  .super-dashboard-body #system-view #settingsForm select,
+  .super-dashboard-body #system-view #settingsForm input,
+  .super-dashboard-body #system-view #settingsForm button { flex: 1 1 100%; }
+}
+
+/* Admin Dashboard shares the operational glass cards and controls. */
+.admin-dashboard-body .admin-dashboard-view .admin-card-container {
+  box-sizing: border-box;
+  margin-bottom: 24px;
+  padding: 24px 28px !important;
+  border: 1px solid rgba(255, 255, 255, .15) !important;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, .45) !important;
+  color: #fff !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.admin-dashboard-body .admin-dashboard-view .admin-card-container > h2 {
+  margin: 0 0 20px !important;
+  color: #fff !important;
+  font-size: 1.5rem !important;
+  font-weight: 800 !important;
+}
+.admin-dashboard-body #customerManagement .customer-records-header h2 { margin: 0 !important; }
+.admin-dashboard-body #serviceManagement.services-container-card { margin-bottom: 24px; }
+.admin-dashboard-body #reportManagement.reports-card-container > h3 { color: #fff; }
+.admin-dashboard-body #reportManagement .tool-filters { align-items: center; gap: 10px; margin: 0 0 16px; }
+.admin-dashboard-body #reportManagement .tool-filters > select,
+.admin-dashboard-body #reportManagement .tool-filters > input[type="date"] {
+  box-sizing: border-box;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .96);
+  color: #172334;
+}
+.admin-dashboard-body #reportManagement .tool-filters > label { display: flex; align-items: center; gap: 8px; color: #fff; }
+.admin-dashboard-body #reportManagement .btn-generate-report,
+.admin-dashboard-body #customerManagement .btn-export-csv-backup {
+  width: auto;
+  padding: 8px 20px;
+  border: 1.5px solid #007aff !important;
+  border-radius: 20px !important;
+  background: transparent !important;
+  color: #007aff !important;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+.admin-dashboard-body #reportManagement .btn-generate-report:hover,
+.admin-dashboard-body #customerManagement .btn-export-csv-backup:hover { background: rgba(0, 122, 255, .15) !important; }
+.admin-dashboard-body #reportManagement .report-history-scroll-wrapper { max-height: 550px; overflow-y: auto; overflow-x: hidden; padding-right: 8px; border-top: 1px solid rgba(255,255,255,.08); }
+.admin-dashboard-body #reportManagement .report-history-dual-flow { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 28px !important; width: 100% !important; }
+.admin-dashboard-body #reportManagement .report-history-row-item,
+.admin-dashboard-body #reportManagement .report-history-empty { padding: 10px 12px !important; border-bottom: 1px solid rgba(255,255,255,.08) !important; color: rgba(255,255,255,.9) !important; font-size: .9rem !important; overflow-wrap: anywhere; }
+.admin-dashboard-body #posMonitoring .tool-filters { align-items: center; gap: 10px; margin: 0 0 16px; }
+.admin-dashboard-body #posMonitoring .tool-filters input,
+.admin-dashboard-body #posMonitoring .tool-filters select { box-sizing: border-box; min-height: 38px; padding: 8px 12px; border: 1px solid #d1d5db; border-radius: 8px; background: rgba(255,255,255,.96); color: #172334; }
+.admin-dashboard-body #posMonitoring .tool-filters label { display: flex; align-items: center; gap: 8px; color: #fff; }
+.admin-dashboard-body #posMonitoring .pos-table-scroll { overflow-x: auto; }
+.admin-dashboard-body #posMonitoring .pos-transaction-table { width: 100%; min-width: 980px; border-collapse: collapse; color: rgba(255,255,255,.92); }
+.admin-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td { padding: 12px 10px !important; border-bottom: 1px solid rgba(255,255,255,.1) !important; vertical-align: middle; }
+.admin-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(1) { width: 25%; }
+.admin-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(2) { width: 12%; }
+.admin-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(3) { width: 17%; }
+.admin-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(4) { width: 11%; }
+.admin-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(5) { width: 10%; }
+.admin-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(6) { width: 12%; }
+.admin-dashboard-body #posMonitoring .pos-transaction-table > tbody > tr.pos-main-row > td:nth-child(7) { width: 13%; }
+.admin-dashboard-body #posMonitoring .pos-main-row { cursor: pointer; transition: background .18s ease; }
+.admin-dashboard-body #posMonitoring .pos-main-row:hover,
+.admin-dashboard-body #posMonitoring .pos-main-row:focus-visible,
+.admin-dashboard-body #posMonitoring .pos-main-row.is-expanded { background: rgba(255,255,255,.055); outline: none; }
+.admin-dashboard-body #posMonitoring .pos-invoice-id { display: block; color: #fff; font-size: .92rem; font-weight: 800; overflow-wrap: anywhere; }
+.admin-dashboard-body #posMonitoring .pos-invoice-time { display: block; margin-top: 4px; color: rgba(255,255,255,.68); font-size: .82rem; }
+.admin-dashboard-body #posMonitoring .pos-status-text { font-weight: 800; text-transform: capitalize; }
+.admin-dashboard-body #posMonitoring .pos-status-text.paid,
+.admin-dashboard-body #posMonitoring .pos-status-text.completed { color: #34c759; }
+.admin-dashboard-body #posMonitoring .pos-status-text.pending { color: #ffb547; }
+.admin-dashboard-body #posMonitoring .pos-status-text.failed,
+.admin-dashboard-body #posMonitoring .pos-status-text.cancelled { color: #ff6961; }
+.admin-dashboard-body #posMonitoring .pos-amount { color: #fff !important; font-weight: 700; white-space: nowrap; }
+.admin-dashboard-body #posMonitoring .pos-actions-button { width: auto; padding: 8px 20px; border: 1.5px solid #007aff !important; border-radius: 20px !important; background: transparent !important; color: #007aff !important; font-weight: 700; cursor: pointer; }
+.admin-dashboard-body #posMonitoring .pos-actions-button:hover,
+.admin-dashboard-body #posMonitoring .pos-actions-button:focus-visible { background: rgba(0,122,255,.15) !important; outline: none; }
+.admin-dashboard-body #posMonitoring .btn-pos-void-action {
+  width: auto;
+  padding: 6px 20px;
+  border: 1.5px solid #ef4444 !important;
+  border-radius: 9999px !important;
+  background: transparent !important;
+  color: #ef4444 !important;
+  font-size: .85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all .2s ease;
+}
+.admin-dashboard-body #posMonitoring .btn-pos-void-action:hover,
+.admin-dashboard-body #posMonitoring .btn-pos-void-action:focus-visible {
+  background: rgba(239,68,68,.12) !important;
+  outline: none;
+}
+.admin-dashboard-body #posMonitoring .pos-detail-row > td { padding: 0 !important; border: 0 !important; }
+.admin-dashboard-body #posMonitoring .pos-accordion-panel { max-height: 0; overflow: hidden; padding: 0 20px; border-radius: 12px; background: rgba(0,0,0,.2); transition: max-height .35s ease-in-out, padding .3s ease; }
+.admin-dashboard-body #posMonitoring .pos-accordion-panel.expanded { max-height: 500px; padding: 16px 20px; border: 1px solid rgba(255,255,255,.08); }
+.admin-dashboard-body #posMonitoring .pos-accordion-summary { margin: 0 0 10px; color: rgba(255,255,255,.9); }
+.admin-dashboard-body #posMonitoring .pos-detail-table-scroll { overflow-x: auto; }
+.admin-dashboard-body #posMonitoring .pos-detail-table { width: 100%; border-collapse: collapse; color: rgba(255,255,255,.9); }
+.admin-dashboard-body #posMonitoring .pos-detail-table th,
+.admin-dashboard-body #posMonitoring .pos-detail-table td { padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,.1); text-align: left; }
+.admin-dashboard-body #posMonitoring .pos-total-summary { display: block; margin-top: 10px; color: #fff; }
+.admin-dashboard-body #notifications-view .notifications-card-container { box-sizing: border-box; padding: 24px 28px !important; border: 1px solid rgba(255,255,255,.15) !important; border-radius: 16px; background: rgba(15,23,42,.45) !important; color: #fff !important; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.admin-dashboard-body #notifications-view .notifications-card-container > h2 { margin: 0 0 20px !important; color: #fff !important; font-size: 1.5rem !important; font-weight: 800 !important; }
+.admin-dashboard-body #notifications-view .notification-list-item { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 16px; border-bottom: 1px solid rgba(255,255,255,.08); color: rgba(255,255,255,.95); font-size: .95rem; line-height: 1.5; }
+.admin-dashboard-body #notifications-view .notification-list-time { flex: 0 0 auto; color: rgba(255,255,255,.62); font-size: .82rem; text-align: right; }
+.admin-dashboard-body .table-pagination-footer { display: flex; justify-content: flex-end; align-items: center; gap: 8px; width: 100%; margin-top: 20px; }
+.admin-dashboard-body .table-pagination-footer .pagination-page-display { color: #fff; font-size: .9rem; user-select: none; }
+.admin-dashboard-body .table-pagination-footer .current-page-num { color: #007aff; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.admin-dashboard-body .table-pagination-footer .btn-pagination-chevron { display: inline-flex; width: 32px; height: 32px; align-items: center; justify-content: center; padding: 0; border: 1.5px solid #007aff !important; border-radius: 50% !important; background: transparent !important; color: #007aff !important; font-weight: 800; cursor: pointer; transition: all .2s ease; }
+.admin-dashboard-body .table-pagination-footer .btn-pagination-chevron:hover:not(:disabled) { background: rgba(0,122,255,.15) !important; }
+.admin-dashboard-body .table-pagination-footer .btn-pagination-chevron:disabled { border-color: rgba(255,255,255,.2) !important; color: rgba(255,255,255,.3) !important; cursor: not-allowed; }
+.admin-dashboard-body .table-pagination-footer .report-page-input { box-sizing: border-box; width: 44px; height: 26px; margin: 0 4px; border: 1px solid #007aff; border-radius: 4px; outline: none; background: #fff; color: #0f172a; font-size: .85rem; font-weight: 700; text-align: center; }
+@media (max-width: 700px) {
+  .admin-dashboard-body .admin-dashboard-view .admin-card-container { padding: 20px 16px !important; }
+  .admin-dashboard-body #reportManagement .tool-filters > select,
+  .admin-dashboard-body #reportManagement .tool-filters > label,
+  .admin-dashboard-body #reportManagement .btn-generate-report,
+  .admin-dashboard-body #posMonitoring .tool-filters > input,
+  .admin-dashboard-body #posMonitoring .tool-filters > select,
+  .admin-dashboard-body #posMonitoring .tool-filters > label { flex: 1 1 100%; }
+  .admin-dashboard-body #reportManagement .tool-filters > input[type="date"] { flex: 1; min-width: 0; }
+}
+
+/* Master dashboard overview widgets */
+.master-overview-container { margin:32px 0 40px; padding:0 12px; color:#fff; }
+.master-overview-container .overview-title { margin:0 0 20px; color:#fff; font-size:1.4rem; font-weight:800; }
+.master-overview-grid { display:grid; grid-template-columns:repeat(12,minmax(0,1fr)); gap:20px; }
+.master-overview-grid .overview-card { min-width:0; height:320px; padding:18px; overflow:hidden; border:1px solid rgba(255,255,255,.12); border-radius:16px; background:rgba(10,18,36,.75); box-shadow:0 14px 32px rgba(0,0,0,.16); backdrop-filter:blur(14px); }
+.master-overview-grid .overview-bookings-card,.master-overview-grid .overview-services-card { height:340px; }
+.master-overview-grid .overview-bookings-card { grid-column:span 7; }
+.master-overview-grid .overview-services-card { grid-column:span 5; }
+.master-overview-grid .overview-inquiries-card,.master-overview-grid .overview-reports-card,.master-overview-grid .overview-notifications-card { grid-column:span 4; }
+.master-overview-grid .overview-card > header { display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:26px; margin-bottom:14px; }
+.master-overview-grid .overview-card h3 { margin:0; color:#fff; font-size:1rem; font-weight:800; }
+.overview-badge { display:inline-flex; align-items:center; padding:5px 9px; border:1px solid rgba(77,156,255,.36); border-radius:999px; background:rgba(33,112,216,.18); color:#9ccaff; font-size:.7rem; font-weight:700; white-space:nowrap; }
+.overview-badge.badge-catalog { border-color:rgba(62,213,225,.3); background:rgba(22,164,178,.17); color:#83e5e9; }
+.master-overview-grid .overview-scrollable-body { max-height:265px; overflow-y:auto; padding-right:5px; scrollbar-color:rgba(146,180,226,.45) transparent; scrollbar-width:thin; }
+.master-overview-grid .overview-services-card .overview-scrollable-body { max-height:265px; }
+.overview-list-item { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:10px 2px; border-bottom:1px solid rgba(255,255,255,.08); color:rgba(241,246,255,.88); font-size:.82rem; }
+.overview-list-item:last-child { border-bottom:0; }
+.overview-item-main { min-width:0; }
+.overview-item-title { display:block; color:#fff; font-weight:700; overflow-wrap:anywhere; }
+.overview-item-meta { display:block; margin-top:4px; color:rgba(224,234,250,.62); font-size:.74rem; line-height:1.4; }
+.overview-item-value { flex:none; color:#a9d6ff; font-size:.78rem; font-weight:700; text-align:right; }
+.overview-status { display:inline-flex; padding:3px 7px; border-radius:999px; background:rgba(244,174,50,.14); color:#ffd273; font-size:.68rem; font-weight:700; text-transform:capitalize; }
+.overview-status.status-confirmed { background:rgba(55,195,139,.14); color:#7fe5b6; }
+.overview-empty { margin:0; padding:18px 2px; color:rgba(224,234,250,.58); font-size:.82rem; }
+.overview-report-visual { width:100%; height:156px; margin-bottom:8px; }
+.overview-report-visual canvas { display:block; width:100%; height:100%; }
+.overview-recent-reports { max-height:88px; overflow-y:auto; color:rgba(240,245,255,.75); font-size:.72rem; }
+.overview-report-row { padding:5px 0; border-bottom:1px solid rgba(255,255,255,.07); }
+@media(max-width:1050px) {
+  .master-overview-grid .overview-bookings-card,.master-overview-grid .overview-services-card { grid-column:span 6; }
+  .master-overview-grid .overview-inquiries-card,.master-overview-grid .overview-reports-card,.master-overview-grid .overview-notifications-card { grid-column:span 6; }
+}
+@media(max-width:680px) {
+  .master-overview-container { padding:0; }
+  .master-overview-grid { grid-template-columns:minmax(0,1fr); gap:14px; }
+  .master-overview-grid .overview-card,.master-overview-grid .overview-bookings-card,.master-overview-grid .overview-services-card,.master-overview-grid .overview-inquiries-card,.master-overview-grid .overview-reports-card,.master-overview-grid .overview-notifications-card { grid-column:1; height:300px; }
+  .master-overview-grid .overview-bookings-card,.master-overview-grid .overview-services-card { height:320px; }
+}
+/* The dashboard pages load dashboard.css directly, so keep their overview cards in sync with the shared style. */
+.master-overview-grid .overview-card {
+  background: transparent !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 12px;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.3s ease, box-shadow 0.3s ease !important;
+}
+.master-overview-grid .overview-card:hover {
+  transform: translateY(-4px) !important;
+  border-color: rgba(56, 189, 248, 0.5) !important;
+  box-shadow: 0 10px 28px rgba(56, 189, 248, 0.15), 0 0 12px rgba(56, 189, 248, 0.1) !important;
+}
+.master-overview-grid .overview-scrollable-body::-webkit-scrollbar { width: 3px !important; }
+.master-overview-grid .overview-scrollable-body::-webkit-scrollbar-track { background: transparent !important; }
+.master-overview-grid .overview-scrollable-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15) !important;
+  border-radius: 10px !important;
+  transition: background 0.2s ease !important;
+}
+.master-overview-grid .overview-scrollable-body:hover::-webkit-scrollbar-thumb { background: rgba(56, 189, 248, 0.4) !important; }
+.master-overview-grid .overview-scrollable-body { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent; }
+/* Hide scrollbars in dashboard overview and data containers without disabling scroll. */
+.overview-scrollable-body,
+.overview-card,
+.dashboard-container,
+.table-responsive,
+div[style*="overflow"] {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+.overview-scrollable-body::-webkit-scrollbar,
+.overview-card::-webkit-scrollbar,
+.dashboard-container::-webkit-scrollbar,
+.table-responsive::-webkit-scrollbar,
+div[style*="overflow"]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+.master-overview-grid .overview-card h3 { font-weight: 400 !important; }
+/* Hide every dashboard scrollbar while keeping wheel and touch scrolling available. */
+.admin-dashboard-body *,
+.super-dashboard-body *,
+.overview-recent-reports {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+.admin-dashboard-body *::-webkit-scrollbar,
+.super-dashboard-body *::-webkit-scrollbar,
+.overview-recent-reports::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+/* Final overview and booking status presentation */
+.master-overview-grid .overview-card {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+.master-overview-grid .overview-card:hover {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  transform: translateY(-2px) !important;
+}
+.master-overview-grid .overview-status {
+  display: inline !important;
+  padding: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: none !important;
+  font-weight: 700 !important;
+}
+.master-overview-grid .overview-status.status-pending { color: #f97316 !important; }
+.master-overview-grid .overview-status.status-confirmed { color: #38bdf8 !important; }
+.master-overview-grid .overview-services-card .overview-item-value { color: #ffffff !important; font-weight: 700 !important; }
+.master-overview-grid .overview-inquiries-card .inquiry-date-text,
+.master-overview-grid .overview-inquiries-card .overview-inquiry-item .date-label { color: #ffffff !important; opacity: .9 !important; }
+.booking-status-pill.status.pending,
+.super-booking-panel .booking-status-text.pending,
+.super-booking-panel .booking-status.pending,
+.super-booking-panel .status-text.pending,
+.super-booking-panel .status-badge.pending {
+  color: #f97316 !important; font-weight: 700 !important; background: none !important; border: none !important; border-radius: 0 !important; padding: 0 !important;
+}
+.booking-status-pill.status.confirmed,
+.super-booking-panel .booking-status-text.confirmed,
+.super-booking-panel .booking-status.confirmed,
+.super-booking-panel .status-text.confirmed,
+.super-booking-panel .status-badge.confirmed {
+  color: #38bdf8 !important; font-weight: 700 !important; background: none !important; border: none !important; border-radius: 0 !important; padding: 0 !important;
+}
+/* Five-column recent bookings table rows */
+#overview-bookings-list { overflow-x: hidden; }
+.overview-booking-row {
+  display: grid;
+  grid-template-columns: 18fr 28fr 28fr 16fr 10fr;
+  column-gap: 4px;
+  align-items: center;
+  width: 100% !important;
+  min-width: 0;
+  min-height: 58px;
+  box-sizing: border-box;
+  padding: 8px 4px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  color: rgba(255,255,255,.85);
+  font-size: .82rem;
+}
+.overview-booking-customer,
+.overview-booking-email,
+.overview-booking-branch,
+.overview-booking-status { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.overview-booking-customer { padding-right: 10px; color: #fff; font-weight: 700; }
+.overview-booking-email { padding: 0 10px; }
+.overview-booking-service { min-width: 0; padding: 0 10px; }
+.overview-booking-service strong,
+.overview-booking-service span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.overview-booking-service strong { color: #fff; font-weight: 700; }
+.overview-booking-service span { margin-top: 3px; color: rgba(255,255,255,.7); font-size: .8rem; }
+.overview-booking-branch { padding: 0 10px; }
+.overview-booking-status { text-align: right; font-weight: 700; }
+/* Hover ambient glow for the Recent Bookings overview card. */
+.master-overview-grid .overview-bookings-card { position: relative; }
+.master-overview-grid .overview-bookings-card:hover {
+  animation: overview-booking-ambient-glow 2.4s ease-in-out infinite alternate;
+}
+@keyframes overview-booking-ambient-glow {
+  from { box-shadow: 0 0 4px rgba(56,189,248,.08); }
+  to { box-shadow: 0 0 18px rgba(56,189,248,.28), 0 0 34px rgba(56,189,248,.12); }
+}
+@media(max-width:760px) {
+  .overview-booking-row { font-size: .72rem; grid-template-columns: 18fr 28fr 28fr 16fr 10fr; }
+  .overview-booking-service span { font-size: .66rem; }
+}
+@media(max-width:520px) {
+  .overview-booking-row { font-size: .64rem; column-gap: 2px; }
+  .overview-booking-customer,.overview-booking-email,.overview-booking-branch { padding-left: 2px; padding-right: 2px; }
+  .overview-booking-service { padding: 0 2px; }
+  .overview-booking-service span { font-size: .58rem; }
+}
+@media(prefers-reduced-motion: reduce) {
+  .master-overview-grid .overview-bookings-card:hover { animation: none; }
+}
+
+/* Full-width top analytics panel and three-row overview layout */
+.master-overview-grid .overview-reports-card {
+  grid-column: 1 / -1;
+  height: 300px;
+  min-height: 0;
+  overflow: visible;
+}
+.master-overview-grid .overview-inquiries-card,
+.master-overview-grid .overview-notifications-card { grid-column: span 6; }
+.master-overview-grid .overview-card-label {
+  margin: 0 0 14px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 400 !important;
+}
+.master-overview-grid .overview-reports-card .overview-card-label { font-size: 1.1rem; }
+.overview-analytics-header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.overview-metric-control { position:relative; flex:0 0 auto; }
+.overview-metric-toggle { padding:7px 12px; border:1px solid #38bdf8; border-radius:8px; background:transparent; color:#38bdf8; font:inherit; font-size:.8rem; cursor:pointer; transition:background .2s ease, box-shadow .2s ease; }
+.overview-metric-toggle:hover,
+.overview-metric-toggle[aria-expanded="true"] { background:rgba(56,189,248,.1); box-shadow:0 0 14px rgba(56,189,248,.16); }
+.overview-metric-toggle:focus-visible { outline:2px solid rgba(56,189,248,.65); outline-offset:2px; }
+.overview-metric-menu { position:absolute; z-index:30; top:calc(100% + 7px); right:0; display:grid; min-width:210px; padding:5px; border:1px solid rgba(56,189,248,.28); border-radius:10px; background:#0c1732; box-shadow:0 12px 30px rgba(0,0,0,.32); }
+.overview-metric-menu[hidden] { display:none !important; }
+.overview-metric-menu .metric-opt { width:100%; padding:9px 10px; border:0; border-radius:6px; background:transparent; color:#fff; font:inherit; font-size:.82rem; text-align:left; cursor:pointer; }
+.overview-metric-menu .metric-opt:hover,
+.overview-metric-menu .metric-opt:focus-visible { outline:none; background:rgba(56,189,248,.14); color:#7dd3fc; }
+.overview-report-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr);
+  align-items: center;
+  gap: 24px;
+}
+.overview-report-visual { height: 220px; margin: 0; }
+.master-overview-grid .overview-reports-card .overview-recent-reports {
+  max-height: 200px;
+  overflow-y: auto;
+  color: rgba(255,255,255,.9);
+  font-size: .85rem;
+}
+@media(max-width:680px) {
+  .master-overview-grid .overview-inquiries-card,
+  .master-overview-grid .overview-notifications-card { grid-column: 1; }
+  .master-overview-grid .overview-reports-card { height: auto; min-height: 0; }
+  .overview-report-layout { grid-template-columns: minmax(0,1fr); gap: 16px; }
+  .overview-report-visual { height: 190px; }
+  .master-overview-grid .overview-reports-card .overview-recent-reports { max-height: 180px; }
+}
+@media(max-width:520px) {
+  .overview-analytics-header { align-items:flex-start; flex-direction:column; }
+  .overview-metric-menu { right:auto; left:0; }
+}
+/* Unified Glassmorphism Card & Container Styling for Admin & Super Admin */
+.admin-dashboard-body .card,
+.super-dashboard-body .card,
+.admin-dashboard-body .panel,
+.super-dashboard-body .panel,
+.admin-dashboard-body .service-card,
+.super-dashboard-body .service-card,
+.admin-dashboard-body .tool-card,
+.super-dashboard-body .tool-card,
+.admin-dashboard-body .booking-card,
+.super-dashboard-body .booking-card,
+.admin-dashboard-body .booking-item-row,
+.super-dashboard-body .booking-item-row,
+.admin-dashboard-body .customer-card,
+.super-dashboard-body .customer-card,
+.admin-dashboard-body .customer-records-card-container,
+.super-dashboard-body .customer-records-card-container,
+.admin-dashboard-body .report-card,
+.super-dashboard-body .report-card,
+.admin-dashboard-body .reports-card-container,
+.super-dashboard-body .reports-card-container,
+.admin-dashboard-body .pos-card,
+.super-dashboard-body .pos-card,
+.admin-dashboard-body .pos-card-container,
+.super-dashboard-body .pos-card-container,
+.admin-dashboard-body .notification-card,
+.super-dashboard-body .notification-card,
+.admin-dashboard-body .notifications-card-container,
+.super-dashboard-body .notifications-card-container,
+.admin-dashboard-body .inquiries-card-container,
+.super-dashboard-body .inquiries-card-container,
+.admin-dashboard-body .system-card-container,
+.super-dashboard-body .system-card-container,
+.admin-dashboard-body .dashboard-module-box,
+.super-dashboard-body .dashboard-module-box,
+.admin-dashboard-body .table-responsive-container,
+.super-dashboard-body .table-responsive-container,
+.admin-dashboard-body .table-scroll,
+.super-dashboard-body .table-scroll,
+.admin-dashboard-body .report-history-scroll-wrapper,
+.super-dashboard-body .report-history-scroll-wrapper,
+.admin-dashboard-body .master-overview-grid .overview-card,
+.super-dashboard-body .master-overview-grid .overview-card {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease, border-color 0.35s ease !important;
+  border-radius: 12px;
+}
+
+/* Unified Ambient Neon Glow on Hover */
+.admin-dashboard-body .card:hover,
+.super-dashboard-body .card:hover,
+.admin-dashboard-body .panel:hover,
+.super-dashboard-body .panel:hover,
+.admin-dashboard-body .service-card:hover,
+.super-dashboard-body .service-card:hover,
+.admin-dashboard-body .tool-card:hover,
+.super-dashboard-body .tool-card:hover,
+.admin-dashboard-body .booking-card:hover,
+.super-dashboard-body .booking-card:hover,
+.admin-dashboard-body .booking-item-row:hover,
+.super-dashboard-body .booking-item-row:hover,
+.admin-dashboard-body .customer-card:hover,
+.super-dashboard-body .customer-card:hover,
+.admin-dashboard-body .customer-records-card-container:hover,
+.super-dashboard-body .customer-records-card-container:hover,
+.admin-dashboard-body .report-card:hover,
+.super-dashboard-body .report-card:hover,
+.admin-dashboard-body .reports-card-container:hover,
+.super-dashboard-body .reports-card-container:hover,
+.admin-dashboard-body .pos-card:hover,
+.super-dashboard-body .pos-card:hover,
+.admin-dashboard-body .pos-card-container:hover,
+.super-dashboard-body .pos-card-container:hover,
+.admin-dashboard-body .notification-card:hover,
+.super-dashboard-body .notification-card:hover,
+.admin-dashboard-body .notifications-card-container:hover,
+.super-dashboard-body .notifications-card-container:hover,
+.admin-dashboard-body .inquiries-card-container:hover,
+.super-dashboard-body .inquiries-card-container:hover,
+.admin-dashboard-body .system-card-container:hover,
+.super-dashboard-body .system-card-container:hover,
+.admin-dashboard-body .dashboard-module-box:hover,
+.super-dashboard-body .dashboard-module-box:hover,
+.admin-dashboard-body .table-responsive-container:hover,
+.super-dashboard-body .table-responsive-container:hover,
+.admin-dashboard-body .table-scroll:hover,
+.super-dashboard-body .table-scroll:hover,
+.admin-dashboard-body .master-overview-grid .overview-card:hover,
+.super-dashboard-body .master-overview-grid .overview-card:hover {
+  transform: translateY(-3px) !important;
+  border: 1px solid rgba(56, 189, 248, 0.35) !important;
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.22), 0 0 10px rgba(56, 189, 248, 0.12) !important;
+}
+/* Completely remove fills, outlines, and borders from dashboard module containers */
+.admin-dashboard-body .card, .super-dashboard-body .card,
+.admin-dashboard-body .service-card, .super-dashboard-body .service-card,
+.admin-dashboard-body .booking-card, .super-dashboard-body .booking-card,
+.admin-dashboard-body .customer-card, .super-dashboard-body .customer-card,
+.admin-dashboard-body .report-card, .super-dashboard-body .report-card,
+.admin-dashboard-body .pos-card, .super-dashboard-body .pos-card,
+.admin-dashboard-body .notification-card, .super-dashboard-body .notification-card,
+.admin-dashboard-body .dashboard-module-box, .super-dashboard-body .dashboard-module-box,
+.admin-dashboard-body .table-responsive, .super-dashboard-body .table-responsive,
+.admin-dashboard-body .table-responsive-container, .super-dashboard-body .table-responsive-container,
+.admin-dashboard-body .overview-card, .super-dashboard-body .overview-card,
+.admin-dashboard-body .filter-card, .super-dashboard-body .filter-card,
+.admin-dashboard-body .panel-container, .super-dashboard-body .panel-container,
+.admin-dashboard-body .panel, .super-dashboard-body .panel,
+.admin-dashboard-body .tool-card, .super-dashboard-body .tool-card,
+.admin-dashboard-body .admin-card-container, .super-dashboard-body .admin-card-container,
+.admin-dashboard-body .inquiries-card-container, .super-dashboard-body .inquiries-card-container,
+.admin-dashboard-body .customer-records-card-container, .super-dashboard-body .customer-records-card-container,
+.admin-dashboard-body .reports-card-container, .super-dashboard-body .reports-card-container,
+.admin-dashboard-body .pos-card-container, .super-dashboard-body .pos-card-container,
+.admin-dashboard-body .notifications-card-container, .super-dashboard-body .notifications-card-container,
+.admin-dashboard-body .system-card-container, .super-dashboard-body .system-card-container,
+.admin-dashboard-body .table-scroll, .super-dashboard-body .table-scroll,
+.admin-dashboard-body .report-history-scroll-wrapper, .super-dashboard-body .report-history-scroll-wrapper,
+.admin-dashboard-body .booking-item-row, .super-dashboard-body .booking-item-row,
+.admin-dashboard-body .pos-main-row, .super-dashboard-body .pos-main-row,
+.admin-dashboard-body .notification-list-item, .super-dashboard-body .notification-list-item {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Keep the subtle lift and ambient blue glow, without adding solid borders. */
+.admin-dashboard-body .card:hover, .super-dashboard-body .card:hover,
+.admin-dashboard-body .service-card:hover, .super-dashboard-body .service-card:hover,
+.admin-dashboard-body .booking-card:hover, .super-dashboard-body .booking-card:hover,
+.admin-dashboard-body .customer-card:hover, .super-dashboard-body .customer-card:hover,
+.admin-dashboard-body .report-card:hover, .super-dashboard-body .report-card:hover,
+.admin-dashboard-body .pos-card:hover, .super-dashboard-body .pos-card:hover,
+.admin-dashboard-body .notification-card:hover, .super-dashboard-body .notification-card:hover,
+.admin-dashboard-body .dashboard-module-box:hover, .super-dashboard-body .dashboard-module-box:hover,
+.admin-dashboard-body .overview-card:hover, .super-dashboard-body .overview-card:hover,
+.admin-dashboard-body .panel:hover, .super-dashboard-body .panel:hover,
+.admin-dashboard-body .tool-card:hover, .super-dashboard-body .tool-card:hover,
+.admin-dashboard-body .admin-card-container:hover, .super-dashboard-body .admin-card-container:hover,
+.admin-dashboard-body .inquiries-card-container:hover, .super-dashboard-body .inquiries-card-container:hover,
+.admin-dashboard-body .customer-records-card-container:hover, .super-dashboard-body .customer-records-card-container:hover,
+.admin-dashboard-body .reports-card-container:hover, .super-dashboard-body .reports-card-container:hover,
+.admin-dashboard-body .pos-card-container:hover, .super-dashboard-body .pos-card-container:hover,
+.admin-dashboard-body .notifications-card-container:hover, .super-dashboard-body .notifications-card-container:hover,
+.admin-dashboard-body .system-card-container:hover, .super-dashboard-body .system-card-container:hover,
+.admin-dashboard-body .table-scroll:hover, .super-dashboard-body .table-scroll:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  transform: translateY(-3px) !important;
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.22), 0 0 10px rgba(56, 189, 248, 0.12) !important;
+}
+/* Prevent white outline flashing on hover/focus across dashboard containers */
+.admin-dashboard-body .overview-card, .super-dashboard-body .overview-card,
+.admin-dashboard-body .card, .super-dashboard-body .card,
+.admin-dashboard-body .service-card, .super-dashboard-body .service-card,
+.admin-dashboard-body .tool-card, .super-dashboard-body .tool-card,
+.admin-dashboard-body .booking-card, .super-dashboard-body .booking-card,
+.admin-dashboard-body .booking-item-row, .super-dashboard-body .booking-item-row,
+.admin-dashboard-body .customer-card, .super-dashboard-body .customer-card,
+.admin-dashboard-body .customer-records-card-container, .super-dashboard-body .customer-records-card-container,
+.admin-dashboard-body .report-card, .super-dashboard-body .report-card,
+.admin-dashboard-body .reports-card-container, .super-dashboard-body .reports-card-container,
+.admin-dashboard-body .pos-card, .super-dashboard-body .pos-card,
+.admin-dashboard-body .pos-card-container, .super-dashboard-body .pos-card-container,
+.admin-dashboard-body .notification-card, .super-dashboard-body .notification-card,
+.admin-dashboard-body .notifications-card-container, .super-dashboard-body .notifications-card-container,
+.admin-dashboard-body .inquiries-card-container, .super-dashboard-body .inquiries-card-container,
+.admin-dashboard-body .system-card-container, .super-dashboard-body .system-card-container,
+.admin-dashboard-body .dashboard-module-box, .super-dashboard-body .dashboard-module-box,
+.admin-dashboard-body .panel, .super-dashboard-body .panel,
+.admin-dashboard-body .panel-container, .super-dashboard-body .panel-container,
+.admin-dashboard-body .admin-card-container, .super-dashboard-body .admin-card-container,
+.admin-dashboard-body .table-responsive, .super-dashboard-body .table-responsive,
+.admin-dashboard-body .table-responsive-container, .super-dashboard-body .table-responsive-container,
+.admin-dashboard-body .table-scroll, .super-dashboard-body .table-scroll,
+.admin-dashboard-body .report-history-scroll-wrapper, .super-dashboard-body .report-history-scroll-wrapper,
+.admin-dashboard-body .filter-card, .super-dashboard-body .filter-card {
+  outline: none !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  transition: transform 0.3s ease, box-shadow 0.3s ease !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.admin-dashboard-body .overview-card:hover, .super-dashboard-body .overview-card:hover,
+.admin-dashboard-body .overview-card:focus, .super-dashboard-body .overview-card:focus,
+.admin-dashboard-body .overview-card:active, .super-dashboard-body .overview-card:active,
+.admin-dashboard-body .card:hover, .super-dashboard-body .card:hover,
+.admin-dashboard-body .card:focus, .super-dashboard-body .card:focus,
+.admin-dashboard-body .card:active, .super-dashboard-body .card:active,
+.admin-dashboard-body .service-card:hover, .super-dashboard-body .service-card:hover,
+.admin-dashboard-body .service-card:focus, .super-dashboard-body .service-card:focus,
+.admin-dashboard-body .service-card:active, .super-dashboard-body .service-card:active,
+.admin-dashboard-body .tool-card:hover, .super-dashboard-body .tool-card:hover,
+.admin-dashboard-body .tool-card:focus, .super-dashboard-body .tool-card:focus,
+.admin-dashboard-body .tool-card:active, .super-dashboard-body .tool-card:active,
+.admin-dashboard-body .booking-card:hover, .super-dashboard-body .booking-card:hover,
+.admin-dashboard-body .booking-item-row:hover, .super-dashboard-body .booking-item-row:hover,
+.admin-dashboard-body .booking-item-row:focus, .super-dashboard-body .booking-item-row:focus,
+.admin-dashboard-body .booking-item-row:active, .super-dashboard-body .booking-item-row:active,
+.admin-dashboard-body .customer-card:hover, .super-dashboard-body .customer-card:hover,
+.admin-dashboard-body .report-card:hover, .super-dashboard-body .report-card:hover,
+.admin-dashboard-body .pos-card:hover, .super-dashboard-body .pos-card:hover,
+.admin-dashboard-body .notification-card:hover, .super-dashboard-body .notification-card:hover,
+.admin-dashboard-body .dashboard-module-box:hover, .super-dashboard-body .dashboard-module-box:hover,
+.admin-dashboard-body .panel:hover, .super-dashboard-body .panel:hover,
+.admin-dashboard-body .panel:focus, .super-dashboard-body .panel:focus,
+.admin-dashboard-body .panel:active, .super-dashboard-body .panel:active,
+.admin-dashboard-body .admin-card-container:hover, .super-dashboard-body .admin-card-container:hover,
+.admin-dashboard-body .table-responsive:hover, .super-dashboard-body .table-responsive:hover,
+.admin-dashboard-body .table-responsive-container:hover, .super-dashboard-body .table-responsive-container:hover,
+.admin-dashboard-body .table-scroll:hover, .super-dashboard-body .table-scroll:hover,
+.admin-dashboard-body .report-history-scroll-wrapper:hover, .super-dashboard-body .report-history-scroll-wrapper:hover,
+.admin-dashboard-body .booking-item-row:focus-visible, .super-dashboard-body .booking-item-row:focus-visible,
+.admin-dashboard-body .account-summary-row:focus-visible, .super-dashboard-body .account-summary-row:focus-visible {
+  outline: none !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.25) !important;
+}
+/* Final dashboard-specific Flash Fix for Overview Widgets */
+.admin-dashboard-body .master-overview-grid .overview-card *,
+.super-dashboard-body .master-overview-grid .overview-card * {
+  outline: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+.admin-dashboard-body .master-overview-grid .overview-card,
+.super-dashboard-body .master-overview-grid .overview-card {
+  background: transparent !important;
+  border: 0px solid transparent !important;
+  outline: 0px solid transparent !important;
+  box-shadow: none !important;
+  transition: transform 0.25s ease, box-shadow 0.25s ease !important;
+}
+.admin-dashboard-body .master-overview-grid .overview-card:hover,
+.admin-dashboard-body .master-overview-grid .overview-card:focus,
+.admin-dashboard-body .master-overview-grid .overview-card:active,
+.admin-dashboard-body .master-overview-grid .overview-card:focus-visible,
+.super-dashboard-body .master-overview-grid .overview-card:hover,
+.super-dashboard-body .master-overview-grid .overview-card:focus,
+.super-dashboard-body .master-overview-grid .overview-card:active,
+.super-dashboard-body .master-overview-grid .overview-card:focus-visible {
+  background: transparent !important;
+  border: 0px solid transparent !important;
+  outline: 0px solid transparent !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.25) !important;
+}
+/* Final transparent surfaces for all dashboard sub-pages and module contents */
+.admin-dashboard-body #services-section, .super-dashboard-body #services-section,
+.admin-dashboard-body #bookings-section, .super-dashboard-body #bookings-section,
+.admin-dashboard-body #inquiries-section, .super-dashboard-body #inquiries-section,
+.admin-dashboard-body #customers-section, .super-dashboard-body #customers-section,
+.admin-dashboard-body #reports-section, .super-dashboard-body #reports-section,
+.admin-dashboard-body #pos-section, .super-dashboard-body #pos-section,
+.admin-dashboard-body #notifications-section, .super-dashboard-body #notifications-section,
+.admin-dashboard-body #services-view, .super-dashboard-body #services-view,
+.admin-dashboard-body #bookings-view, .super-dashboard-body #bookings-view,
+.admin-dashboard-body #customers-view, .super-dashboard-body #customers-view,
+.admin-dashboard-body #reports-view, .super-dashboard-body #reports-view,
+.admin-dashboard-body #pos-transactions-view, .super-dashboard-body #pos-transactions-view,
+.admin-dashboard-body #notifications-view, .super-dashboard-body #notifications-view,
+.admin-dashboard-body .main-content-wrapper, .super-dashboard-body .main-content-wrapper,
+.admin-dashboard-body .section-container, .super-dashboard-body .section-container,
+.admin-dashboard-body .main-content-card, .super-dashboard-body .main-content-card,
+.admin-dashboard-body .subpage-container, .super-dashboard-body .subpage-container,
+.admin-dashboard-body .panel, .super-dashboard-body .panel,
+.admin-dashboard-body .panel-container, .super-dashboard-body .panel-container,
+.admin-dashboard-body .services-container-card, .super-dashboard-body .services-container-card,
+.admin-dashboard-body .super-booking-panel, .super-dashboard-body .super-booking-panel,
+.admin-dashboard-body .inquiries-card-container, .super-dashboard-body .inquiries-card-container,
+.admin-dashboard-body .customer-records-card-container, .super-dashboard-body .customer-records-card-container,
+.admin-dashboard-body .reports-card-container, .super-dashboard-body .reports-card-container,
+.admin-dashboard-body .pos-card-container, .super-dashboard-body .pos-card-container,
+.admin-dashboard-body .notifications-card-container, .super-dashboard-body .notifications-card-container,
+.admin-dashboard-body .system-card-container, .super-dashboard-body .system-card-container,
+.admin-dashboard-body .card, .super-dashboard-body .card,
+.admin-dashboard-body .service-card, .super-dashboard-body .service-card,
+.admin-dashboard-body .tool-card, .super-dashboard-body .tool-card,
+.admin-dashboard-body .service-card-item, .super-dashboard-body .service-card-item,
+.admin-dashboard-body .booking-card, .super-dashboard-body .booking-card,
+.admin-dashboard-body .booking-item-row, .super-dashboard-body .booking-item-row,
+.admin-dashboard-body .customer-card, .super-dashboard-body .customer-card,
+.admin-dashboard-body .report-card, .super-dashboard-body .report-card,
+.admin-dashboard-body .pos-card, .super-dashboard-body .pos-card,
+.admin-dashboard-body .notification-card, .super-dashboard-body .notification-card,
+.admin-dashboard-body .dashboard-module-box, .super-dashboard-body .dashboard-module-box,
+.admin-dashboard-body .filter-card, .super-dashboard-body .filter-card,
+.admin-dashboard-body .table-responsive, .super-dashboard-body .table-responsive,
+.admin-dashboard-body .table-responsive-container, .super-dashboard-body .table-responsive-container,
+.admin-dashboard-body .table-scroll, .super-dashboard-body .table-scroll,
+.admin-dashboard-body .report-history-scroll-wrapper, .super-dashboard-body .report-history-scroll-wrapper,
+.admin-dashboard-body .overview-card, .super-dashboard-body .overview-card,
+.admin-dashboard-body .report-history-row-item, .super-dashboard-body .report-history-row-item,
+.admin-dashboard-body .notification-list-item, .super-dashboard-body .notification-list-item,
+.admin-dashboard-body .pos-main-row, .super-dashboard-body .pos-main-row,
+.admin-dashboard-body .pos-accordion-panel, .super-dashboard-body .pos-accordion-panel,
+.admin-dashboard-body #inquiryResults tr, .super-dashboard-body #inquiryResults tr,
+.admin-dashboard-body #customerResults tr, .super-dashboard-body #customerResults tr,
+.admin-dashboard-body #posMonitoring .pos-main-row > td, .super-dashboard-body #posMonitoring .pos-main-row > td {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.admin-dashboard-body #services-section:hover, .super-dashboard-body #services-section:hover,
+.admin-dashboard-body #bookings-section:hover, .super-dashboard-body #bookings-section:hover,
+.admin-dashboard-body #inquiries-section:hover, .super-dashboard-body #inquiries-section:hover,
+.admin-dashboard-body #customers-section:hover, .super-dashboard-body #customers-section:hover,
+.admin-dashboard-body #reports-section:hover, .super-dashboard-body #reports-section:hover,
+.admin-dashboard-body #pos-section:hover, .super-dashboard-body #pos-section:hover,
+.admin-dashboard-body #notifications-section:hover, .super-dashboard-body #notifications-section:hover,
+.admin-dashboard-body .section-container:hover, .super-dashboard-body .section-container:hover,
+.admin-dashboard-body .panel:hover, .super-dashboard-body .panel:hover,
+.admin-dashboard-body .tool-card:hover, .super-dashboard-body .tool-card:hover,
+.admin-dashboard-body .service-card-item:hover, .super-dashboard-body .service-card-item:hover,
+.admin-dashboard-body .booking-item-row:hover, .super-dashboard-body .booking-item-row:hover,
+.admin-dashboard-body .customer-records-card-container:hover, .super-dashboard-body .customer-records-card-container:hover,
+.admin-dashboard-body .inquiries-card-container:hover, .super-dashboard-body .inquiries-card-container:hover,
+.admin-dashboard-body .reports-card-container:hover, .super-dashboard-body .reports-card-container:hover,
+.admin-dashboard-body .pos-card-container:hover, .super-dashboard-body .pos-card-container:hover,
+.admin-dashboard-body .notifications-card-container:hover, .super-dashboard-body .notifications-card-container:hover,
+.admin-dashboard-body .overview-card:hover, .super-dashboard-body .overview-card:hover,
+.admin-dashboard-body .pos-main-row:hover, .super-dashboard-body .pos-main-row:hover,
+.admin-dashboard-body .notification-list-item:hover, .super-dashboard-body .notification-list-item:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, .18) !important;
+}
+/* High-specificity transparency overrides for the actual dashboard sub-page modules */
+body.admin-dashboard-body #services-view .services-container-card,
+body.super-dashboard-body #services-view .services-container-card,
+body.admin-dashboard-body #bookings-view #bookingManagement,
+body.super-dashboard-body #bookings-view #bookingManagement,
+body.admin-dashboard-body #customers-view #inquiryManagement,
+body.super-dashboard-body #customers-view #inquiryManagement,
+body.admin-dashboard-body #customers-view #customerManagement,
+body.super-dashboard-body #customers-view #customerManagement,
+body.admin-dashboard-body #reports-view #reportManagement,
+body.super-dashboard-body #reports-view #reportManagement,
+body.admin-dashboard-body #pos-transactions-view #posMonitoring,
+body.super-dashboard-body #pos-transactions-view #posMonitoring,
+body.admin-dashboard-body #notifications-view .notifications-card-container,
+body.super-dashboard-body #notifications-view .notifications-card-container,
+body.admin-dashboard-body .admin-dashboard-view > .panel,
+body.super-dashboard-body .super-dashboard-view > .panel {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+body.admin-dashboard-body #services-view .tool-card,
+body.admin-dashboard-body #services-view .service-card-item,
+body.super-dashboard-body #services-view .tool-card,
+body.super-dashboard-body #services-view .service-card-item {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid rgba(255, 255, 255, .08) !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: transform .25s ease, box-shadow .25s ease !important;
+}
+body.admin-dashboard-body #services-view .tool-card:hover,
+body.admin-dashboard-body #services-view .service-card-item:hover,
+body.super-dashboard-body #services-view .tool-card:hover,
+body.super-dashboard-body #services-view .service-card-item:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: 1px solid transparent !important;
+  outline: none !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, .25) !important;
+}
+
+body.admin-dashboard-body #bookings-view #bookingResults,
+body.super-dashboard-body #bookings-view #bookingResults,
+body.admin-dashboard-body #customers-view .table-scroll,
+body.super-dashboard-body #customers-view .table-scroll,
+body.admin-dashboard-body #customers-view .inquiries-card-container table,
+body.super-dashboard-body #customers-view .inquiries-card-container table,
+body.admin-dashboard-body #reports-view #reportHistory,
+body.super-dashboard-body #reports-view #reportHistory,
+body.admin-dashboard-body #reports-view .report-history-scroll-wrapper,
+body.super-dashboard-body #reports-view .report-history-scroll-wrapper,
+body.admin-dashboard-body #pos-transactions-view .pos-table-scroll,
+body.super-dashboard-body #pos-transactions-view .pos-table-scroll,
+body.admin-dashboard-body #notifications-view .notification-list,
+body.super-dashboard-body #notifications-view .notification-list,
+body.admin-dashboard-body #notifications-view .notification-list-item,
+body.super-dashboard-body #notifications-view .notification-list-item {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Keep the real dashboard module panels transparent in every state. */
+body.admin-dashboard-body #serviceManagement,
+body.super-dashboard-body #serviceManagement,
+body.admin-dashboard-body #bookingManagement,
+body.super-dashboard-body #bookingManagement,
+body.admin-dashboard-body #inquiryManagement,
+body.super-dashboard-body #inquiryManagement,
+body.admin-dashboard-body #customerManagement,
+body.super-dashboard-body #customerManagement,
+body.admin-dashboard-body #reportManagement,
+body.super-dashboard-body #reportManagement,
+body.admin-dashboard-body #posMonitoring,
+body.super-dashboard-body #posMonitoring,
+body.admin-dashboard-body #notifications-view .notifications-card-container,
+body.super-dashboard-body #notifications-view .notifications-card-container {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: transform .25s ease, box-shadow .25s ease !important;
+}
+
+body.admin-dashboard-body #serviceManagement:hover,
+body.super-dashboard-body #serviceManagement:hover,
+body.admin-dashboard-body #bookingManagement:hover,
+body.super-dashboard-body #bookingManagement:hover,
+body.admin-dashboard-body #inquiryManagement:hover,
+body.super-dashboard-body #inquiryManagement:hover,
+body.admin-dashboard-body #customerManagement:hover,
+body.super-dashboard-body #customerManagement:hover,
+body.admin-dashboard-body #reportManagement:hover,
+body.super-dashboard-body #reportManagement:hover,
+body.admin-dashboard-body #posMonitoring:hover,
+body.super-dashboard-body #posMonitoring:hover,
+body.admin-dashboard-body #notifications-view .notifications-card-container:hover,
+body.super-dashboard-body #notifications-view .notifications-card-container:hover {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 0 20px rgba(56, 189, 248, .25) !important;
+}
+
+body.admin-dashboard-body #bookingResults,
+body.super-dashboard-body #bookingResults,
+body.admin-dashboard-body #inquiryManagement .table-scroll,
+body.super-dashboard-body #inquiryManagement .table-scroll,
+body.admin-dashboard-body #customerManagement .table-scroll,
+body.super-dashboard-body #customerManagement .table-scroll,
+body.admin-dashboard-body #reportManagement #reportHistory,
+body.super-dashboard-body #reportManagement #reportHistory,
+body.admin-dashboard-body #posMonitoring .table-scroll,
+body.super-dashboard-body #posMonitoring .table-scroll,
+body.admin-dashboard-body #notificationResults,
+body.super-dashboard-body #notificationResults,
+body.admin-dashboard-body #inquiryManagement table,
+body.super-dashboard-body #inquiryManagement table,
+body.admin-dashboard-body #customerManagement table,
+body.super-dashboard-body #customerManagement table,
+body.admin-dashboard-body #posMonitoring table,
+body.super-dashboard-body #posMonitoring table {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Consistent spacing and separators for overview service rows. */
+.overview-service-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100%;
+  box-sizing: border-box;
+  padding-block: 12px !important;
+  margin-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, .1) !important;
+}
+
+/* Reveal service management actions when a service card is hovered. */
+.service-card .service-actions,
+.service-card .btn-edit-service,
+.service-card .btn-remove-service,
+.service-item-card .card-actions,
+.service-card-item .service-card-actions,
+.service-card-item .btn-service-toggle-edit,
+.service-card-item .btn-service-remove {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  transition: opacity .25s ease, visibility .25s ease !important;
+}
+
+.service-card:hover .service-actions,
+.service-card:hover .btn-edit-service,
+.service-card:hover .btn-remove-service,
+.service-item-card:hover .card-actions,
+.service-card-item:hover .service-card-actions,
+.service-card-item:hover .btn-service-toggle-edit,
+.service-card-item:hover .btn-service-remove {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+@media (hover: none) {
+  .service-card .service-actions,
+  .service-card .btn-edit-service,
+  .service-card .btn-remove-service,
+  .service-item-card .card-actions,
+  .service-card-item .service-card-actions,
+  .service-card-item .btn-service-toggle-edit,
+  .service-card-item .btn-service-remove {
+    opacity: 1 !important;
+    visibility: visible !important;
+  }
+}
+
+/* Clickable, text-only notification rows and their booking detail dialog. */
+.overview-notification-row { cursor: pointer; }
+.overview-notification-row:focus-visible { outline: none !important; box-shadow: 0 0 20px rgba(56,189,248,.25) !important; }
+.notification-detail-modal {
+  width: min(680px, calc(100vw - 32px)); max-height: min(80vh, 760px); overflow-y: auto;
+  padding: 24px; border: 1px solid rgba(255,255,255,.16); border-radius: 16px;
+  background: #0b1530; color: #fff; box-shadow: 0 18px 60px rgba(0,0,0,.45);
+}
+.notification-detail-modal::backdrop { background: rgba(2,6,23,.72); }
+.notification-detail-modal h2 { margin: 4px 0 20px; color: #fff; font-size: 1.2rem; }
+.notification-detail-modal dl { display: grid; grid-template-columns: minmax(150px,.7fr) minmax(0,1.3fr); gap: 10px 18px; margin: 0; }
+.notification-detail-modal dt { color: rgba(255,255,255,.65); }
+.notification-detail-modal dd { margin: 0; color: #fff; overflow-wrap: anywhere; }
+.notification-detail-close { display: block; margin-left: auto; padding: 7px 14px; border: 1px solid rgba(255,255,255,.2); border-radius: 8px; background: transparent; color: #fff; cursor: pointer; }
+@media (max-width: 560px) {
+  .notification-detail-modal dl { grid-template-columns: 1fr; gap: 4px; }
+  .notification-detail-modal dd { margin-bottom: 10px; }
+}
+
+/* Structured Super Admin system settings. */
+.super-dashboard-body #settings-section { color:#fff; padding-top:8px; }
+.super-dashboard-body .settings-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+.super-dashboard-body .settings-grid > .col-lg-6 { min-width:0; }
+.super-dashboard-body .settings-grid > .col-12 { grid-column:1 / -1; min-width:0; }
+.super-dashboard-body .settings-card {
+  height:100%;
+  padding:24px;
+  border:0;
+  border-radius:14px;
+  background:transparent;
+  color:#fff;
+}
+.super-dashboard-body .settings-card h5 { margin:0 0 18px; color:#fff; font-size:1.08rem; font-weight:400; }
+.super-dashboard-body .settings-form { display:flex; flex-direction:column; gap:16px; }
+.super-dashboard-body .settings-form > div { min-width:0; }
+.super-dashboard-body .settings-form .form-label,
+.super-dashboard-body .settings-form legend { display:block; margin:0 0 7px; color:rgba(255,255,255,.68); font-size:.88rem; }
+.super-dashboard-body .settings-form fieldset { min-width:0; margin:0; padding:0; border:0; }
+.super-dashboard-body .settings-form .form-control,
+.super-dashboard-body .settings-form .form-select {
+  width:100%;
+  min-height:42px;
+  padding:9px 12px;
+  border:1px solid rgba(148,163,184,.3);
+  border-radius:8px;
+  background:#101a32;
+  color:#fff;
+  font:inherit;
+}
+.super-dashboard-body .settings-form textarea.form-control { min-height:110px; resize:vertical; }
+.super-dashboard-body .settings-form .form-control:focus,
+.super-dashboard-body .settings-form .form-select:focus { outline:2px solid rgba(56,189,248,.5); outline-offset:1px; border-color:#38bdf8; }
+.super-dashboard-body .settings-radio-group { display:flex; flex-wrap:wrap; gap:22px; color:#fff; }
+.super-dashboard-body .settings-radio-group label { display:inline-flex; align-items:center; gap:8px; }
+.super-dashboard-body .settings-radio-group input { accent-color:#38bdf8; }
+.super-dashboard-body .settings-save-button { align-self:flex-start; padding:8px 14px; border:1px solid #38bdf8; border-radius:8px; background:transparent; color:#38bdf8; font:inherit; cursor:pointer; }
+.super-dashboard-body .settings-save-button:hover { background:rgba(56,189,248,.1); box-shadow:0 0 16px rgba(56,189,248,.18); }
+.super-dashboard-body .settings-form output { min-height:1.2em; color:#bae6fd; font-size:.88rem; }
+.super-dashboard-body .settings-security-note { display:block; margin:8px 0 0; color:rgba(255,255,255,.58); font-size:.8rem; line-height:1.5; }
+.super-dashboard-body .settings-saved-values { margin:24px 0; color:rgba(255,255,255,.8); }
+.super-dashboard-body .settings-saved-values h4 { color:#fff; font-size:1rem; font-weight:400; }
+.super-dashboard-body .settings-saved-values p { margin:0; padding:9px 2px; border-bottom:1px solid rgba(255,255,255,.08); overflow-wrap:anywhere; }
+@media(max-width:760px) {
+  .super-dashboard-body .settings-grid { grid-template-columns:minmax(0,1fr); }
+  .super-dashboard-body .settings-grid > .col-12 { grid-column:auto; }
+  .super-dashboard-body .settings-card { padding:18px; }
+}

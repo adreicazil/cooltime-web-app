@@ -1,0 +1,11 @@
+.services-page { max-width:none; padding:28px clamp(16px,4vw,56px) 44px; background:#061632; color:#fff; }
+.services-page>h1 { color:#fff; font-size:clamp(2.5rem,6vw,4rem); margin:0 0 20px; }
+.services-page .service-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:0; }
+.services-page .package-card { min-height:460px; display:flex; align-items:center; padding:clamp(22px,5vw,62px); border-radius:0; background-size:cover; background-position:center; }
+.services-page .package-card:first-child { background-image:linear-gradient(115deg,rgba(2,48,83,.28),rgba(0,20,48,.38)),radial-gradient(ellipse at 28% 50%,#13acd1,#075178 44%,#09234c); }
+.services-page .package-card.double-aircon { background-image:linear-gradient(115deg,rgba(2,35,75,.32),rgba(0,14,40,.45)),radial-gradient(ellipse at 72% 48%,#1493ba,#07517c 45%,#071b42); }
+.package-overlay { width:min(100%,420px); padding:24px 26px; border-radius:16px; background:rgba(5,20,61,.76); box-shadow:0 8px 25px rgba(0,0,0,.3); }
+.package-overlay h3 { margin:0 0 14px; color:#7edaff; font-size:clamp(1.3rem,2.4vw,1.85rem); font-style:italic; }
+.package-overlay ul { padding-left:20px; margin:0 0 22px; font-weight:650; font-size:.98rem; line-height:1.35; }
+.package-price { color:#00aaff; line-height:1.4; }
+@media(max-width:760px) { .services-page .service-grid { grid-template-columns:1fr; }.services-page .package-card { min-height:430px; }.package-overlay { padding:20px; } }

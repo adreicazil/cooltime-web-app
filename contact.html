@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>CoolTime Auto Aircon | Contact Us</title>
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/login.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="css/public-pages.css">
+  <link rel="stylesheet" href="css/guest-booking.css">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <script src="js/toast.js"></script>
+  <script src="js/security-validator.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&amp;display=swap" rel="stylesheet">
+</head>
+<body class="public-page contact-public">
+  <header class="site-header">
+    <div class="brand-bar">
+      <a class="logo" href="index.html" aria-label="CoolTime Home">
+        <img class="brand-logo-image" src="assets/images/transparentwhite.png" alt="CoolTime">
+      </a>
+      <p class="tagline global-tagline-text">"WE KEEP YOU COOL ON THE ROAD"</p>
+    </div>
+    <nav class="main-nav" data-auth-pending aria-label="Main navigation">
+      <a href="index.html">Home</a>
+      <a href="about.html">About Us</a>
+      <a href="services.html">Services</a>
+      <a href="contact.html">Contact Us</a>
+      <a href="feedback.html">Feedback/Report</a>
+      <a href="book-now.html">Book Now</a>
+      
+      <div id="auth-nav-container" class="auth-nav-container"><a data-auth-bookings href="my-bookings.html" hidden>My Bookings</a><a class="nav-link-login" data-auth-session data-authenticated="false" href="login.html">Log in</a></div>
+    </nav>
+  </header>
+
+  <section class="public-hero contact-hero"><h1>Contact Us</h1></section>
+  <main class="contact-page public-wide">
+    <section class="contact-feature">
+      <div class="contact-locations"><h3>Our Branches</h3>
+      <div class="branch-grid maps-container">
+        <article class="branch-card">
+          <iframe class="branch-map" title="Map to Cabuyao Main Branch" src="https://maps.google.com/maps?q=Brgy.%20Sala%20National%20Hi-way%20infront%20of%20PNB%20and%20Asia%20Brewery%2C%20Cabuyao%20City%2C%20Laguna%2C%204025&amp;output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+          <div class="branch-card-content">
+            <h3>Cabuyao Main Branch</h3>
+            <address>Brgy. Sala National Hi-way infront of PNB and Asia Brewery, Cabuyao City, Laguna, 4025</address>
+          </div>
+        </article>
+        <article class="branch-card">
+          <iframe class="branch-map" title="Map to Santa Rosa Branch" src="https://maps.google.com/maps?q=Tagaytay%20Rd%2C%20City%20of%20Santa%20Rosa%2C%20Laguna%2C%204026&amp;output=embed" loading="lazy" referrerpolicy="no-referrer-when-downgrade" allowfullscreen></iframe>
+          <div class="branch-card-content">
+            <h3>Santa Rosa Branch</h3>
+            <address>Tagaytay Rd, City of Santa Rosa, Laguna, 4026</address>
+          </div>
+        </article>
+      </div>
+      </div>
+      <div class="contact-bottom-row contact-footer-wrapper">
+            <div class="contact-strip contact-details-stacked" aria-label="Contact details">
+        <article><a href="https://web.facebook.com/Cooltime.Autoaircon/?_rdc=1&amp;_rdr#" aria-label="Facebook"><img class="contact-icon" src="assets/images/fbicon1.png" alt="">Cooltime Auto Aircon Parts and Services</a></article>
+        <article><a href="https://mail.google.com/mail/u/0/#inbox?compose=CllgCKCFSmcvhfgLmqcHZJBDZWrWvwLnLQpNZwmpDLphmHnvzcGZhtccqbBRvNfTWzzGNmfLpNB" aria-label="Email CoolTime"><img class="contact-icon" src="assets/images/gmailicon1.png" alt="">cooltimeautoaircon@gmail.com</a></article>
+        <article><a href="tel:+639499596609"><img class="contact-icon" src="assets/images/contactsicon1.png" alt="">0949 959 6609</a><small>MON-SUN 7AM-5PM</small></article>
+      </div>
+      <section class="inquiry-cta-container inquiry-cta-block text-end" aria-label="Send an inquiry">
+        <button type="button" class="btn btn-dark btn-lg inquiry-cta-button" data-bs-toggle="modal" data-bs-target="#inquiry-form-modal">Send inquiry</button>
+        <p>Got questions? Send us an inquiry and our team will assist you!</p>
+      </section>
+      </div>
+    </section>
+  </main>
+  <div id="inquiry-form-modal" class="modal fade" tabindex="-1" aria-hidden="true" aria-labelledby="inquiryTitle" data-bs-backdrop="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content guest-modal-content inquiry-modal-content">
+      <div class="modal-header"><h3 class="modal-title" id="inquiryTitle">Got questions? Send us a message!</h3></div>
+      <div class="modal-body">
+      <form id="popup-inquiry-form" class="public-form contact-form" data-kind="inquiry">
+        <h2>Got questions? Send us a message!</h2>
+        <p>No account is required to send an inquiry.</p>
+        <div class="contact-fields">
+          <div><label for="inquiryName">Name</label><input id="inquiryName" name="name" required maxlength="120"></div>
+          <div><label for="inquiryEmail">Email</label><input id="inquiryEmail" name="email" type="email" required maxlength="254"></div>
+          <div><label for="inquiryContact">Contact number</label><input id="inquiryContact" name="contactNumber" type="tel" required maxlength="40"></div>
+          <div><label for="requestedService">Service performed (optional)</label><input id="requestedService" name="requestedService" maxlength="160"></div>
+          <div><label for="inquiryType">Request type</label><select id="inquiryType" name="requestType"><option value="inquiry">General inquiry</option><option value="manual_booking">Manual booking request</option></select></div>
+          <div><label for="requestedBranch">Preferred branch</label><select id="requestedBranch" name="branchId"><option value="">Choose branch</option><option value="cabuyao">Cabuyao Main</option><option value="santa_rosa">Santa Rosa</option></select></div>
+          <div><label for="requestedDate">Preferred date</label><input id="requestedDate" name="requestedDate" type="date"></div>
+          <div><label for="requestedTime">Preferred time</label><input id="requestedTime" name="requestedTime" type="time"></div>
+          <div class="contact-message"><label for="inquiryMessage">Description</label><textarea id="inquiryMessage" name="message" required maxlength="5000" rows="5"></textarea></div>
+        </div>
+        <div class="mt-4 d-flex inquiry-form-actions"><button class="btn btn-primary btn-lg" type="submit">Send inquiry</button></div>
+        <p class="form-feedback" role="status" aria-live="polite"></p>
+      </form>
+      </div>
+    </div></div>
+  </div>
+    <footer class="marketing-footer site-footer">
+    <div class="footer-brand">
+      <a class="logo footer-logo" href="index.html" aria-label="CoolTime home"><img class="brand-logo-image" src="assets/images/transparentwhite.png" alt="CoolTime"></a>
+      <div class="footer-brand-copy"><strong>OPEN DAILY ON SUNDAY AND HOLIDAYS<br>FROM 8AM-5PM</strong><p>Prevent your aircon system from malfunctioning and pay for a high-quality repair. Visit CoolTime Auto Aircon Parts and Services.</p></div>
+      <div class="footer-socials" aria-label="Contact and social links">
+        <a href="https://web.facebook.com/Cooltime.Autoaircon/?_rdc=1&amp;_rdr#" aria-label="Facebook"><img src="assets/images/fbicon.png" alt=""></a>
+        <a href="tel:+639499596609" aria-label="Call CoolTime"><img src="assets/images/contactsicon.png" alt=""></a>
+        <a href="https://mail.google.com/mail/u/0/#inbox?compose=CllgCKCFSmcvhfgLmqcHZJBDZWrWvwLnLQpNZwmpDLphmHnvzcGZhtccqbBRvNfTWzzGNmfLpNB" aria-label="Email CoolTime"><img src="assets/images/gmailicon.png" alt=""></a>
+      </div>
+    </div>
+    <div><h3>About Us</h3><a href="about.html">Our Story</a></div>
+    <div><h3>Services</h3><a href="register.html">Create Account</a><a href="book-now.html">Book an appointment</a></div>
+    <div><h3>Contact Us</h3><a href="feedback.html">Feedback/Report</a><a href="contact.html#inquiry-form-modal" data-open-inquiry>Inquiry</a><a href="contact.html">Locations</a></div>
+    <div><h3>Privacy</h3><a href="#">Terms and Conditions</a></div>
+    <p class="footer-copy">&copy; 2026 CoolTime. All rights reserved.</p>
+  </footer>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/public-forms.js"></script>
+  <script type="module" src="js/auth-nav.js"></script>
+  <script src="js/faq-chatbot.js" defer></script>
+</body>
+</html>

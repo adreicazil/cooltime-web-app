@@ -1,0 +1,21 @@
+.admin-tools-shell { min-height: 100vh; background: #f4f7fb; padding: 18px; }
+.admin-tools-main { display: grid; gap: 18px; max-width: 1500px; margin: 0 auto; }
+.admin-tools-main .panel { padding: 20px; background: #fff; border-radius: 8px; overflow: hidden; }
+.admin-tools-main h2 { margin-top: 0; }
+.table-scroll { overflow-x: auto; }
+.table-scroll table { width: 100%; border-collapse: collapse; }
+.table-scroll th, .table-scroll td { padding: 9px; border-bottom: 1px solid #e5e7eb; text-align: left; vertical-align: top; }
+.tool-filters, .tool-form { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; align-items: end; }
+.tool-form { padding: 12px 0; }
+.tool-form h3, .tool-form output { flex-basis: 100%; }
+.tool-filters input, .tool-filters select, .tool-form input, .tool-form select, .tool-form textarea { min-width: 145px; padding: 9px; border: 1px solid #ccd5e0; border-radius: 5px; }
+.tool-form textarea { flex: 1 1 240px; min-height: 70px; }
+.tool-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.tool-card { border: 1px solid #dbe3ed; padding: 12px; border-radius: 6px; }
+.tool-card p { overflow-wrap: anywhere; }
+#detailDialog { width: min(720px, calc(100% - 24px)); border: 0; border-radius: 8px; padding: 24px; box-shadow: 0 15px 50px #0004; }
+#detailDialog::backdrop { background: #07162999; }
+.report-bars { display: flex; align-items: end; gap: 8px; min-height: 180px; padding: 14px; border-bottom: 1px solid #9aa8b8; }
+.report-bar { min-width: 24px; flex: 1; background: #0874d1; color: #fff; text-align: center; font-size: 12px; }
+.admin-tools-shell .dashboard-topbar { max-width: 1500px; margin: 0 auto 18px; }
+@media (max-width: 680px) { .admin-tools-shell { padding: 8px; } .admin-tools-main .panel { padding: 12px; } .tool-filters input, .tool-filters select, .tool-form input, .tool-form select { flex: 1 1 100%; } }

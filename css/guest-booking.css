@@ -1,0 +1,52 @@
+.service-card.package-card { cursor:pointer; }
+.service-card.package-card:focus-visible { outline:3px solid #7edaff; outline-offset:3px; }
+.guest-modal-content { background:rgba(15,23,42,.96); backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,.15); border-radius:16px; color:#fff; }
+#guest-booking-modal .modal-content { background:url('../assets/images/texture5.png') center/cover no-repeat!important; border:1px solid rgba(255,255,255,.2)!important; border-radius:16px!important; color:#fff!important; box-shadow:0 20px 50px rgba(0,0,0,.7)!important; overflow:hidden; }
+#guest-booking-modal .modal-header { border-bottom:1px solid rgba(255,255,255,.1); }
+#guest-booking-modal .modal-header { border-bottom:1px solid rgba(255,255,255,.15); padding:24px 28px 16px; }
+#guest-booking-modal .modal-title { margin:0; color:#fff!important; font-size:1.75rem!important; font-weight:900!important; letter-spacing:-.5px; }
+#guest-booking-modal .form-control,#guest-booking-modal .form-select { height:40px; background:#f8fafc; color:#0f172a; border-radius:8px; font-weight:500; }
+#guest-booking-modal .form-label { margin-bottom:6px; color:#fff; font-size:.9rem; font-weight:800; }
+#guest-booking-modal .btn-primary { width:auto!important; height:auto!important; background:#007aff!important; border:0!important; border-radius:9999px!important; padding:12px 38px!important; color:#fff!important; font-size:1.1rem!important; font-weight:800!important; box-shadow:0 4px 15px rgba(0,122,255,.4); transition:transform .2s ease; }
+#guest-booking-modal .btn-primary:hover { transform:translateY(-2px); }
+#guest-payment-modal h2 { font-size:1.5rem; font-weight:800; margin-bottom:12px; }
+#guest-payment-modal p { color:rgba(255,255,255,.75); font-size:.9rem; }
+#guest-payment-modal [data-payment-method] { border-radius:12px; font-weight:700; }
+#paymongo-qr-display-container { margin-top:16px; padding:16px; background:#fff; border-radius:12px; color:#0f172a; }
+#paymongo-qr-display-container[hidden] { display:none; }
+#paymongo-qr-image { max-width:220px; height:auto; margin:12px 0; }
+.guest-booking-notice { margin:12px 0 0; color:#fbbf24!important; }
+.guest-booking-actions { gap:16px; }
+.booking-notice-container { flex:1 1 auto; min-width:0; }
+@media (max-width:575.98px) {
+  .guest-booking-actions { align-items:stretch!important; flex-direction:column; }
+  #guest-booking-modal .guest-booking-actions .btn-primary { align-self:flex-end; }
+}
+.inquiry-cta-container { grid-column:1/-1; text-align:center; padding:40px 20px; }
+.inquiry-cta-container .inquiry-cta-button { background:#0f172a; color:#fff; border:0; border-radius:9999px; padding:12px 36px; font-weight:700; font-size:1.1rem; box-shadow:0 4px 14px rgba(0,0,0,.15); transition:transform .2s ease; }
+.inquiry-cta-container .inquiry-cta-button:hover { color:#fff; transform:translateY(-2px); }
+.inquiry-cta-container p { color:#64748b; font-size:.875rem; font-weight:500; margin:12px 0 0; }
+.inquiry-modal-content .modal-header { border-bottom:1px solid rgba(255,255,255,.1); }
+.inquiry-modal-content .contact-form { padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; backdrop-filter:none; }
+.inquiry-modal-content .contact-form h2 { display:none; }
+.inquiry-modal-content .contact-form>p:not(.form-feedback) { display:block; color:rgba(255,255,255,.72); }
+.inquiry-modal-content .contact-fields label { color:rgba(255,255,255,.9); }
+.inquiry-modal-content .contact-form .form-feedback { color:#fbbf24; }
+#inquiry-form-modal .modal-content { background:url('../assets/images/texture5.png') center/cover no-repeat!important; border:1px solid rgba(255,255,255,.2)!important; border-radius:16px!important; color:#fff!important; box-shadow:0 20px 50px rgba(0,0,0,.7)!important; overflow:hidden; }
+#inquiry-form-modal .modal-header { border-bottom:1px solid rgba(255,255,255,.15); padding:24px 28px 16px; }
+#inquiry-form-modal .modal-header .modal-title { display:block; margin:0; color:#fff!important; font-size:1.75rem!important; font-weight:900!important; letter-spacing:-.5px; text-align:left; }
+#inquiry-form-modal .modal-body { padding:24px; }
+#inquiry-form-modal .contact-form { color:#fff; }
+#inquiry-form-modal .contact-form>p:not(.form-feedback) { display:none; }
+#inquiry-form-modal .contact-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px 16px; }
+#inquiry-form-modal .contact-fields>div:nth-child(n) { grid-column:auto; grid-row:auto; }
+#inquiry-form-modal .contact-fields .contact-message { grid-column:1/-1; }
+#inquiry-form-modal .contact-fields label { display:block; margin:0 0 6px; color:#fff; font-size:.9rem; font-weight:800; }
+#inquiry-form-modal .contact-form input,#inquiry-form-modal .contact-form select,#inquiry-form-modal .contact-form textarea { width:100%; min-height:38px; height:38px; padding:7px 12px; border:1px solid #cbd5e1; border-radius:8px; background:#f8fafc; color:#0f172a; font-size:.95rem; font-weight:500; }
+#inquiry-form-modal .contact-form textarea { height:auto; min-height:100px; resize:vertical; }
+#inquiry-form-modal .contact-form .btn { display:inline-block; width:auto; min-height:0; margin:0; padding:12px 38px!important; border:0!important; border-radius:9999px!important; background:#007aff!important; color:#fff!important; font-size:1.1rem; font-weight:800!important; box-shadow:0 4px 15px rgba(0,122,255,.4); transition:transform .2s ease; }
+#inquiry-form-modal .contact-form .btn:hover { transform:translateY(-2px); }
+#inquiry-form-modal .inquiry-form-actions { justify-content:flex-end; }
+#inquiry-form-modal .form-feedback { color:#fff; }
+@media(max-width:760px) { .inquiry-cta-container { grid-column:1; padding:28px 12px; } }
+@media(max-width:575px) { #inquiry-form-modal .modal-header { padding:20px 18px 14px; } #inquiry-form-modal .modal-header .modal-title { font-size:1.35rem!important; } #inquiry-form-modal .modal-body { padding:18px; } #inquiry-form-modal .contact-fields { grid-template-columns:1fr; } #inquiry-form-modal .contact-fields>div:nth-child(n),#inquiry-form-modal .contact-fields .contact-message { grid-column:1; } }

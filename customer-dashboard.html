@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>CoolTime | Customer Dashboard</title>
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/register.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="css/customer-dashboard.css">
+  <script src="js/toast.js"></script>
+  <script src="js/security-validator.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&amp;display=swap" rel="stylesheet">
+</head>
+<body class="customer-dashboard-page">
+  <header class="site-header">
+    <div class="brand-bar"><a class="logo" href="index.html" aria-label="CoolTime home"><img class="brand-logo-image" src="assets/images/transparentwhite.png" alt="CoolTime"></a><p class="tagline">"WE KEEP YOU COOL ON THE ROAD"</p></div>
+    <nav class="main-nav" aria-label="Main navigation" data-auth-pending>
+      <a href="index.html">Home</a>
+      <a href="about.html">About Us</a>
+      <a href="services.html">Services</a>
+      <a href="contact.html">Contact Us</a>
+      
+      <div id="auth-nav-container" class="auth-nav-container dashboard-auth-links"><a class="active-dashboard-link" data-auth-bookings href="customer-dashboard.html" hidden style="color:#38bdf8!important;font-weight:800!important;font-size:1rem;">My Dashboard</a><a id="customerLogoutBtn" data-auth-session data-authenticated="true" href="#">Log out</a></div>
+    </nav>
+  </header>
+  <main class="customer-dashboard" hidden>
+    <aside class="customer-sidebar" aria-label="Customer dashboard navigation">
+      <span class="customer-side-label">Main</span>
+      <a href="#customerHome" data-dashboard-view="customerHome" aria-label="Home"><img class="customer-nav-icon" src="assets/images/icons/homesymbol1_2.png" alt=""><span>Home</span></a>
+      <a href="#runningBills" data-dashboard-view="runningBills" aria-label="Bills"><img class="customer-nav-icon" src="assets/images/icons/pos_2.png" alt=""><span>Bills</span></a>
+      <a href="#bookings" data-dashboard-view="bookings" aria-label="Bookings"><img class="customer-nav-icon" src="assets/images/icons/bookings_2.png" alt=""><span>Bookings</span></a>
+      <a href="#notifications" data-dashboard-view="notifications" aria-label="Notifications"><img class="customer-nav-icon" src="assets/notifications1.png" alt=""><span>Notifications</span></a>
+      <a href="feedback.html" aria-label="Feedback and Report"><img class="customer-nav-icon" src="assets/feedbackreport.png" alt=""><span>Feedback and Report</span></a>
+      <a class="customer-logout" href="#" id="customerSidebarLogoutBtn" aria-label="Log out"><img class="customer-nav-icon" src="assets/images/icons/logout_2.png" alt=""><span>Log out</span></a>
+      <small>© 2026 CoolTime. All rights reserved.</small>
+    </aside>
+    <div class="customer-dashboard-content">
+    <section id="customerHome" class="customer-view customer-home-view" aria-labelledby="customer-greeting-text">
+      <div class="user-greeting-header mb-4">
+        <div class="customer-role-label">CUSTOMER</div>
+        <h2 id="customer-greeting-text">Hello customer</h2>
+      </div>
+      <div class="customer-metrics" aria-label="Account summary">
+        <article><span>Upcoming booking appointments</span><strong id="upcomingBookingCount">—</strong></article>
+        <article><span>Pending bills</span><strong id="pendingBillCount">—</strong></article>
+        <article><span>Unpaid amount</span><strong id="unpaidAmount">—</strong></article>
+        <article><span>Overdue amount</span><strong id="overdueAmount">—</strong></article>
+      </div>
+      <h3 class="customer-overview-title mb-4" style="color: #ffffff; font-weight: 400 !important; font-size: 1.35rem; letter-spacing: 0.5px;">Overview</h3>
+      <section class="customer-summary-card" aria-labelledby="billSummaryTitle">
+        <h2 id="billSummaryTitle"><a href="#runningBills" data-dashboard-view="runningBills">Running bills</a></h2>
+        <div id="customerInvoiceSummary" class="customer-summary-list" aria-live="polite">Loading bills…</div>
+      </section>
+      <section class="customer-summary-card" aria-labelledby="bookingSummaryTitle">
+        <h2 id="bookingSummaryTitle"><a href="#bookings" data-dashboard-view="bookings">Bookings</a></h2>
+        <p>Book or cancel your appointment.</p>
+        <div id="customerBookingSummary" class="customer-summary-list" aria-live="polite">Loading bookings…</div>
+      </section>
+    </section>
+    <section id="notifications" class="customer-view customer-notifications-view" aria-labelledby="customerNotificationsTitle" hidden>
+      <section class="customer-summary-card customer-notifications-card">
+        <h2 id="customerNotificationsTitle">Notifications</h2>
+        <div id="customerNotifications" class="customer-notification-list" aria-live="polite">Loading notifications…</div>
+      </section>
+    </section>
+    <section id="bookings" class="customer-view form-page customer-booking-section" aria-labelledby="bookingTitle" hidden>
+      <section class="form-card customer-bookings-card" aria-labelledby="bookingTitle">
+        <div class="booking-card-heading"><div><h2 id="bookingTitle">Bookings</h2><p>Book or cancel an appointment.</p></div><button class="btn booking-add-button" id="showBookingForm" type="button">Add new booking</button></div>
+        <p id="paymentReturnNotice" role="status" aria-live="polite" hidden></p>
+        <div id="customerBookings" class="customer-bookings-list" aria-live="polite">Loading bookings…</div>
+        <form class="booking-create-form" id="bookingForm" hidden>
+          <strong class="booking-form-index" id="bookingFormIndex" aria-hidden="true"></strong>
+          <div class="booking-form-fields">
+            <div class="booking-form-column">
+              <label for="serviceType">Name of service</label><select id="serviceType" name="serviceType" required><option value="">Select a Service</option></select>
+              <label for="branchId">Branch</label><select id="branchId" name="branchId" required><option value="">Select branch</option><option value="cabuyao">Cabuyao Branch</option><option value="santarosa">Santa Rosa Branch</option></select>
+              <label for="appointmentDate">Preferred date</label><input id="appointmentDate" name="appointmentDate" type="date" required>
+              <label for="timeSlot">Available slot</label><select id="timeSlot" name="timeSlot" required disabled><option value="">Select branch and date first</option></select>
+            </div>
+            <div class="booking-form-column">
+              <label for="plateNumber">Vehicle Plate Number</label><input id="plateNumber" name="plateNumber" type="text" maxlength="20" required>
+              <label for="vehicleMake">Vehicle Make</label><input id="vehicleMake" name="vehicleMake" type="text" required>
+              <label for="vehicleModel">Vehicle Model</label><input id="vehicleModel" name="vehicleModel" type="text" required>
+              <label for="vehicleYear">Vehicle Year</label><input id="vehicleYear" name="vehicleYear" type="number" min="1900" max="2100" required>
+            </div>
+            <p id="availabilityNotice" class="availability-notice" role="status" aria-live="polite"></p>
+            <p class="booking-form-help">Can't find an available time? <a href="contact.html#inquiryForm">Send us an inquiry</a> and our team will help arrange your appointment.</p>
+          </div>
+          <div class="booking-form-actions"><button class="btn booking-form-cancel" id="cancelBookingForm" type="button">Cancel</button><button id="bookBtn" class="btn btn-primary" type="submit">Submit Booking</button></div>
+          <input id="fullName" name="fullName" type="hidden"><input id="email" name="email" type="hidden">
+        </form>
+      </section>
+    </section>
+    <section id="runningBills" class="customer-view form-page customer-bills" aria-labelledby="invoicesTitle" hidden>
+      <div class="form-card"><h2 id="invoicesTitle">Running bills</h2><p>Track your charges as you add more services.</p><div id="customerInvoices" class="running-bills-container" aria-live="polite">Loading bills…</div></div>
+    </section>
+    </div>
+
+  </main>
+  <dialog id="notificationDetailModal" class="notification-detail-modal" aria-labelledby="notificationDetailTitle">
+    <form method="dialog"><button class="notification-detail-close" aria-label="Close notification details">Close</button></form>
+    <h2 id="notificationDetailTitle">Notification details</h2>
+    <div class="notification-detail-content"></div>
+  </dialog>
+  <script type="module" src="js/booking.js"></script>
+  <script type="module" src="js/customer-dashboard.js"></script>
+  <script type="module" src="js/auth-nav.js"></script>
+  <script type="module">
+    import { logoutUser } from './js/auth.js';
+    document.getElementById('customerSidebarLogoutBtn')?.addEventListener('click', async (event) => { event.preventDefault(); await logoutUser('index.html'); });
+  </script>
+</body>
+</html>

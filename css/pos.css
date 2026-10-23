@@ -1,0 +1,34 @@
+.pos-header { display:flex; align-items:center; gap:18px; padding:14px 4vw; background:#101c35; color:#fff; }
+.pos-header h1,.pos-header p { margin:0; }
+.pos-header p { opacity:.8; }
+.pos-header .btn { margin-left:auto; }
+.pos-header .btn + .btn { margin-left:0; }
+.pos-layout { max-width:1280px; margin:28px auto; padding:0 20px; display:grid; grid-template-columns:minmax(0,1.5fr) minmax(300px,.8fr); gap:20px; align-items:start; }
+.pos-layout[hidden] { display:none; }
+.pos-layout .panel { background:#fff; border-radius:12px; padding:22px; box-shadow:0 8px 24px #16233a12; }
+.pos-layout h2 { margin-top:0; }
+.pos-layout label { display:block; margin:12px 0 6px; font-weight:700; }
+.pos-layout select,.pos-layout input { width:100%; padding:10px; border:1px solid #aab3c2; border-radius:6px; }
+.service-catalog { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-top:20px; }
+.service-card { border:1px solid #d1d8e2; border-radius:8px; padding:14px; }
+.service-card h3 { margin:0 0 8px; }
+.service-card button { width:100%; margin-top:10px; }
+.cart-items { display:grid; gap:12px; min-height:80px; }
+.cart-line { display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:center; border-bottom:1px solid #e5e7eb; padding-bottom:10px; }
+.cart-line input { width:68px; }
+.cart-total { display:flex; justify-content:space-between; border-top:2px solid #14233f; margin:18px 0; padding-top:14px; font-size:1.2rem; }
+#posCheckout { width:100%; }
+.receipt { grid-column:1/-1; }
+.receipt table { width:100%; border-collapse:collapse; }
+.receipt td,.receipt th { padding:8px; border-bottom:1px solid #ddd; text-align:left; }
+.receipt .btn { margin:14px 8px 0 0; }
+@media(max-width:760px) { .pos-layout { grid-template-columns:1fr; } .pos-header { flex-wrap:wrap; } .pos-header .btn { margin-left:0; } }
+@media print {
+  body * { visibility:hidden; }
+  #receiptPreview,#receiptPreview * { visibility:visible; }
+  #receiptPreview { position:absolute; left:0; top:0; width:100%; box-shadow:none; }
+  #receiptPayLink,#printReceipt { display:none!important; }
+}
+
+.pos-header { background-color:#071738; background-image:url('../assets/images/textureheader.png'); background-size:cover; background-position:center 42%; }
+.pos-header .logo:has(.brand-logo-image) { border:0; background:transparent; }

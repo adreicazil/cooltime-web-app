@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>CoolTime | Register</title>
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/register.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="css/public-pages.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/toast.js"></script>
+  <script src="js/security-validator.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&amp;display=swap" rel="stylesheet">
+</head>
+<body class="public-page register-public">
+  <header class="site-header auth-site-header">
+    <div class="brand-bar">
+      <p class="tagline">"WE KEEP YOU COOL ON THE ROAD"</p>
+      <a class="logo large-logo" href="index.html" aria-label="CoolTime Home"><img class="brand-logo-image" src="assets/images/transparentwhite.png" alt="CoolTime"></a>
+      <div class="years-badge header-badge"><strong>29+</strong><span>YEARS IN<br>SERVICE</span></div>
+    </div>
+    <nav class="main-nav" data-auth-pending aria-label="Main navigation">
+      <a href="index.html">Home</a>
+      <a href="about.html">About Us</a>
+      <a href="services.html">Services</a>
+      <a href="contact.html">Contact Us</a>
+      <a href="feedback.html">Feedback/Report</a>
+      <a href="book-now.html">Book Now</a>
+      
+      <div id="auth-nav-container" class="auth-nav-container"><a data-auth-bookings href="my-bookings.html" hidden>My Bookings</a><a data-auth-session data-authenticated="false" href="login.html">Log in</a></div>
+    </nav>
+  </header>
+
+  <!-- Hero Banner Section -->
+  <section class="hero-banner-section" style="width: 100%; display: block !important; visibility: visible !important;">
+    <div class="hero-banner-wrapper" style="width: 100%; height: 380px; overflow: hidden; position: relative;">
+      <img src="assets/images/banner1.jpg" alt="CoolTime Hero Banner" class="page-hero-img" style="width: 100% !important; height: 380px !important; object-fit: cover !important; object-position: center !important; display: block !important;">
+    </div>
+  </section>
+  <main class="form-page auth-page">
+    <div class="register-layout-container">
+      <div class="register-hero-text" style="max-width: 480px;">
+        <h1 style="font-size: 2.5rem; font-weight: 900; font-style: italic; color: #38bdf8; margin-bottom: 16px; line-height: 1.2;">
+          Get started with our service!
+        </h1>
+        <p style="color: rgba(255, 255, 255, 0.75); font-size: 0.95rem; line-height: 1.5;">
+          The best auto aircon, parts and services online at the best prices. Trusted auto service since 1997.
+        </p>
+      </div>
+      <div class="register-card-wrapper">
+    <form class="form-card auth-card" id="registerForm">
+      <div class="card-header-inner text-center mb-4">
+        <h1 style="font-size: 2.5rem; font-weight: 900; color: #ffffff; text-align: center; margin-bottom: 20px;">
+          Create account
+        </h1>
+      </div>
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" autocomplete="username" required>
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="email" required>
+      <label for="password">Password</label>
+      <div class="password-input-wrap"><input id="password" name="password" type="password" autocomplete="new-password" required><button class="toggle-password" type="button" data-password-toggle aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg></button></div>
+      <button id="registerBtn" class="btn btn-pill auth-submit" type="submit">Register<br>customer account</button>
+    </form>
+      </div>
+    </div>
+  </main>
+  <!-- Terms and Conditions Pop-Up Modal -->
+  <div class="modal fade" id="tocModal" tabindex="-1" aria-hidden="true" aria-labelledby="tocModalTitle" data-bs-backdrop="true" data-bs-keyboard="true" role="dialog">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content toc-modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title" id="tocModalTitle">Terms and Conditions</h2>
+        </div>
+        <div class="modal-body">
+          <div id="tocContainer" class="toc-scroll-body" tabindex="0" aria-label="Terms and conditions document">
+            <h3>1. Agreement to Terms</h3>
+            <p>By accessing, browsing, or registering on the CoolTime Auto Aircon Parts and Services Web-Based System, you signify your agreement to these Terms of Service. This agreement governs your use of our online booking platform, the Point of Sale (POS) system, and all related digital services. If you do not accept these terms, please refrain from using the platform.</p>
+            <h3>2. Account Management and Security</h3>
+            <p><strong>Customer Registration:</strong> To fully utilize our online booking features and track your vehicle's service history, you may be required to create an account. You agree to provide truthful, current, and complete information.</p>
+            <p><strong>Staff and Administrator Access:</strong> Administrative accounts (Admin, Staff, Super Admin) are strictly provisioned by CoolTime management. You are solely responsible for safeguarding your login credentials and One-Time Passwords (OTP). Any activity conducted under your account is your responsibility.</p>
+            <p><strong>Right to Terminate:</strong> We reserve the right to suspend or permanently revoke access to any user who provides falsified information or violates system security protocols.</p>
+            <h3>3. Prohibited Activities</h3>
+            <p>You agree to use the CoolTime platform strictly for legitimate business purposes. You are strictly prohibited from:</p>
+            <ul><li>Submitting fraudulent or prank booking appointments.</li><li>Attempting to bypass security measures or access unauthorized areas (such as the Admin Dashboard or POS modules).</li><li>Interfering with the system's operations, servers, or payment gateways.</li><li>Using the platform for any unlawful or abusive activities.</li></ul>
+            <h3>4. Financial Terms, Cancellations, and Rescheduling</h3>
+            <p><strong>Service Payments:</strong> All payments—whether processed in-person via Cash or online through our integrated PayMongo gateway (QR/E-wallet)—must be authorized by the customer.</p>
+            <p><strong>Strict No-Refund Policy:</strong> All confirmed bookings and rendered services are final. CoolTime enforces a strict <strong>No Refund Policy</strong> once a booking is confirmed or a service has been initiated.</p>
+            <p><strong>Rescheduling Guidelines:</strong> If you cannot attend your scheduled appointment, you may request a reschedule via the system or by contacting the shop.</p>
+            <ul><li>Rescheduling is subject to branch capacity and slot availability.</li><li>Any initial downpayment will not be refunded but will be applied to your new schedule.</li><li>Reschedule requests must be submitted before the original time slot.</li></ul>
+            <p><strong>No-Show Policy:</strong> If a customer fails to arrive for their scheduled appointment without prior rescheduling, the slot will be released for other customers, and any downpayment made will be strictly non-refundable and will be forfeited in favor of the business.</p>
+            <p><strong>Transaction Voids and Audits:</strong> In the rare event of a billing discrepancy or system error at the POS, the transaction will be voided. All voided transactions are subject to review and audit by the Super Admin to ensure financial accountability.</p>
+            <h3>5. Data Privacy and Information Collection</h3>
+            <p>By using our system, you consent to the collection and processing of necessary data, including personal contact details, vehicle information, and transaction history. This data is utilized strictly for managing your bookings, verifying payments, and improving our services, in compliance with our operational and legal obligations.</p>
+            <h3>6. Disclaimers and Limitation of Liability</h3>
+            <p><strong>Estimated Pricing:</strong> Please note that all prices displayed on the website are estimates. The final cost will be determined only after a physical inspection and assessment of your vehicle at our branch.</p>
+            <p><strong>Liability:</strong> To the maximum extent permitted by law, CoolTime and its developers shall not be held liable for any indirect or consequential damages resulting from system downtime, third-party payment gateway errors, or inaccurate information provided by the user.</p>
+            <h3>7. Modifications to the Service</h3>
+            <p>We reserve the right to update or modify these terms, as well as the system's features, at any time without prior notice. Your continued use of the platform after changes are posted constitutes acceptance of the revised terms.</p>
+            <h3>8. Governing Law</h3>
+            <p>This agreement is governed by the laws of the Republic of the Philippines. Any legal disputes arising from the use of this platform shall be subject to the exclusive jurisdiction of the courts in the province of Laguna.</p>
+            <h3>9. Contact Us</h3>
+            <p>For any inquiries, concerns, or technical support regarding the system or these terms, please reach out to:<br>Email: cooltimeautoaircon@gmail.com<br>Phone: 0949 959 6609</p>
+          </div>
+          <div class="toc-controls">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="tocCheckbox" disabled>
+              <label class="form-check-label" for="tocCheckbox">I agree to the terms and conditions</label>
+              <small id="toc-scroll-hint" role="status">Please scroll through the entire terms document to enable the checkbox.</small>
+            </div>
+            <div class="toc-actions">
+              <button type="button" id="tocSubmitBtn" disabled>Agree and continue</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+    <footer class="marketing-footer site-footer">
+    <div class="footer-brand">
+      <a class="logo footer-logo" href="index.html" aria-label="CoolTime home"><img class="brand-logo-image" src="assets/images/transparentwhite.png" alt="CoolTime"></a>
+      <div class="footer-brand-copy"><strong>OPEN DAILY ON SUNDAY AND HOLIDAYS<br>FROM 8AM-5PM</strong><p>Prevent your aircon system from malfunctioning and pay for a high-quality repair. Visit CoolTime Auto Aircon Parts and Services.</p></div>
+      <div class="footer-socials" aria-label="Contact and social links">
+        <a href="https://web.facebook.com/Cooltime.Autoaircon/?_rdc=1&amp;_rdr#" aria-label="Facebook"><img src="assets/images/fbicon.png" alt=""></a>
+        <a href="tel:+639499596609" aria-label="Call CoolTime"><img src="assets/images/contactsicon.png" alt=""></a>
+        <a href="https://mail.google.com/mail/u/0/#inbox?compose=CllgCKCFSmcvhfgLmqcHZJBDZWrWvwLnLQpNZwmpDLphmHnvzcGZhtccqbBRvNfTWzzGNmfLpNB" aria-label="Email CoolTime"><img src="assets/images/gmailicon.png" alt=""></a>
+      </div>
+    </div>
+    <div><h3>About Us</h3><a href="about.html">Our Story</a></div>
+    <div><h3>Services</h3><a href="register.html">Create Account</a><a href="book-now.html">Book an appointment</a></div>
+    <div><h3>Contact Us</h3><a href="feedback.html">Feedback/Report</a><a href="contact.html#inquiryForm">Inquiry</a><a href="contact.html">Locations</a></div>
+    <div><h3>Privacy</h3><a href="#">Terms and Conditions</a></div>
+    <p class="footer-copy">&copy; 2026 CoolTime. All rights reserved.</p>
+  </footer>
+  <script type="module" src="js/auth.js"></script>
+  <script type="module" src="js/auth-nav.js"></script>
+  <script src="js/toc-modal.js"></script>
+  <script src="js/password-toggle.js"></script>
+</body>
+</html>

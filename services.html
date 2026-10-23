@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>CoolTime Auto Aircon | Services</title>
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/login.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="stylesheet" href="css/services-packages.css">
+  <link rel="stylesheet" href="css/public-pages.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/guest-booking.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script src="js/toast.js"></script>
+  <script src="js/security-validator.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&amp;display=swap" rel="stylesheet">
+</head>
+<body class="public-page services-public">
+  <header class="site-header">
+    <div class="brand-bar">
+      <a class="logo" href="index.html" aria-label="CoolTime Home">
+        <img class="brand-logo-image" src="assets/images/transparentwhite.png" alt="CoolTime">
+      </a>
+      <p class="tagline global-tagline-text">"WE KEEP YOU COOL ON THE ROAD"</p>
+    </div>
+    <nav class="main-nav" data-auth-pending aria-label="Main navigation">
+      <a href="index.html">Home</a>
+      <a href="about.html">About Us</a>
+      <a href="services.html">Services</a>
+      <a href="contact.html">Contact Us</a>
+      <a href="feedback.html">Feedback/Report</a>
+      <a href="book-now.html">Book Now</a>
+      
+      <div id="auth-nav-container" class="auth-nav-container"><a data-auth-bookings href="my-bookings.html" hidden>My Bookings</a><a class="nav-link-login" data-auth-session data-authenticated="false" href="login.html">Log in</a></div>
+    </nav>
+  </header>
+
+  <section class="public-hero services-hero"><h1>Services</h1></section>
+  <main class="content-page services-page services-container-wrapper">
+    <section class="service-grid services-grid-container service-section-bg" aria-label="Service list">
+      <article class="service-card package-card package-card-bg" data-bookable-service="Basic Package (Single Aircon)" tabindex="0" role="button" aria-label="Book Basic Package (Single Aircon)">
+        <div class="package-overlay"><h3>Basic Package (Single Aircon)</h3>
+        <ul><li>General Service</li><li>Pull down evaporator</li><li>Pull down condenser</li><li>For cleaning and leak testing</li><li>Vacuum &amp; Flushing of system</li><li>Full charge refrigerant</li><li>Replace Rubber O-rings</li><li>Replace Cabin filter</li></ul>
+        <strong class="package-price">Starting price:<br>PHP4,000.00 no baklas dashboard<br>PHP6,000.00 baklas dashboard</strong></div>
+      </article>
+      <article class="service-card package-card package-card-bg double-aircon" data-bookable-service="Basic Package (Double Aircon)" tabindex="0" role="button" aria-label="Book Basic Package (Double Aircon)">
+        <div class="package-overlay"><h3>Basic Package (Double Aircon)</h3>
+        <ul><li>General Service</li><li>Pull down evaporator</li><li>Pull down condenser</li><li>For cleaning and leak testing</li><li>Vacuum &amp; Flushing of system</li><li>Full charge refrigerant</li><li>Replace Rubber O-rings</li><li>Replace Cabin filter</li></ul>
+        <strong class="package-price">Starting price:<br>PHP5,000.00 no baklas dashboard<br>PHP7,000.00 baklas dashboard</strong></div>
+      </article>
+    </section>
+  </main>
+  <div id="guest-booking-modal" class="modal fade" tabindex="-1" aria-hidden="true" aria-labelledby="guest-booking-title" data-bs-backdrop="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content guest-modal-content">
+        <div class="modal-header"><h3 class="modal-title" id="guest-booking-title">Book Service Appointment</h3></div>
+      <div class="modal-body"><form id="guest-booking-form">
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label" for="guest-name">Full Name</label><input id="guest-name" name="name" class="form-control" placeholder="Full Name" autocomplete="name" required></div>
+          <div class="col-md-6"><label class="form-label" for="guest-email">Email Address</label><input id="guest-email" name="email" type="email" class="form-control" placeholder="Email Address" autocomplete="email" required></div>
+          <div class="col-md-6"><label class="form-label" for="guest-service-select">Name of Service</label><select id="guest-service-select" name="service" class="form-select" required><option value="">Select a Service</option></select></div>
+          <div class="col-md-6"><label class="form-label" for="guest-branch-select">Branch</label><select id="guest-branch-select" name="branch" class="form-select" required><option value="Cabuyao Branch">Cabuyao Branch</option><option value="Santa Rosa Branch">Santa Rosa Branch</option></select></div>
+          <div class="col-md-6"><label class="form-label" for="guest-date">Preferred Date</label><input id="guest-date" name="date" type="date" class="form-control" required></div>
+          <div class="col-md-6"><label class="form-label" for="guest-time-slot">Preferred Time / Available Slot</label><select id="guest-time-slot" name="timeSlot" class="form-select" required disabled><option value="">Select branch and date first</option></select></div>
+          <div class="col-md-3"><label class="form-label" for="guest-plate-no">Vehicle Plate Number</label><input id="guest-plate-no" name="plateNumber" class="form-control" placeholder="ABC 1234" required></div>
+          <div class="col-md-3"><label class="form-label" for="guest-vehicle-make">Vehicle Make</label><input id="guest-vehicle-make" name="vehicleMake" class="form-control" placeholder="Toyota" required></div>
+          <div class="col-md-3"><label class="form-label" for="guest-vehicle-model">Vehicle Model</label><input id="guest-vehicle-model" name="vehicleModel" class="form-control" placeholder="Vios" required></div>
+          <div class="col-md-3"><label class="form-label" for="guest-vehicle-year">Vehicle Year</label><input id="guest-vehicle-year" name="vehicleYear" type="number" min="1950" max="2100" placeholder="2020" class="form-control" required></div>
+        </div>
+        <div id="guest-booking-notice" class="guest-booking-notice" role="status" aria-live="polite"></div>
+        <div class="mt-4 d-flex justify-content-between align-items-end guest-booking-actions" style="width:100%;"><div class="booking-notice-container" style="text-align:left;font-size:0.85rem;line-height:1.4;"><p style="color:#ef4444;margin:0;font-weight:600;">NOTICE: This is only for WALK-IN customers. If you are online, please book with your <a href="login.html" id="noticeRegisteredAccountLink" style="color:#38bdf8;text-decoration:underline;">registered account</a>.</p><p style="color:#ffffff;margin:4px 0 0 0;">Downpayment can be requested.</p></div><button type="submit" class="btn btn-primary">Continue to payment</button></div>
+      </form></div>
+    </div></div>
+  </div>
+  <div id="guest-payment-modal" class="modal fade" tabindex="-1" aria-hidden="true" aria-labelledby="guest-payment-title">
+    <div class="modal-dialog modal-dialog-centered"><div class="modal-content guest-modal-content text-center"><div class="modal-body p-4">
+      <h2 id="guest-payment-title">Select Payment Option</h2><p>Choose how you would like to complete your booking payment.</p>
+      <div class="d-grid gap-3 my-4"><button type="button" class="btn btn-outline-info p-3" data-payment-method="e_wallet">Pay via E-Wallet / GCash QR</button><button type="button" class="btn btn-outline-light p-3" data-payment-method="cash">Pay via Cash / OTC QR Code</button></div>
+      <div id="paymongo-qr-display-container" hidden><h3>Scan QR Code to Pay</h3><img id="paymongo-qr-image" alt="PayMongo QR Code"><p>Powered by PayMongo Payment Gateway</p></div>
+      <p id="guest-payment-notice" class="guest-booking-notice" role="status" aria-live="polite"></p>
+    </div></div></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+  <script type="module" src="js/main.js"></script>
+  <script type="module" src="js/app.js"></script>
+  <script type="module" src="js/auth-nav.js"></script>
+  <script src="js/faq-chatbot.js" defer></script>
+
+  <footer class="marketing-footer site-footer">
+    <div class="footer-brand">
+      <a class="logo footer-logo" href="index.html" aria-label="CoolTime home"><img class="brand-logo-image" src="assets/images/transparentwhite.png" alt="CoolTime"></a>
+      <div class="footer-brand-copy"><strong>OPEN DAILY ON SUNDAY AND HOLIDAYS<br>FROM 8AM-5PM</strong><p>Prevent your aircon system from malfunctioning and pay for a high-quality repair. Visit CoolTime Auto Aircon Parts and Services.</p></div>
+      <div class="footer-socials" aria-label="Contact and social links"><a href="https://web.facebook.com/Cooltime.Autoaircon/?_rdc=1&amp;_rdr#" aria-label="Facebook"><img src="assets/images/fbicon.png" alt=""></a><a href="tel:+639499596609" aria-label="Call CoolTime"><img src="assets/images/contactsicon.png" alt=""></a><a href="https://mail.google.com/mail/u/0/#inbox?compose=CllgCKCFSmcvhfgLmqcHZJBDZWrWvwLnLQpNZwmpDLphmHnvzcGZhtccqbBRvNfTWzzGNmfLpNB" aria-label="Email CoolTime"><img src="assets/images/gmailicon.png" alt=""></a></div>
+    </div>
+    <div><h3>About Us</h3><a href="about.html">Our Story</a></div><div><h3>Services</h3><a href="register.html">Create Account</a><a href="book-now.html">Book an appointment</a></div><div><h3>Contact Us</h3><a href="feedback.html">Feedback/Report</a><a href="contact.html#inquiryForm">Inquiry</a><a href="contact.html">Locations</a></div><div><h3>Privacy</h3><a href="#">Terms and Conditions</a></div>
+    <p class="footer-copy">&copy; 2026 CoolTime. All rights reserved.</p>
+  </footer>
+</body>
+</html>

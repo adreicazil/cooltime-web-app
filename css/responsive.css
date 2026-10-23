@@ -1,0 +1,112 @@
+﻿@media (max-width: 900px) {
+  .tagline {
+    white-space: normal;
+  }
+
+  .hero-cards,
+  .service-grid,
+  .about-layout,
+  .branch-grid,
+  .contact-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-cards {
+    padding: 28px;
+  }
+
+  .about-collage {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .map-section {
+    padding: 22px 20px 28px;
+  }
+
+  .contact-strip {
+    padding: 18px 24px;
+    gap: 20px;
+  }
+
+  .admin-login-header {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: 10px;
+    padding: 18px;
+    text-align: center;
+  }
+
+  .header-badge {
+    justify-self: center;
+  }
+
+  .dashboard-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+  }
+
+  .side-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric-grid,
+  .super-metrics,
+  .dashboard-grid,
+  .super-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .panel.wide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .brand-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .main-nav {
+    justify-content: flex-start;
+  }
+
+  .hero-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .public-footer {
+    grid-template-columns: 1fr 1fr;
+    padding-inline: 24px;
+  }
+
+  .copyright {
+    margin-inline: -24px;
+  }
+
+  .about-copy h1,
+  .services-page h1 {
+    font-size: 2rem;
+  }
+
+  .side-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-main {
+    padding: 10px;
+  }
+
+  .dashboard-topbar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  table {
+    font-size: 0.75rem;
+  }
+}

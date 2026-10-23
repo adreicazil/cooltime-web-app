@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>CoolTime | Point of Sale</title>
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/pos.css">
+  <script src="js/toast.js"></script>
+  <script src="js/security-validator.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&amp;display=swap" rel="stylesheet">
+</head>
+<body data-required-role="admin">
+  <header class="pos-header"><a class="logo" href="admin-dashboard.html"><img class="brand-logo-image" src="assets/images/transparentwhite.png" alt="CoolTime"></a><div><h1>Point of Sale</h1><p>CoolTime branch billing</p></div><a class="btn btn-dark" href="admin-dashboard.html">Admin Dashboard</a><button id="posLogout" class="btn btn-dark" type="button">Log out</button></header>
+  <main class="pos-layout" hidden>
+    <section class="pos-catalog panel">
+      <h2>Service Selection</h2>
+      <label for="branchSelect">Branch</label><select id="branchSelect"><option value="cabuyao">Cabuyao Main</option><option value="santa_rosa">Santa Rosa</option></select>
+      <label for="walkInName">Customer name (optional)</label><input id="walkInName" type="text" placeholder="Walk-in customer">
+      <div id="serviceCatalog" class="service-catalog">Loading servicesâ€¦</div>
+    </section>
+    <aside class="pos-cart panel" aria-labelledby="cartTitle">
+      <h2 id="cartTitle">Running Bill / Current Cart</h2>
+      <div id="cartItems" class="cart-items">Select services to start a bill.</div>
+      <div class="cart-total"><span>Total</span><strong id="cartTotal">â‚±0.00</strong></div>
+      <label for="paymentMethod">Payment</label><select id="paymentMethod"><option value="cash">Cash (paid now)</option><option value="paymongo">PayMongo (pending)</option></select>
+      <button id="posCheckout" class="btn btn-primary" type="button" disabled>Checkout</button>
+      <p id="posStatus" role="status" aria-live="polite"></p>
+    </aside>
+    <section id="receiptPreview" class="receipt panel" hidden aria-labelledby="receiptTitle"><h2 id="receiptTitle">Receipt Preview</h2><div id="receiptBody"></div><a id="receiptPayLink" class="btn btn-primary" hidden>Continue to PayMongo</a><button id="printReceipt" class="btn btn-dark" type="button">Print receipt</button></section>
+  </main>
+  <script type="module" src="js/pos.js"></script>
+</body>
+</html>

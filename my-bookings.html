@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>CoolTime | My Bookings</title>
+  <link rel="stylesheet" href="css/global.css">
+  <link rel="stylesheet" href="css/register.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <script src="js/toast.js"></script>
+  <script src="js/security-validator.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&amp;display=swap" rel="stylesheet">
+</head>
+<body class="customer-dashboard-page">
+  <header class="site-header">
+    <div class="brand-bar"><a class="logo" href="index.html" aria-label="CoolTime home"><img class="brand-logo-image" src="assets/images/transparentwhite.png" alt="CoolTime"></a><p class="tagline">"WE KEEP YOU COOL ON THE ROAD"</p></div>
+    <nav class="main-nav" aria-label="Main navigation" data-auth-pending>
+      <a href="index.html">Home</a><a href="about.html">About Us</a><a href="services.html">Services</a><a href="contact.html">Contact Us</a><a href="feedback.html">Feedback/Report</a><a href="book-now.html">Book Now</a>
+      <div id="auth-nav-container" class="auth-nav-container"><a data-auth-bookings href="my-bookings.html" hidden>My Bookings</a><a id="customerLogoutBtn" data-auth-session data-authenticated="true" href="#">Log out</a></div>
+    </nav>
+  </header>
+  <main class="customer-dashboard" hidden>
+    <section class="form-page customer-bills" aria-labelledby="myBookingsTitle">
+      <div class="form-card"><h1 id="myBookingsTitle">My bookings</h1><p>To request cancellation, email us with your name, booking date, time, and service. Our admin team will review your request.</p><div id="customerBookings" aria-live="polite">Loading bookings&#8230;</div></div>
+    </section>
+  </main>
+  <script type="module" src="js/booking.js"></script>
+  <script type="module" src="js/auth-nav.js"></script>
+
+  <footer class="marketing-footer site-footer">
+    <div class="footer-brand">
+      <a class="logo footer-logo" href="index.html" aria-label="CoolTime home"><img class="brand-logo-image" src="assets/images/transparentwhite.png" alt="CoolTime"></a>
+      <div class="footer-brand-copy"><strong>OPEN DAILY ON SUNDAY AND HOLIDAYS<br>FROM 8AM-5PM</strong><p>Prevent your aircon system from malfunctioning and pay for a high-quality repair. Visit CoolTime Auto Aircon Parts and Services.</p></div>
+      <div class="footer-socials" aria-label="Contact and social links"><a href="https://web.facebook.com/Cooltime.Autoaircon/?_rdc=1&amp;_rdr#" aria-label="Facebook"><img src="assets/images/fbicon.png" alt=""></a><a href="tel:+639499596609" aria-label="Call CoolTime"><img src="assets/images/contactsicon.png" alt=""></a><a href="https://mail.google.com/mail/u/0/#inbox?compose=CllgCKCFSmcvhfgLmqcHZJBDZWrWvwLnLQpNZwmpDLphmHnvzcGZhtccqbBRvNfTWzzGNmfLpNB" aria-label="Email CoolTime"><img src="assets/images/gmailicon.png" alt=""></a></div>
+    </div>
+    <div><h3>About Us</h3><a href="about.html">Our Story</a></div><div><h3>Services</h3><a href="register.html">Create Account</a><a href="book-now.html">Book an appointment</a></div><div><h3>Contact Us</h3><a href="feedback.html">Feedback/Report</a><a href="contact.html#inquiryForm">Inquiry</a><a href="contact.html">Locations</a></div><div><h3>Privacy</h3><a href="#">Terms and Conditions</a></div>
+    <p class="footer-copy">&copy; 2026 CoolTime. All rights reserved.</p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <title>Auto Aircon Firestore Initializer</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&amp;display=swap" rel="stylesheet">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero">
+      <p class="eyebrow">Auto Aircon Service Booking System</p>
+      <h1>Firestore Database Initializer</h1>
+      <p class="intro">
+        Create missing branches and services, and fill missing branch schedule
+        settings without replacing existing values. User and transaction
+        documents are created automatically by normal system actions.
+      </p>
+      <button id="initializeBtn" class="primary-button" type="button">
+        Initialize Firestore Database
+      </button>
+    </section>
+
+    <section class="status-panel" aria-live="polite">
+      <h2>Status</h2>
+      <p id="statusMessage" class="status-message idle">
+        Sign in as an Admin or Super Admin in this browser, then click the button.
+      </p>
+      <ul id="logList" class="log-list"></ul>
+    </section>
+  </main>
+
+  <script type="module" src="script.js"></script>
+</body>
+</html>
