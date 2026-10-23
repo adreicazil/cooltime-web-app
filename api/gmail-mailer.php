@@ -30,7 +30,7 @@ function gmailSendEmail(string $to, string $subject, string $htmlBody, string $t
         throw new RuntimeException('Google OAuth token request failed (HTTP ' . $tokenResponse['status'] . '): ' . gmailErrorText($tokenResponse));
     }
 
-    $sender = trim((string) (getenv('SYSTEM_EMAIL_ADDRESS') ?: 'cooltimeautoaircon2@gmail.com'));
+    $sender = trim((string) (getenv('GMAIL_SENDER_EMAIL') ?: getenv('SYSTEM_EMAIL_ADDRESS') ?: 'noreply@cooltimeautoaircon.online'));
     $safeTo = gmailHeaderValue($to);
     $safeSender = gmailHeaderValue($sender);
     $encodedSubject = '=?UTF-8?B?' . base64_encode($subject) . '?=';

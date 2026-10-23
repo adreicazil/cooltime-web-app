@@ -104,10 +104,7 @@ Because the project uses ES modules, run it through a local server:
 ```powershell
 $env:FIREBASE_API_KEY = 'your_firebase_web_api_key'
 $env:FIREBASE_SERVICE_ACCOUNT_FILE = 'C:\secure\cooltime-firebase-service-account.json'
-$env:GMAIL_CLIENT_ID = 'your_google_oauth_client_id'
-$env:GMAIL_CLIENT_SECRET = 'your_google_oauth_client_secret'
-$env:GMAIL_REFRESH_TOKEN = 'your_google_oauth_refresh_token'
-$env:SYSTEM_EMAIL_ADDRESS = 'cooltimeautoaircon2@gmail.com'
+$env:SYSTEM_EMAIL_ADDRESS = 'support@cooltimeautoaircon.online'
 powershell -ExecutionPolicy Bypass -File scripts/dev-server.ps1
 ```
 
@@ -122,7 +119,7 @@ To test, open `login.html` and sign in with a Firebase account that has the matc
 To test password reset, open `forgot-password.html`, enter the registered email, and use the Firebase password-reset link delivered by email. The browser response remains generic so it does not reveal whether an account exists.
 ## Central notification dispatcher
 
-This project runs on PHP endpoints and dispatches mail through the existing Gmail API OAuth mailer (`api/gmail-mailer.php`); it does not have a Node/Nodemailer server. Set `SYSTEM_EMAIL_ADDRESS=cooltimeautoaircon2@gmail.com` in the server's `.env` and authorize that address as the OAuth sender (or as a Gmail send-as alias). Keep Gmail OAuth credentials on the server only.
+Application email (OTP, password verification, bookings, and notifications) is sent through Resend. Set `RESEND_API_KEY` and `RESEND_FROM_EMAIL="CoolTime Auto Aircon <noreply@cooltimeautoaircon.online>"` in the server environment after verifying the domain in Resend. Set `SYSTEM_EMAIL_ADDRESS=support@cooltimeautoaircon.online` for admin notification copies. Keep provider credentials on the server only.
 
 Booking submission, cancellation, reschedule, and payment-overdue events write notification records to Firestore and dispatch email from the configured system sender. Customer notifications are scoped to the authenticated customer's UID. Admin and Super Admin receive system copies at the system address.
 

@@ -293,27 +293,23 @@ function withSessionOtpRecord(string $purpose, string $subject, callable $callba
     return $result['response'];
 }
 
-function sendOtpEmail(string $email, string $code, string $purpose = 'login'): void
+function sendResendEmail(string $email, string $subject, string $html, string $text): void
 {
-    $isPasswordReset = $purpose === 'password_reset';
-    $action = $isPasswordReset ? 'password reset' : 'sign-in verification';
     if (!function_exists('curl_init')) {
         throw new RuntimeException('Resend email delivery requires the PHP cURL extension.');
     }
 
-    $apiKey = environment('RESEND_API_KEY');
-    $from = environment('RESEND_FROM_EMAIL', false) ?: 'CoolTime Auto Aircon <onboarding@resend.dev>';
-    $html = '<div style="font-family:Arial,sans-serif;padding:20px;color:#0b1329">'
-        . '<h2>CoolTime Auto Aircon Verification</h2>'
-        . '<p>Your ' . htmlspecialchars($action, ENT_QUOTES, 'UTF-8') . ' code is:</p>'
-        . '<h1 style="color:#38bdf8;font-size:32px">' . htmlspecialchars($code, ENT_QUOTES, 'UTF-8') . '</h1>'
-        . '<p>This code expires in 5 minutes. Do not share it with anyone.</p></div>';
+    $apiKey = environment('RESEND_API_KEY', false);
+    if (!isConfiguredValue($apiKey)) {
+        throw new RuntimeException('Resend email delivery is not configured on this server.');
+    }
+    $from = environment('RESEND_FROM_EMAIL', false) ?: 'CoolTime Auto Aircon <noreply@cooltimeautoaircon.online>';
     $payload = json_encode([
         'from' => $from,
         'to' => [$email],
-        'subject' => "Your CoolTime {$action} code",
+        'subject' => $subject,
         'html' => $html,
-        'text' => "Your CoolTime {$action} code is: {$code}\n\nThis code expires in 5 minutes. Do not share it with anyone.",
+        'text' => $text,
     ], JSON_THROW_ON_ERROR);
 
     $curl = curl_init('https://api.resend.com/emails');
@@ -330,13 +326,13 @@ function sendOtpEmail(string $email, string $code, string $purpose = 'login'): v
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CONNECTTIMEOUT => 5,
         CURLOPT_TIMEOUT => 15,
-        CURLOPT_SSL_VERIFYPEER => false,
-        CURLOPT_SSL_VERIFYHOST => 0,
+        CURLOPT_SSL_VERIFYPEER => true,
+        CURLOPT_SSL_VERIFYHOST => 2,
     ]);
     $response = curl_exec($curl);
     $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
     $curlError = curl_error($curl);
-    //curl_close($curl);
+    curl_close($curl);
 
     if ($response === false) {
         throw new RuntimeException('Resend API request failed: ' . $curlError);
@@ -348,9 +344,24 @@ function sendOtpEmail(string $email, string $code, string $purpose = 'login'): v
     }
 }
 
+function sendOtpEmail(string $email, string $code, string $purpose = 'login'): void
+{
+    $isPasswordReset = $purpose === 'password_reset';
+    $action = $isPasswordReset ? 'password reset' : 'sign-in verification';
+    $escapedCode = htmlspecialchars($code, ENT_QUOTES, 'UTF-8');
+    $html = '<div style="font-family:Inter,Arial,sans-serif;padding:20px;color:#0b1329">'
+        . '<h2>CoolTime Auto Aircon Verification</h2>'
+        . '<p>Your ' . htmlspecialchars($action, ENT_QUOTES, 'UTF-8') . ' code is:</p>'
+        . '<h1 style="color:#38bdf8;font-size:32px">' . $escapedCode . '</h1>'
+        . '<p>This code expires in 5 minutes. Do not share it with anyone.</p></div>';
+    sendResendEmail($email, "Your CoolTime {$action} code", $html,
+        "Your CoolTime {$action} code is: {$code}\n\nThis code expires in 5 minutes. Do not share it with anyone.");
+}
+
 function sendConfiguredEmail(string $email, string $subject, string $htmlBody, string $textBody = ''): void
 {
-    gmailSendEmail($email, $subject, $htmlBody, $textBody);
+    $plainText = $textBody !== '' ? $textBody : trim(strip_tags(str_replace(['</p>', '<br>', '<br/>'], "\n", $htmlBody)));
+    sendResendEmail($email, $subject, $htmlBody, $plainText);
 }
 
 // Payment callbacks must finish their database updates even if email delivery fails.

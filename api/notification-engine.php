@@ -6,7 +6,10 @@ declare(strict_types=1);
  * Firestore writes use the server service account; browser clients never write
  * notification records directly.
  */
-const COOLTIME_SYSTEM_EMAIL = 'cooltimeautoaircon2@gmail.com';
+function cooltimeSystemEmail(): string
+{
+    return trim((string) (getenv('SYSTEM_EMAIL_ADDRESS') ?: 'support@cooltimeautoaircon.online'));
+}
 
 function notificationCreate(array $account, string $id, array $data): ?bool
 {
@@ -138,7 +141,7 @@ function notifyAdminRecipients(array $account, string $eventId, string $type, st
         'type' => $type, 'message' => $message, 'recipientRole' => 'admin',
         'createdAt' => gmdate('Y-m-d\TH:i:s\Z'),
     ]);
-    if (notificationCreate($account, 'admin_' . $eventId, $record) !== false) notificationEmail(COOLTIME_SYSTEM_EMAIL, $subject, $record);
+    if (notificationCreate($account, 'admin_' . $eventId, $record) !== false) notificationEmail(cooltimeSystemEmail(), $subject, $record);
 }
 
 function notifyCustomerRecipient(array $account, string $eventId, string $customerId, string $email, string $type, string $message, array $details, string $subject): bool
