@@ -1,13 +1,20 @@
 <?php
 declare(strict_types=1);
 
+error_reporting(0);
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, private');
 header('X-Content-Type-Options: nosniff');
+ob_start();
 
 function respond(int $status, bool $success, string $reply): never
 {
     http_response_code($status);
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
     echo json_encode(['success' => $success, ($success ? 'reply' : 'error') => $reply], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     exit;
 }

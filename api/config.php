@@ -1,6 +1,15 @@
 <?php
 declare(strict_types=1);
 
+error_reporting(0);
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, private');
+if (ob_get_level() === 0) {
+    ob_start();
+}
+
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 loadEnvironmentFile(dirname(__DIR__) . '/.env');
@@ -29,6 +38,9 @@ function jsonResponse(array $data, int $status = 200): never
     http_response_code($status);
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store, private');
+    if (ob_get_level() > 0) {
+        ob_clean();
+    }
     echo json_encode($data);
     exit;
 }
@@ -384,6 +396,9 @@ function base64UrlEncode(string $value): string
 function firebaseServiceAccountFile(): string
 {
     $configuredPath = environment('FIREBASE_CREDENTIALS', false);
+    if (str_starts_with(ltrim($configuredPath), '{')) {
+        $configuredPath = '';
+    }
     if ($configuredPath === '') {
         $configuredPath = environment('FIREBASE_SERVICE_ACCOUNT_FILE', false);
     }
@@ -406,8 +421,17 @@ function firebaseServiceAccountFile(): string
 
 function firebaseServiceAccount(): array
 {
+    $json = environment('FIREBASE_SERVICE_ACCOUNT', false);
+    if ($json === '') {
+        $credentials = environment('FIREBASE_CREDENTIALS', false);
+        if (str_starts_with(ltrim($credentials), '{')) {
+            $json = $credentials;
+        }
+    }
     $file = firebaseServiceAccountFile();
-    $json = $file !== '' ? @file_get_contents($file) : environment('FIREBASE_SERVICE_ACCOUNT_JSON', false);
+    if ($json === '') {
+        $json = $file !== '' ? @file_get_contents($file) : environment('FIREBASE_SERVICE_ACCOUNT_JSON', false);
+    }
     $account = is_string($json) ? json_decode($json, true) : null;
     if (!is_array($account) || empty($account['client_email']) || empty($account['private_key']) || empty($account['project_id'])) {
         throw new RuntimeException('Firebase service account configuration is missing or invalid.');
@@ -504,7 +528,11 @@ function firebaseAdminUpdatePassword(string $uid, string $newPassword): void
 
 function hasFirebaseServiceAccount(): bool
 {
-    return firebaseServiceAccountFile() !== '' || isConfiguredValue((string) getenv('FIREBASE_SERVICE_ACCOUNT_JSON'));
+    $credentials = (string) getenv('FIREBASE_CREDENTIALS');
+    return firebaseServiceAccountFile() !== ''
+        || isConfiguredValue((string) getenv('FIREBASE_SERVICE_ACCOUNT'))
+        || (str_starts_with(ltrim($credentials), '{') && isConfiguredValue($credentials))
+        || isConfiguredValue((string) getenv('FIREBASE_SERVICE_ACCOUNT_JSON'));
 }
 
 // OTPs remain hashed and server-only. This optional audit record never exposes its code.
