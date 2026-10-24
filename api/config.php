@@ -448,7 +448,11 @@ function firebaseServiceAccount(): array
 
 function normalizeFirebasePrivateKey(string $privateKey): string
 {
-    $privateKey = str_replace(['\\r\\n', '\\n', '\\r'], "\n", $privateKey);
+    $privateKey = str_replace(
+        ['\\\\r\\\\n', '\\\\n', '\\\\r', '\\r\\n', '\\n', '\\r', "\r\n", "\r"],
+        "\n",
+        $privateKey
+    );
     $privateKey = trim($privateKey);
     if (preg_match('/\A(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----)(.*?)(-----END [A-Z0-9 ]*PRIVATE KEY-----)\z/s', $privateKey, $matches)) {
         $body = preg_replace('/\s+/', '', $matches[2]) ?? '';
@@ -490,7 +494,18 @@ function firebaseAdminAccessToken(): string
         logFirebaseOpenSslError('Firebase service-account private key could not be loaded for signing');
         throw new RuntimeException('Firebase service-account private key is invalid.');
     }
-    if (!openssl_sign($unsignedToken, $signature, $privateKey, OPENSSL_ALGO_SHA256)) {
+    try {
+        set_error_handler(static function (int $severity, string $message): never {
+            throw new ErrorException($message, 0, $severity);
+        }, E_WARNING);
+        $signed = openssl_sign($unsignedToken, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+    } catch (Throwable $error) {
+        logFirebaseOpenSslError('Firebase administrator JWT signing failed: ' . $error->getMessage());
+        throw new RuntimeException('Unable to sign Firebase administrator request.', 0, $error);
+    } finally {
+        restore_error_handler();
+    }
+    if (!$signed) {
         logFirebaseOpenSslError('Firebase administrator JWT signing failed');
         throw new RuntimeException('Unable to sign Firebase administrator request.');
     }
