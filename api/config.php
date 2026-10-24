@@ -437,7 +437,23 @@ function firebaseServiceAccount(): array
     if (!is_array($account) || empty($account['client_email']) || empty($account['private_key']) || empty($account['project_id'])) {
         throw new RuntimeException('Firebase service account configuration is missing or invalid.');
     }
+    $account['private_key'] = str_replace('\\n', "\n", (string) $account['private_key']);
+    $privateKey = openssl_pkey_get_private($account['private_key']);
+    if ($privateKey === false) {
+        logFirebaseOpenSslError('Firebase service-account private key could not be parsed');
+        throw new RuntimeException('Firebase service-account private key is invalid.');
+    }
+    openssl_pkey_free($privateKey);
     return $account;
+}
+
+function logFirebaseOpenSslError(string $context): void
+{
+    $errors = [];
+    while (($error = openssl_error_string()) !== false) {
+        $errors[] = $error;
+    }
+    error_log($context . ': ' . ($errors !== [] ? implode('; ', $errors) : 'No OpenSSL error details available.'));
 }
 
 function firebaseAdminAccessToken(): string
@@ -459,9 +475,17 @@ function firebaseAdminAccessToken(): string
         'exp' => $now + 3600,
     ], JSON_THROW_ON_ERROR));
     $unsignedToken = "{$header}.{$claims}";
-    if (!openssl_sign($unsignedToken, $signature, $account['private_key'], OPENSSL_ALGO_SHA256)) {
+    $privateKey = openssl_pkey_get_private($account['private_key']);
+    if ($privateKey === false) {
+        logFirebaseOpenSslError('Firebase service-account private key could not be loaded for signing');
+        throw new RuntimeException('Firebase service-account private key is invalid.');
+    }
+    if (!openssl_sign($unsignedToken, $signature, $privateKey, OPENSSL_ALGO_SHA256)) {
+        logFirebaseOpenSslError('Firebase administrator JWT signing failed');
+        openssl_pkey_free($privateKey);
         throw new RuntimeException('Unable to sign Firebase administrator request.');
     }
+    openssl_pkey_free($privateKey);
 
     $response = httpJsonRequest('https://oauth2.googleapis.com/token', [
         'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
