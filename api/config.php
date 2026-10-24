@@ -443,7 +443,6 @@ function firebaseServiceAccount(): array
         logFirebaseOpenSslError('Firebase service-account private key could not be parsed');
         throw new RuntimeException('Firebase service-account private key is invalid.');
     }
-    openssl_pkey_free($privateKey);
     return $account;
 }
 
@@ -493,10 +492,8 @@ function firebaseAdminAccessToken(): string
     }
     if (!openssl_sign($unsignedToken, $signature, $privateKey, OPENSSL_ALGO_SHA256)) {
         logFirebaseOpenSslError('Firebase administrator JWT signing failed');
-        openssl_pkey_free($privateKey);
         throw new RuntimeException('Unable to sign Firebase administrator request.');
     }
-    openssl_pkey_free($privateKey);
 
     $response = httpJsonRequest('https://oauth2.googleapis.com/token', [
         'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
