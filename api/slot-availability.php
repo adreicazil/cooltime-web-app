@@ -31,8 +31,17 @@ function availabilityFirestoreQuery(array $account, string $branchId): array
     ]]);
     $response = @file_get_contents($url, false, $context);
     $statusLine = $http_response_header[0] ?? '';
-    if (!is_string($response) || !preg_match('/\s2\d\d\s/', $statusLine)) {
-        throw new RuntimeException('Firestore availability query failed.');
+    preg_match('/\s(\d{3})\s/', $statusLine, $statusMatches);
+    $status = (int) ($statusMatches[1] ?? 0);
+    if (!is_string($response) || $status < 200 || $status >= 300) {
+        $errorBody = is_string($response) ? json_decode($response, true) : null;
+        $providerError = is_array($errorBody) ? ($errorBody['error']['status'] ?? $errorBody['error']['message'] ?? '') : '';
+        $providerError = substr(preg_replace('/[^A-Za-z0-9_. -]/', '', (string) $providerError) ?? '', 0, 120);
+        throw new RuntimeException(sprintf(
+            'Firestore availability query failed (HTTP %d, provider_error=%s).',
+            $status,
+            $providerError !== '' ? $providerError : 'unspecified'
+        ));
     }
     $rows = json_decode($response, true);
     if (!is_array($rows)) throw new RuntimeException('Firestore availability response was invalid.');
