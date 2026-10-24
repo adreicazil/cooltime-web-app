@@ -437,7 +437,7 @@ function firebaseServiceAccount(): array
     if (!is_array($account) || empty($account['client_email']) || empty($account['private_key']) || empty($account['project_id'])) {
         throw new RuntimeException('Firebase service account configuration is missing or invalid.');
     }
-    $account['private_key'] = str_replace('\\n', "\n", (string) $account['private_key']);
+    $account['private_key'] = normalizeFirebasePrivateKey((string) $account['private_key']);
     $privateKey = openssl_pkey_get_private($account['private_key']);
     if ($privateKey === false) {
         logFirebaseOpenSslError('Firebase service-account private key could not be parsed');
@@ -445,6 +445,17 @@ function firebaseServiceAccount(): array
     }
     openssl_pkey_free($privateKey);
     return $account;
+}
+
+function normalizeFirebasePrivateKey(string $privateKey): string
+{
+    $privateKey = str_replace(['\\r\\n', '\\n', '\\r'], "\n", $privateKey);
+    $privateKey = trim($privateKey);
+    if (preg_match('/\A(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----)(.*?)(-----END [A-Z0-9 ]*PRIVATE KEY-----)\z/s', $privateKey, $matches)) {
+        $body = preg_replace('/\s+/', '', $matches[2]) ?? '';
+        $privateKey = $matches[1] . "\n" . implode("\n", str_split($body, 64)) . "\n" . $matches[3];
+    }
+    return $privateKey;
 }
 
 function logFirebaseOpenSslError(string $context): void
