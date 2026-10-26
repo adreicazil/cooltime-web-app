@@ -479,9 +479,11 @@ function firebaseServiceAccount(): array
         throw new RuntimeException('Firebase project ID is missing from configuration.');
     }
     $account['project_id'] = $projectId;
-    $account['private_key'] = normalizeFirebasePrivateKey((string) $account['private_key']);
-    $privateKey = openssl_pkey_get_private($account['private_key']);
-    if ($privateKey === false) {
+    $rawKey = (string) ($account['private_key'] ?? '');
+    $privateKey = normalizeFirebasePrivateKey($rawKey);
+    $account['private_key'] = $privateKey;
+    $parsedKey = openssl_pkey_get_private($privateKey);
+    if ($parsedKey === false) {
         respondToInvalidFirebasePrivateKey('Firebase service-account private key could not be parsed');
     }
     return $account;
@@ -495,10 +497,23 @@ function normalizeFirebasePrivateKey(string $privateKey): string
         $privateKey
     );
     $privateKey = trim($privateKey);
-    if (preg_match('/\A(-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----)(.*?)(-----END [A-Z0-9 ]*PRIVATE KEY-----)\z/s', $privateKey, $matches)) {
-        $body = preg_replace('/\s+/', '', $matches[2]) ?? '';
-        $privateKey = $matches[1] . "\n" . implode("\n", str_split($body, 64)) . "\n" . $matches[3];
+
+    if (!preg_match('/-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/', $privateKey)) {
+        $privateKey = "-----BEGIN PRIVATE KEY-----\n" . $privateKey . "\n-----END PRIVATE KEY-----";
     }
+
+    $privateKey = preg_replace_callback(
+        '/-----BEGIN ([A-Z0-9 ]*PRIVATE KEY)-----\\s*(.*?)\\s*-----END ([A-Z0-9 ]*PRIVATE KEY)-----/s',
+        static function (array $matches): string {
+            if ($matches[1] !== $matches[3]) return $matches[0];
+            $body = preg_replace('/\\s+/', '', $matches[2]) ?? '';
+            return '-----BEGIN ' . $matches[1] . "-----\n"
+                . implode("\n", str_split($body, 64))
+                . "\n-----END " . $matches[3] . '-----';
+        },
+        $privateKey
+    ) ?? $privateKey;
+
     return $privateKey;
 }
 
