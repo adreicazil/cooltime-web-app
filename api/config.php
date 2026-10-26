@@ -433,44 +433,59 @@ function base64UrlEncode(string $value): string
 
 function firebaseServiceAccountFile(): string
 {
-    $configuredPath = environment('FIREBASE_CREDENTIALS', false);
-    if (str_starts_with(ltrim($configuredPath), '{')) {
-        $configuredPath = '';
+    foreach ([
+        environment('FIREBASE_SERVICE_ACCOUNT', false),
+        environment('FIREBASE_CREDENTIALS', false),
+        environment('FIREBASE_SERVICE_ACCOUNT_FILE', false),
+        environment('FIREBASE_SERVICE_ACCOUNT_JSON', false),
+    ] as $value) {
+        if ($value === '' || isFirebaseServiceAccountJson($value)) continue;
+        $path = resolveFirebaseCredentialPath($value);
+        if ($path !== '' && file_exists($path) && is_file($path) && is_readable($path)) return $path;
     }
-    if ($configuredPath === '') {
-        $configuredPath = environment('FIREBASE_SERVICE_ACCOUNT_FILE', false);
-    }
-    if ($configuredPath === '') {
-        return '';
-    }
+    return '';
+}
 
-    // Relative paths in .env are resolved from the project root, regardless
-    // of the web server's current working directory.
+function isFirebaseServiceAccountJson(string $value): bool
+{
+    return str_starts_with(ltrim($value), '{')
+        || (bool) preg_match('/"type"\\s*:\\s*"service_account"/', $value);
+}
+
+function resolveFirebaseCredentialPath(string $configuredPath): string
+{
     $path = $configuredPath;
     $isAbsolute = str_starts_with($path, DIRECTORY_SEPARATOR)
         || (bool) preg_match('/^[A-Za-z]:[\\\\\/]/', $path)
         || str_starts_with($path, '\\\\');
-    if (!$isAbsolute) {
-        $path = dirname(__DIR__) . DIRECTORY_SEPARATOR . $path;
-    }
-    $resolved = realpath($path);
-    return $resolved !== false && is_file($resolved) && is_readable($resolved) ? $resolved : '';
+    if (!$isAbsolute) $path = dirname(__DIR__) . DIRECTORY_SEPARATOR . $path;
+    return $path;
 }
 
 function firebaseServiceAccount(): array
 {
-    $json = environment('FIREBASE_SERVICE_ACCOUNT', false);
-    if ($json === '') {
-        $credentials = environment('FIREBASE_CREDENTIALS', false);
-        if (str_starts_with(ltrim($credentials), '{')) {
-            $json = $credentials;
+    $account = null;
+    foreach ([
+        environment('FIREBASE_SERVICE_ACCOUNT', false),
+        environment('FIREBASE_CREDENTIALS', false),
+        environment('FIREBASE_SERVICE_ACCOUNT_JSON', false),
+        environment('FIREBASE_SERVICE_ACCOUNT_FILE', false),
+    ] as $value) {
+        if ($value === '') continue;
+        if (isFirebaseServiceAccountJson($value)) {
+            $json = $value;
+        } else {
+            $path = resolveFirebaseCredentialPath($value);
+            if (!file_exists($path) || !is_file($path) || !is_readable($path)) continue;
+            $json = @file_get_contents($path);
+            if (!is_string($json)) continue;
+        }
+        $candidate = json_decode($json, true);
+        if (is_array($candidate) && !empty($candidate['client_email']) && !empty($candidate['private_key'])) {
+            $account = $candidate;
+            break;
         }
     }
-    $file = firebaseServiceAccountFile();
-    if ($json === '') {
-        $json = $file !== '' ? @file_get_contents($file) : environment('FIREBASE_SERVICE_ACCOUNT_JSON', false);
-    }
-    $account = is_string($json) ? json_decode($json, true) : null;
     if (!is_array($account) || empty($account['client_email']) || empty($account['private_key'])) {
         throw new RuntimeException('Firebase service account configuration is missing or invalid.');
     }
@@ -658,11 +673,13 @@ function firebaseAdminUpdatePassword(string $uid, string $newPassword): void
 
 function hasFirebaseServiceAccount(): bool
 {
-    $credentials = (string) getenv('FIREBASE_CREDENTIALS');
+    $serviceAccount = environment('FIREBASE_SERVICE_ACCOUNT', false);
+    $credentials = environment('FIREBASE_CREDENTIALS', false);
+    $serviceAccountJson = environment('FIREBASE_SERVICE_ACCOUNT_JSON', false);
     return firebaseServiceAccountFile() !== ''
-        || isConfiguredValue((string) getenv('FIREBASE_SERVICE_ACCOUNT'))
-        || (str_starts_with(ltrim($credentials), '{') && isConfiguredValue($credentials))
-        || isConfiguredValue((string) getenv('FIREBASE_SERVICE_ACCOUNT_JSON'));
+        || (isFirebaseServiceAccountJson($serviceAccount) && isConfiguredValue($serviceAccount))
+        || (isFirebaseServiceAccountJson($credentials) && isConfiguredValue($credentials))
+        || (isFirebaseServiceAccountJson($serviceAccountJson) && isConfiguredValue($serviceAccountJson));
 }
 
 // OTPs remain hashed and server-only. This optional audit record never exposes its code.
