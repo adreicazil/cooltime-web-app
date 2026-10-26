@@ -481,11 +481,18 @@ function firebaseServiceAccount(): array
     $account['project_id'] = $projectId;
     $rawKey = (string) ($account['private_key'] ?? '');
     $privateKey = normalizeFirebasePrivateKey($rawKey);
-    $account['private_key'] = $privateKey;
     $parsedKey = openssl_pkey_get_private($privateKey);
+    if ($parsedKey === false) {
+        $alternateKey = alternateFirebasePrivateKeyHeader($privateKey);
+        if ($alternateKey !== $privateKey) {
+            $parsedKey = openssl_pkey_get_private($alternateKey);
+            if ($parsedKey !== false) $privateKey = $alternateKey;
+        }
+    }
     if ($parsedKey === false) {
         respondToInvalidFirebasePrivateKey('Firebase service-account private key could not be parsed');
     }
+    $account['private_key'] = $privateKey;
     return $account;
 }
 
@@ -514,6 +521,20 @@ function normalizeFirebasePrivateKey(string $privateKey): string
         $privateKey
     ) ?? $privateKey;
 
+    return $privateKey;
+}
+
+function alternateFirebasePrivateKeyHeader(string $privateKey): string
+{
+    $headerPairs = [
+        ['-----BEGIN PRIVATE KEY-----', '-----END PRIVATE KEY-----', '-----BEGIN RSA PRIVATE KEY-----', '-----END RSA PRIVATE KEY-----'],
+        ['-----BEGIN RSA PRIVATE KEY-----', '-----END RSA PRIVATE KEY-----', '-----BEGIN PRIVATE KEY-----', '-----END PRIVATE KEY-----'],
+    ];
+    foreach ($headerPairs as [$begin, $end, $alternateBegin, $alternateEnd]) {
+        if (str_contains($privateKey, $begin) && str_contains($privateKey, $end)) {
+            return str_replace([$begin, $end], [$alternateBegin, $alternateEnd], $privateKey);
+        }
+    }
     return $privateKey;
 }
 
