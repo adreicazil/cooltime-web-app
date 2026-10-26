@@ -1,5 +1,3 @@
-# Image Placeholders
-
 Replace these CSS placeholders with approved CoolTime photos:
 
 - Shop/front signage photo for the home and about pages.

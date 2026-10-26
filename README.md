@@ -1,8 +1,5 @@
-# CoolTime Auto Aircon Capstone Frontend
-
 Vanilla HTML, CSS, and JavaScript frontend prepared for Firebase Authentication and Firestore integration.
 
-## Pages
 
 - `index.html` - Home
 - `about.html` - About Us
@@ -21,7 +18,6 @@ Vanilla HTML, CSS, and JavaScript frontend prepared for Firebase Authentication 
 - `super-dashboard.html` - Master dashboard
 - `dashboard.html` - Redirects to the admin dashboard
 
-## Project Structure
 
 ```text
 project/
@@ -36,8 +32,6 @@ project/
 └── firebase/
 ```
 
-## Firebase Status
-
 Firebase is configured with the CDN modular SDK in:
 
 - `js/firebase-config.js`
@@ -50,8 +44,6 @@ The app uses ES module imports directly from the Firebase CDN and does not requi
 Before testing privileged dashboards or catalog initialization, complete the
 one-time account and catalog setup in [FIREBASE_SETUP.md](FIREBASE_SETUP.md).
 
-## Authentication and password reset setup
-
 Firebase Authentication is the primary session authority. After a successful email/password login, the app reads only the authenticated user's canonical `users/{uid}` profile and routes by its Firestore role:
 
 - `admin` → Admin dashboard
@@ -60,51 +52,47 @@ Firebase Authentication is the primary session authority. After a successful ema
 
 The configured Firebase provider is Email/Password. Customer profiles still retain their existing `username` field, but it cannot safely be used to find an account before sign-in: the published Firestore rules allow a user to read only their own profile. The unified form therefore uses the registered email address and password, without adding an insecure username lookup or a duplicate account system.
 
-The **Forgot Password** page calls Firebase's `sendPasswordResetEmail()` API. Enable the Email/Password provider and ensure the deployed site domain is listed in Firebase Authentication's authorized domains. This flow does not require the PHP Gmail sender, PHP sessions, a Firebase service account, or an application-managed OTP.
+The **Forgot Password** page calls Firebase's `sendPasswordResetEmail()` API. Enable the Email/Password provider and ensure the deployed site domain is listed in Firebase Authentication's authorized domains. This flow does not require SMTP, PHP sessions, a Firebase service account, or an application-managed OTP.
 
-The legacy PHP OTP endpoints remain in the repository for compatibility with any separately deployed server process, but no browser page calls them for login or password reset. Do not configure client-side code with Gmail OAuth or service-account credentials.
-
-## Firestore rule required for registration
+The legacy PHP OTP endpoints remain in the repository for compatibility with any separately deployed server process, but no browser page calls them for login or password reset. Do not configure client-side code with SMTP or service-account credentials.
 
 Customer registration first creates the Firebase Authentication account, then writes `users/{uid}`. If the second step says **Missing or insufficient permissions**, publish the `users` rule from [firestore.rules](firestore.rules) in Firebase Console: **Firestore Database → Rules → paste/merge the `match /users/{userId}` block → Publish**. Do not use a public `allow read, write: if true` rule.
 
 If the error already happened once, the Firebase Authentication account may already exist but be missing its Firestore profile. Publish the rule, then submit the registration form again with the same email/password; the app will complete the missing profile. If it reports that an account already exists, use the unified login page instead.
 
-## Firestore data model
 
 The app uses the configured Firebase project in `js/firebase-config.js`; it does not create a second Firebase project or duplicate collections. Publish [firestore.rules](firestore.rules) before testing writes.
 
 - `users/{uid}` — Firebase UID, username/name, email, role, contact, status, created/updated timestamps. Registration creates the authenticated customer profile automatically; passwords remain in Firebase Authentication only.
-- `branches/{cabuyao|santarosa}` — name, address, capacity, status, `operatingHours`, `operatingDays`, `holidaysOpen`, `slotDurationMinutes`, timezone, and timestamps. The booking form also reads legacy `branch/{cabuyao|santa_rosa}` documents. Run `firestore-initializer/index.html` as an Admin/Super Admin to apply the 08:00–17:00 every-day schedule.
+- `branch/{cabuyao|santa_rosa}` — name, address, capacity (4 or 3), status, timestamps. Open `firestore-initializer/index.html` while signed in as an Admin/Super Admin to create only missing branch/service catalog records; it never overwrites existing records. The app still reads legacy `branches` documents for compatibility.
 - `services/{serviceId}` — name, description, price, duration, status, timestamps.
 - `vehicles/{vehicleId}` — customerId (Firebase UID), plate number, make, model, year, timestamps.
-- `bookings/{bookingId}` — customerId, vehicleId, branchId, serviceId, selectedServices, date (`YYYY-MM-DD`), timeSlot, status, timestamps.
+- `bookings/{bookingId}` — customerId, vehicleId, branchId, serviceId, selectedServices, date, timeSlot, status, timestamps.
 - `scheduleSlots/{slotId}` — branchId, date, timeSlot, capacity, bookedCount, available, timestamps.
-- `invoices/{invoiceId}` — shared Web/POS record with invoiceId, customerId, branchId (`cabuyao` or `santa_rosa`), source, servicesAdded, serviceDetails, runningTotal, finalAmount/totalAmount in pesos, status, timestamps, and optional paymentId.
-- `payments/{paymentId}` — invoiceId, customerId, branchId, amount, currency, amountUnit, method, status, referenceNumber, and paidAt.
+- `invoices/{invoiceId}` — bookingId, customerId, servicesAdded, runningTotal, finalAmount, status, timestamps.
+- `payments/{paymentId}` — invoiceId, bookingId, customerId, amount, method, status, referenceNumber, paidAt.
 - `serviceHistory/{historyId}` — booking/customer/vehicle IDs, completed services, parts, optional technician name, total amount, completedAt.
-- `notifications/{notificationId}` — recipientRole, customer userId when applicable, event type, message, booking/payment detail fields, and createdAt.
+- `notifications/{notificationId}` — userId, optional email, type, message, status, createdAt.
 - `otp/{hash}` — server-only audit record with userId, email, `codeHash`, purpose, expiration, used flag, and timestamp. No client can read or write it.
 - `reports/{reportId}` — type, period, generated timestamp, and a compact summary. Reports should use bookings/payments/invoices/history as their source rather than copy all transactional data.
 
-Web booking saves the booking and vehicle, then calls `api/create-web-invoice.php`. The endpoint verifies the Firebase ID token, reads the saved booking and service price from Firestore, and writes a retry-safe `web_{bookingId}` pending invoice. When PayMongo is configured, the browser sends that invoice ID to `api/create-checkout-session.php` and opens the resulting checkout session. Set `PAYMONGO_RETURN_URL` to the deployed HTTPS customer dashboard URL in the server `.env`.
-
-Customer availability uses `api/slot-availability.php`: it verifies the Firebase ID token, queries active bookings server-side using the Firebase service account, and returns only counts by time slot. Customer browsers do not query or receive other customers' booking documents. The booking form refreshes this aggregate every 15 seconds while a branch/date is selected.
-
-For payment confirmation, register `https://<your-domain>/api/paymongo-webhook.php` in PayMongo's webhook settings, subscribe to `checkout_session.payment.paid` and `payment.paid`, and store that endpoint's signing secret as `PAYMONGO_WEBHOOK_SECRET` in the server `.env`. The handler verifies PayMongo's signature over the raw request before atomically marking the invoice and payment record paid. PayMongo describes the signature format and checkout event fields in its [webhook security guide](https://docs.paymongo.com/docs/developer-tools-webhook-setup-management) and [hosted checkout guide](https://docs.paymongo.com/docs/payment-channels-hosted-checkout).
-
-The admin POS page at `pos.html` uses the Firestore service catalog, keeps a live cart total, and writes the same invoice schema. Cash checkout atomically creates a paid invoice and payment record; PayMongo checkout creates a pending invoice and receipt with a checkout link. Both branches use `cabuyao` and `santa_rosa` invoice IDs. Firestore rules restrict POS invoice/payment writes to administrators; the Web invoice API uses the server service account.
+`createBooking()` runs one Firestore transaction. It checks the branch capacity, increments exactly one slot, and creates the vehicle, booking, open invoice, and notification together. Firestore retries concurrent transactions; the check rejects a fifth Cabuyao booking or fourth Santa Rosa booking in the same slot. `cancelBooking()` performs the matching transactional slot decrement and booking cancellation.
 
 Administrative helpers in `js/firestore.js` provide the persistence operations for adding invoice service lines, recording payments, completing a service, and saving report metadata. They are intentionally not connected to the static dashboard placeholder controls, so dashboard UI and behavior are preserved.
 
-## Run Locally
 
 Because the project uses ES modules, run it through a local server:
 
 ```powershell
 $env:FIREBASE_API_KEY = 'your_firebase_web_api_key'
 $env:FIREBASE_SERVICE_ACCOUNT_FILE = 'C:\secure\cooltime-firebase-service-account.json'
-$env:SYSTEM_EMAIL_ADDRESS = 'support@cooltimeautoaircon.online'
+$env:SMTP_HOST = 'smtp.gmail.com'
+$env:SMTP_PORT = '587'
+$env:SMTP_ENCRYPTION = 'tls'
+$env:SMTP_USERNAME = 'your-gmail-address@gmail.com'
+$env:SMTP_PASSWORD = 'your-gmail-app-password'
+$env:SMTP_FROM_EMAIL = 'your-gmail-address@gmail.com'
+$env:SMTP_FROM_NAME = 'Auto Aircon Service System'
 powershell -ExecutionPolicy Bypass -File scripts/dev-server.ps1
 ```
 
@@ -117,11 +105,3 @@ Then open `http://localhost:8000/`. The local server uses PHP because the OTP en
 To test, open `login.html` and sign in with a Firebase account that has the matching canonical `users/{uid}` Firestore role (`super_admin`, `admin`, or `customer`).
 
 To test password reset, open `forgot-password.html`, enter the registered email, and use the Firebase password-reset link delivered by email. The browser response remains generic so it does not reveal whether an account exists.
-## Central notification dispatcher
-
-Application email (OTP, password verification, bookings, and notifications) is sent through Resend. Set `RESEND_API_KEY` and `RESEND_FROM_EMAIL="CoolTime Auto Aircon <noreply@cooltimeautoaircon.online>"` in the server environment after verifying the domain in Resend. Set `SYSTEM_EMAIL_ADDRESS=support@cooltimeautoaircon.online` for admin notification copies. Keep provider credentials on the server only.
-
-Booking submission, cancellation, reschedule, and payment-overdue events write notification records to Firestore and dispatch email from the configured system sender. Customer notifications are scoped to the authenticated customer's UID. Admin and Super Admin receive system copies at the system address.
-
-Appointment reminders are handled by `POST /api/notification-scheduler.php`. Set a long random `NOTIFICATION_CRON_TOKEN` in `.env` and invoke this endpoint every five minutes with `Authorization: Bearer <token>`. The job sends next-day reminders and same-day reminders during the final 30 minutes before an appointment. Do not expose this token in frontend code.
-

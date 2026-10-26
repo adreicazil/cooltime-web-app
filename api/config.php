@@ -440,8 +440,7 @@ function firebaseServiceAccount(): array
     $account['private_key'] = normalizeFirebasePrivateKey((string) $account['private_key']);
     $privateKey = openssl_pkey_get_private($account['private_key']);
     if ($privateKey === false) {
-        logFirebaseOpenSslError('Firebase service-account private key could not be parsed');
-        throw new RuntimeException('Firebase service-account private key is invalid.');
+        respondToInvalidFirebasePrivateKey('Firebase service-account private key could not be parsed');
     }
     return $account;
 }
@@ -470,6 +469,12 @@ function logFirebaseOpenSslError(string $context): void
     error_log($context . ': ' . ($errors !== [] ? implode('; ', $errors) : 'No OpenSSL error details available.'));
 }
 
+function respondToInvalidFirebasePrivateKey(string $context): never
+{
+    logFirebaseOpenSslError($context);
+    jsonResponse(['ok' => false, 'message' => 'The server Firebase credentials are invalid.'], 500);
+}
+
 function firebaseAdminAccessToken(): string
 {
     static $token = null;
@@ -491,8 +496,7 @@ function firebaseAdminAccessToken(): string
     $unsignedToken = "{$header}.{$claims}";
     $privateKey = openssl_pkey_get_private($account['private_key']);
     if ($privateKey === false) {
-        logFirebaseOpenSslError('Firebase service-account private key could not be loaded for signing');
-        throw new RuntimeException('Firebase service-account private key is invalid.');
+        respondToInvalidFirebasePrivateKey('Firebase service-account private key could not be loaded for signing');
     }
     try {
         set_error_handler(static function (int $severity, string $message): never {
