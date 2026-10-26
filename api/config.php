@@ -14,6 +14,7 @@ if (ob_get_level() === 0) {
 require_once dirname(__DIR__) . '/vendor/autoload.php';
 
 loadEnvironmentFile(dirname(__DIR__) . '/.env');
+configureApiCors();
 require_once __DIR__ . '/gmail-mailer.php';
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -33,6 +34,42 @@ const OTP_RESEND_COOLDOWN_SECONDS = 60;
 const OTP_MAX_REQUESTS_PER_WINDOW = 3;
 const OTP_REQUEST_WINDOW_SECONDS = 900;
 const OTP_SESSION_TTL_SECONDS = 43200;
+
+function configureApiCors(): void
+{
+    $origin = trim((string) ($_SERVER['HTTP_ORIGIN'] ?? ''));
+    $configuredOrigins = array_filter(array_map('trim', explode(',', environment('FRONTEND_URL', false))));
+    $requestScheme = strtolower((string) ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+    if (!in_array($requestScheme, ['http', 'https'], true)) {
+        $requestScheme = !empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off' ? 'https' : 'http';
+    }
+    $requestOrigin = $requestScheme . '://' . strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    $allowed = $origin !== '' && strcasecmp($origin, $requestOrigin) === 0;
+    foreach ($configuredOrigins as $configuredOrigin) {
+        $parts = parse_url($configuredOrigin);
+        $configuredOrigin = is_array($parts) && isset($parts['scheme'], $parts['host'])
+            ? strtolower($parts['scheme'] . '://' . $parts['host'] . (isset($parts['port']) ? ':' . $parts['port'] : ''))
+            : rtrim($configuredOrigin, '/');
+        if (strcasecmp($origin, $configuredOrigin) === 0) {
+            $allowed = true;
+            break;
+        }
+    }
+
+    if ($allowed) {
+        header('Access-Control-Allow-Origin: ' . $origin);
+        header('Vary: Origin', false);
+        header('Access-Control-Allow-Methods: POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    } elseif ($origin !== '') {
+        jsonResponse(['ok' => false, 'message' => 'This website is not allowed to access the API.'], 403);
+    }
+
+    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+        http_response_code(204);
+        exit;
+    }
+}
 
 function jsonResponse(array $data, int $status = 200): never
 {
@@ -434,9 +471,14 @@ function firebaseServiceAccount(): array
         $json = $file !== '' ? @file_get_contents($file) : environment('FIREBASE_SERVICE_ACCOUNT_JSON', false);
     }
     $account = is_string($json) ? json_decode($json, true) : null;
-    if (!is_array($account) || empty($account['client_email']) || empty($account['private_key']) || empty($account['project_id'])) {
+    if (!is_array($account) || empty($account['client_email']) || empty($account['private_key'])) {
         throw new RuntimeException('Firebase service account configuration is missing or invalid.');
     }
+    $projectId = environment('FIREBASE_PROJECT_ID', false) ?: (string) ($account['project_id'] ?? '');
+    if ($projectId === '') {
+        throw new RuntimeException('Firebase project ID is missing from configuration.');
+    }
+    $account['project_id'] = $projectId;
     $account['private_key'] = normalizeFirebasePrivateKey((string) $account['private_key']);
     $privateKey = openssl_pkey_get_private($account['private_key']);
     if ($privateKey === false) {

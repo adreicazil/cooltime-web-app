@@ -76,7 +76,7 @@ export async function updateAvailableSlots(dateInput, branchInput, slotSelectEle
         if (!auth.currentUser) throw new Error('Please sign in again to check appointment availability.');
         headers.Authorization = `Bearer ${await auth.currentUser.getIdToken()}`;
       }
-      const response = await fetch('api/slot-availability.php', {
+      const response = await fetch('/api/slot-availability.php', {
         method: 'POST', headers,
         body: JSON.stringify({ branchId, date }),
       });
