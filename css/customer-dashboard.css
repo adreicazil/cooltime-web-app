@@ -345,6 +345,18 @@ body.customer-dashboard-page .main-nav a:hover {
 .customer-booking-status.completed { color: #34c759 !important; font-weight: 600; }
 .customer-booking-status.cancelled,
 .customer-booking-status.canceled { color: #ff3b30 !important; font-weight: 600; }
+.customer-reschedule-dialog { width:min(94vw,480px); max-height:90vh; padding:0; border:1px solid rgba(255,255,255,.25); border-radius:18px; background:#102b43; color:#fff; box-shadow:0 24px 70px rgba(0,0,0,.45); }
+.customer-reschedule-dialog::backdrop { background:rgba(2,10,22,.72); backdrop-filter:blur(3px); }
+.customer-reschedule-form { display:grid; gap:10px; padding:24px; }
+.reschedule-modal-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.reschedule-modal-heading h2 { margin:0; color:#5ac8fa; font-size:1.3rem; }
+.customer-reschedule-form>p { margin:0 0 4px; color:rgba(255,255,255,.75); }
+.customer-reschedule-form label { margin-top:4px; color:#fff; font-size:.9rem; font-weight:600; }
+.customer-reschedule-form input,.customer-reschedule-form select { width:100%; min-height:42px; padding:8px 10px; border:1px solid rgba(255,255,255,.35); border-radius:8px; background:#fff; color:#152536; }
+.reschedule-modal-close { border:0; background:transparent; color:#fff; font-size:1.7rem; line-height:1; cursor:pointer; }
+.reschedule-error { margin:0; color:#ff9b9b!important; font-weight:600; }
+.reschedule-modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:8px; }
+.reschedule-modal-actions .btn { width:auto; margin:0; }
 .booking-action-spacer { display: block; width: 104px; }
 .customer-dashboard-page .customer-booking-section .customer-bookings-card .booking-cancel-link { display: block; width: 104px; margin: 0; padding: 8px 14px; border: 2px solid #0789ff; border-radius: 12px; background: transparent; color: #0789ff; font-weight: 700; text-align: center; text-decoration: none; }
 .booking-details-panel,

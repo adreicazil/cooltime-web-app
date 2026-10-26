@@ -24,6 +24,20 @@ let allSystemLogs = [];
 let currentAccountsPage = 1;
 const accountsPerPage = 15;
 
+function bookingServiceId(booking) {
+  return booking.serviceId || booking.service_id || booking.serviceID || '';
+}
+
+function bookingServiceName(booking) {
+  const serviceId = bookingServiceId(booking);
+  const currentName = servicesById[serviceId]?.name;
+  if (currentName) return currentName;
+  const storedName = booking.service_name || booking.serviceName;
+  if (storedName && storedName !== serviceId) return storedName;
+  return String(serviceId).replace(/^svc[_-]?/i, '').replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase()) || 'Service';
+}
+
 function setupModulePagination(config) {
   const container = document.getElementById(config.listContainerId);
   const card = document.getElementById(config.cardContainerId);
@@ -104,7 +118,7 @@ function overviewDate(value) {
 
 function createHorizontalBookingRowHTML(booking) {
   const user = usersById[booking.customerId] || {};
-  const service = servicesById[booking.serviceId] || {};
+  const serviceName = bookingServiceName(booking);
   const status = normalizeBookingFilterStatus(booking.status || 'pending');
   const statusColor = status === 'confirmed' ? '#38bdf8' : '#f97316';
   const branchKey = String(booking.branchId || '').toLowerCase().replace(/[\s-]+/g, '_');
@@ -115,7 +129,7 @@ function createHorizontalBookingRowHTML(booking) {
   return `<div class="overview-booking-row" role="row">
     <div class="overview-booking-customer" role="cell" title="${esc(user.name || user.username || booking.customerName || 'Customer')}">${esc(user.name || user.username || booking.customerName || 'Customer')}</div>
     <div class="overview-booking-email" role="cell" title="${esc(user.email || booking.customerEmail || '')}">${esc(user.email || booking.customerEmail || '')}</div>
-    <div class="overview-booking-service" role="cell" title="${esc(service.name || booking.serviceName || booking.serviceId || 'Service')}"><strong>${esc(service.name || booking.serviceName || booking.serviceId || 'Service')}</strong><span>${esc(dateTime)}</span></div>
+    <div class="overview-booking-service" role="cell" title="${esc(serviceName)}"><strong>${esc(serviceName)}</strong><span>${esc(dateTime)}</span></div>
     <div class="overview-booking-branch" role="cell" title="${esc(branch)}">${esc(branch)}</div>
     <div class="overview-booking-status" role="cell" style="color: ${statusColor} !important;">${esc(status.replace(/\b\w/g, (letter) => letter.toUpperCase()))}</div>
   </div>`;
@@ -294,6 +308,7 @@ async function initialize() {
   if (role === 'super_admin') document.querySelectorAll('.super-only').forEach((node) => { node.hidden = false; });
   await loadCoreData();
   watchDashboardNotifications();
+  watchServiceCatalog();
   $('#toolsLogout')?.addEventListener('click', () => logoutUser('login.html'));
   on('#closeDialog', 'click', () => $('#detailDialog')?.close());
   on('#booking-search-input', 'input', renderBookings);
@@ -494,6 +509,17 @@ function watchDashboardNotifications() {
   }, (error) => console.error('Dashboard sales analytics could not be refreshed:', error));
 }
 
+function watchServiceCatalog() {
+  onSnapshot(collection(db, 'services'), (snapshot) => {
+    services = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    servicesById = Object.fromEntries(services.map((item) => [item.id, item]));
+    adminRows.services = services;
+    renderServices();
+    renderBookings();
+    renderDashboardOverview();
+  }, (error) => console.error('Service catalog could not be refreshed:', error));
+}
+
 function normalizeBookingFilterStatus(value) {
   const status = String(value || '').toLowerCase().trim().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
   if (['pending checkout', 'unpaid'].includes(status)) return 'pending';
@@ -518,7 +544,7 @@ function renderBookings() {
   });
   const renderedRows = rows.map((booking) => {
     const user = usersById[booking.customerId] || { name: booking.customerName, email: booking.customerEmail, phone: booking.contactNumber };
-    const service = servicesById[booking.serviceId]?.name || booking.serviceId;
+    const service = bookingServiceName(booking);
     const invoice = invoices.find((item) => item.id === `web_${booking.id}` || item.bookingId === booking.id);
     const sessionId = String(invoice?.latestPaymentSessionId || '');
     const checkout = payments.find((item) => item.id === `paymongo_${sessionId}` || item.checkoutSessionId === sessionId);
@@ -538,7 +564,7 @@ function renderBookings() {
     if (isDashboardPage) {
       const vehicle = vehiclesById[booking.vehicleId] || {};
       const branch = branchesById[booking.branchId] || {};
-      const serviceRecord = servicesById[booking.serviceId] || {};
+      const serviceRecord = servicesById[bookingServiceId(booking)] || {};
       const branchKey = String(booking.branchId || '').toLowerCase().replace(/[\s-]+/g, '_');
       const branchName = branch.name || ({ cabuyao_main: 'Cabuyao', cabuyao: 'Cabuyao', santa_rosa: 'Santa Rosa', santarosa: 'Santa Rosa' }[branchKey] || booking.branchId);
       const customerName = user.name || user.username || booking.customerName || booking.customerId;
@@ -636,8 +662,8 @@ async function bookingAction(event) {
     const user = usersById[booking.customerId] || {};
     const vehicle = vehiclesById[booking.vehicleId] || {};
     const branch = branchesById[booking.branchId] || {};
-    const serviceRecord = servicesById[booking.serviceId] || {};
-    $('#detailContent').innerHTML = `<h2>Booking ${esc(booking.id)}</h2><dl>${[['Customer', user.name || user.username], ['Email', user.email], ['Contact', user.phone || user.contact], ['Date', booking.date], ['Time', booking.timeSlot], ['Service', serviceRecord.name || booking.serviceId], ['Service price', money(serviceRecord.price)], ['Branch', branch.name || booking.branchId], ['Branch address', branch.address], ['Status', booking.status], ['Vehicle plate', vehicle.plateNumber], ['Vehicle', `${vehicle.make || ''} ${vehicle.model || ''} ${vehicle.year || ''}`], ['Cancellation request reason', booking.cancellationRequestReason], ['Admin cancellation reason', booking.cancellationReason]].map(([key, val]) => `<dt>${esc(key)}</dt><dd>${esc(val || '—')}</dd>`).join('')}</dl>`;
+    const serviceRecord = servicesById[bookingServiceId(booking)] || {};
+    $('#detailContent').innerHTML = `<h2>Booking ${esc(booking.id)}</h2><dl>${[['Customer', user.name || user.username], ['Email', user.email], ['Contact', user.phone || user.contact], ['Date', booking.date], ['Time', booking.timeSlot], ['Service', bookingServiceName(booking)], ['Service price', money(serviceRecord.price)], ['Branch', branch.name || booking.branchId], ['Branch address', branch.address], ['Status', booking.status], ['Vehicle plate', vehicle.plateNumber], ['Vehicle', `${vehicle.make || ''} ${vehicle.model || ''} ${vehicle.year || ''}`], ['Cancellation request reason', booking.cancellationRequestReason], ['Admin cancellation reason', booking.cancellationReason]].map(([key, val]) => `<dt>${esc(key)}</dt><dd>${esc(val || '—')}</dd>`).join('')}</dl>`;
     $('#detailDialog').showModal(); return;
   }
   if (button.classList.contains('reject-cancellation')) {
@@ -865,7 +891,7 @@ function renderPos() {
     const serviceRows = (invoice.serviceDetails || []).map((line) => {
       const quantity = Number(line.quantity || 1);
       const unitPrice = Number(line.price || 0);
-      const serviceName = line.name || servicesById[line.serviceId]?.name || line.serviceId || 'Service';
+      const serviceName = line.name || servicesById[line.serviceId || line.service_id]?.name || line.serviceId || line.service_id || 'Service';
       return `<tr><td>${esc(serviceName)}</td><td>${quantity}</td><td>${money(unitPrice)}</td><td>${money(line.lineTotal ?? unitPrice * quantity)}</td></tr>`;
     }).join('') || '<tr><td colspan="4">No itemized services recorded.</td></tr>';
     const customer = invoice.customerName || (invoice.customerId ? usersById[invoice.customerId]?.name || usersById[invoice.customerId]?.username || invoice.customerId : 'Walk-in customer');
@@ -1058,7 +1084,7 @@ function reportDisplayRows(rows, type) {
       const amountLabel = `PHP ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       return [dateKey(row) || '—', row.id || '—', row.customerName || (row.customerId ? user.name || user.username || row.customerId : 'Walk-in customer'), branch.name || row.branchName || row.branchId || '—', transactionMethod(row, payment), row.status || '—', amountLabel];
     }
-    return [dateKey(row) || '—', user.name || user.username || row.customerName || row.customerEmail || row.customerId || '—', service.name || row.serviceName || row.serviceId || '—', branch.name || row.branchName || row.branchId || '—', row.status || row.rating || '—', amount != null ? money(amount) : '—'];
+    return [dateKey(row) || '—', user.name || user.username || row.customerName || row.customerEmail || row.customerId || '—', service.name || bookingServiceName(row) || '—', branch.name || row.branchName || row.branchId || '—', row.status || row.rating || '—', amount != null ? money(amount) : '—'];
   });
 }
 

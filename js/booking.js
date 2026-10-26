@@ -233,96 +233,139 @@ async function refreshInvoicesFromServer(user) {
   renderInvoices(snapshot);
 }
 
+let stopCustomerServiceCatalog = null;
+
+function readableServiceFallback(serviceId) {
+  return String(serviceId || '').replace(/^svc[_-]?/i, '').replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase()) || 'Service';
+}
+
+function renderCustomerBookings(records, serviceCatalog, vehicleData, branchCatalog, user, profile, target) {
+  const bookingData = records.map((record) => {
+    const data = record.data;
+    const serviceId = data.serviceId || data.service_id || data.serviceID || '';
+    const service = serviceCatalog[serviceId] || {};
+    const branchKey = String(data.branchId || data.branch_id || '').toLowerCase().replace(/[- ]/g, '_');
+    const branch = branchCatalog[branchKey] || {};
+    return {
+      ...data, id: record.id, serviceId,
+      serviceName: service.name || data.service_name || data.serviceName || readableServiceFallback(serviceId),
+      servicePrice: Number(service.price || data.servicePrice || data.service_price || 0),
+      branchName: data.branchName || branch.name || ({ cabuyao: 'Cabuyao Branch', santarosa: 'Santa Rosa Branch', santa_rosa: 'Santa Rosa Branch' }[branchKey]) || data.branchId || 'Branch unavailable',
+      branchAddress: data.branchAddress || branch.address || 'Address unavailable',
+      customerName: profile?.name || profile?.username || 'Customer',
+      customerEmail: user.email || profile?.email || 'Email unavailable',
+      vehicle: data.vehicle || vehicleData[data.vehicleId || data.vehicle_id] || {}
+    };
+  });
+  window.dispatchEvent(new CustomEvent('customer:bookings', { detail: bookingData }));
+  if (!bookingData.length) { target.innerHTML = '<p class="customer-bookings-empty">No bookings yet.</p>'; return; }
+  const name = profile?.name || profile?.username || 'Customer';
+  target.innerHTML = bookingData.map((booking, index) => {
+    const rawStatus = String(booking.status || 'pending');
+    const rawStatusKey = rawStatus.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const statusKey = rawStatusKey === 'in-progress' ? 'ongoing' : rawStatusKey;
+    const status = statusKey === 'ongoing' ? 'Ongoing' : statusKey.charAt(0).toUpperCase() + statusKey.slice(1).replaceAll('-', ' ');
+    const branchKey = String(booking.branchId || '').toLowerCase().replace(/[- ]/g, '_');
+    const branch = booking.branchName || ({ santarosa: 'Sta. Rosa', santa_rosa: 'Sta. Rosa', cabuyao: 'Cabuyao' }[branchKey]) || booking.branchId || 'Branch unavailable';
+    const vehicle = booking.vehicle || {};
+    const subject = `Cancellation request for booking ${booking.id}`;
+    const body = `Name: ${name}\nBooking ID: ${booking.id}\nDate: ${booking.date || ''}\nTime: ${booking.timeSlot || ''}\nService: ${booking.serviceName}\n\nPlease review my cancellation request.`;
+    const href = `mailto:cooltimeautoaircon@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const cancelControl = statusKey === 'ongoing' ? `<a class="btn booking-cancel-link" href="${href}">Cancel</a>` : '<span class="booking-action-spacer" aria-hidden="true"></span>';
+    const detailsId = `booking-details-${escapeHtml(booking.id)}`;
+    const details = [
+      ['Customer name', booking.customerName || name], ['Customer email', booking.customerEmail || 'Email unavailable'],
+      ['Branch', branch], ['Branch address', booking.branchAddress || 'Address unavailable'],
+      ['Service', booking.serviceName], ['Appointment date', booking.date || 'Date unavailable'], ['Preferred time', booking.timeSlot || 'Time unavailable'],
+      ['Service price', `₱${Number(booking.servicePrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
+      ['Vehicle plate number', vehicle.plateNumber || 'Plate unavailable'], ['Vehicle make', vehicle.make || 'Make unavailable'],
+      ['Vehicle model', vehicle.model || 'Model unavailable'], ['Vehicle year', vehicle.year || 'Year unavailable']
+    ].map(([label, value]) => `<div class="booking-detail-field"><div class="booking-detail-label">${escapeHtml(label)}</div><div class="booking-detail-value">${escapeHtml(value)}</div></div>`).join('');
+    const rescheduleControl = ['pending', 'confirmed'].includes(statusKey)
+      ? `<button class="booking-reschedule-link" type="button" data-booking-id="${escapeHtml(booking.id)}" data-date="${escapeHtml(booking.date || '')}" data-time="${escapeHtml(booking.timeSlot || '')}">Request reschedule</button>` : '';
+    return `<article class="customer-booking-row booking-status-${escapeHtml(statusKey)}" data-booking-id="${escapeHtml(booking.id)}"><div class="booking-row-main"><button class="booking-summary-toggle" type="button" aria-expanded="false" aria-controls="${detailsId}"><span class="booking-index">${index + 1}</span><span class="booking-summary-meta"><strong>${escapeHtml(booking.serviceName)}</strong><small>${escapeHtml(booking.date || 'Date unavailable')} - ${escapeHtml(booking.timeSlot || '')}</small></span></button><span class="customer-booking-status ${escapeHtml(statusKey)}">${escapeHtml(status)}</span>${cancelControl}</div><div class="booking-details-panel" id="${detailsId}" aria-hidden="true" inert><div class="booking-details booking-expanded-grid">${details}</div>${rescheduleControl}</div></article>`;
+  }).join('');
+}
+
 async function loadCustomerBookings(user, profile) {
   const target = document.getElementById('customerBookings');
   if (!target) return;
   try {
-    const [bookings, services, vehicles, branches] = await Promise.all([
+    const [bookings, vehicles, branches] = await Promise.all([
       getDocs(query(collection(db, 'bookings'), where('customerId', '==', user.uid))),
-      getDocs(collection(db, 'services')),
       getDocs(query(collection(db, 'vehicles'), where('customerId', '==', user.uid))),
       getDocs(collection(db, 'branches'))
     ]);
-    const serviceCatalog = Object.fromEntries(services.docs.map((item) => [item.id, { ...item.data(), name: item.data().name || item.id }]));
+    const records = bookings.docs.map((item) => ({ id: item.id, data: item.data() }));
     const vehicleData = Object.fromEntries(vehicles.docs.map((item) => [item.id, item.data()]));
     const branchCatalog = Object.fromEntries(branches.docs.map((item) => [item.id.toLowerCase().replace(/[- ]/g, '_'), { id: item.id, ...item.data() }]));
-    const bookingData = bookings.docs.map((item) => {
-      const data = item.data();
-      const service = serviceCatalog[data.serviceId] || {};
-      const branchKey = String(data.branchId || '').toLowerCase().replace(/[- ]/g, '_');
-      const branch = branchCatalog[branchKey] || {};
-      return {
-        ...data, id: item.id,
-        serviceName: service.name || data.serviceId || 'Service',
-        servicePrice: Number(service.price || 0),
-        branchName: data.branchName || branch.name || ({ cabuyao: 'Cabuyao Branch', santarosa: 'Santa Rosa Branch', santa_rosa: 'Santa Rosa Branch' }[branchKey]) || data.branchId || 'Branch unavailable',
-        branchAddress: data.branchAddress || branch.address || 'Address unavailable',
-        customerName: profile?.name || profile?.username || 'Customer',
-        customerEmail: user.email || profile?.email || 'Email unavailable',
-        vehicle: data.vehicle || vehicleData[data.vehicleId] || {}
-      };
+    stopCustomerServiceCatalog?.();
+    stopCustomerServiceCatalog = onSnapshot(collection(db, 'services'), (snapshot) => {
+      const serviceCatalog = Object.fromEntries(snapshot.docs.map((item) => [item.id, { ...item.data() }]));
+      renderCustomerBookings(records, serviceCatalog, vehicleData, branchCatalog, user, profile, target);
+    }, (error) => {
+      console.error('Service names for customer bookings could not be refreshed:', error);
+      renderCustomerBookings(records, {}, vehicleData, branchCatalog, user, profile, target);
     });
-    window.dispatchEvent(new CustomEvent('customer:bookings', { detail: bookingData }));
-    if (bookings.empty) { target.innerHTML = '<p class="customer-bookings-empty">No bookings yet.</p>'; return; }
-    const name = profile?.name || profile?.username || 'Customer';
-    target.innerHTML = bookingData.map((booking, index) => {
-      const rawStatus = String(booking.status || 'pending');
-      const rawStatusKey = rawStatus.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-      const statusKey = rawStatusKey === 'in-progress' ? 'ongoing' : rawStatusKey;
-      const status = statusKey === 'ongoing' ? 'Ongoing' : statusKey.charAt(0).toUpperCase() + statusKey.slice(1).replaceAll('-', ' ');
-      const branchKey = String(booking.branchId || '').toLowerCase().replace(/[- ]/g, '_');
-      const branch = booking.branchName || ({ santarosa: 'Sta. Rosa', santa_rosa: 'Sta. Rosa', cabuyao: 'Cabuyao' }[branchKey]) || booking.branchId || 'Branch unavailable';
-      const vehicle = booking.vehicle || {};
-      const subject = `Cancellation request for booking ${booking.id}`;
-      const body = `Name: ${name}\nBooking ID: ${booking.id}\nDate: ${booking.date || ''}\nTime: ${booking.timeSlot || ''}\nService: ${booking.serviceName}\n\nPlease review my cancellation request.`;
-      const href = `mailto:cooltimeautoaircon@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-      const cancelControl = statusKey === 'ongoing' ? `<a class="btn booking-cancel-link" href="${href}">Cancel</a>` : '<span class="booking-action-spacer" aria-hidden="true"></span>';
-      const detailsId = `booking-details-${escapeHtml(booking.id)}`;
-      const details = [
-        ['Customer name', booking.customerName || name], ['Customer email', booking.customerEmail || 'Email unavailable'],
-        ['Branch', branch], ['Branch address', booking.branchAddress || 'Address unavailable'],
-        ['Service', booking.serviceName], ['Appointment date', booking.date || 'Date unavailable'], ['Preferred time', booking.timeSlot || 'Time unavailable'],
-        ['Service price', `₱${Number(booking.servicePrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-        ['Vehicle plate number', vehicle.plateNumber || 'Plate unavailable'], ['Vehicle make', vehicle.make || 'Make unavailable'],
-        ['Vehicle model', vehicle.model || 'Model unavailable'], ['Vehicle year', vehicle.year || 'Year unavailable']
-      ].map(([label, value]) => `<div class="booking-detail-field"><div class="booking-detail-label">${escapeHtml(label)}</div><div class="booking-detail-value">${escapeHtml(value)}</div></div>`).join('');
-      const rescheduleControl = ['pending', 'confirmed'].includes(statusKey)
-        ? `<button class="booking-reschedule-link" type="button" data-booking-id="${escapeHtml(booking.id)}">Request reschedule</button>` : '';
-      return `<article class="customer-booking-row booking-status-${escapeHtml(statusKey)}" data-booking-id="${escapeHtml(booking.id)}"><div class="booking-row-main"><button class="booking-summary-toggle" type="button" aria-expanded="false" aria-controls="${detailsId}"><span class="booking-index">${index + 1}</span><span class="booking-summary-meta"><strong>${escapeHtml(booking.serviceName)}</strong><small>${escapeHtml(booking.date || 'Date unavailable')} - ${escapeHtml(booking.timeSlot || '')}</small></span></button><span class="customer-booking-status ${escapeHtml(statusKey)}">${escapeHtml(status)}</span>${cancelControl}</div><div class="booking-details-panel" id="${detailsId}" aria-hidden="true" inert><div class="booking-details booking-expanded-grid">${details}</div>${rescheduleControl}</div></article>`;
-    }).join('');
   } catch (error) {
     console.error('Customer bookings could not be loaded:', error);
     target.textContent = 'Bookings are temporarily unavailable.';
   }
 }
 
+const rescheduleDialog = document.getElementById('rescheduleModal');
+const rescheduleForm = document.getElementById('rescheduleForm');
+const rescheduleDateInput = document.getElementById('rescheduleDate');
+const rescheduleTimeInput = document.getElementById('rescheduleTime');
+const rescheduleBookingIdInput = document.getElementById('rescheduleBookingId');
+const rescheduleError = document.getElementById('rescheduleError');
+const rescheduleSubmit = document.getElementById('rescheduleSubmit');
+
+function localDateInputValue(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function isRescheduleSelectionValid(date, time) {
+  const selectedDate = new Date(`${date}T00:00:00`);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return /^\d{4}-\d{2}-\d{2}$/.test(date)
+    && !Number.isNaN(selectedDate.getTime())
+    && localDateInputValue(selectedDate) === date
+    && selectedDate >= today
+    && Boolean(time);
+}
+
+function clearRescheduleErrorWhenValid() {
+  if (isRescheduleSelectionValid(rescheduleDateInput?.value || '', rescheduleTimeInput?.value || '') && rescheduleError) {
+    rescheduleError.textContent = '';
+    rescheduleError.hidden = true;
+  }
+}
+
+rescheduleDateInput?.addEventListener('input', clearRescheduleErrorWhenValid);
+rescheduleTimeInput?.addEventListener('change', clearRescheduleErrorWhenValid);
+rescheduleDialog?.querySelectorAll('[data-reschedule-close]').forEach((button) => {
+  button.addEventListener('click', () => rescheduleDialog.close());
+});
+
 document.getElementById('customerBookings')?.addEventListener('click', (event) => {
   const rescheduleButton = event.target.closest('.booking-reschedule-link');
   if (rescheduleButton) {
     event.preventDefault();
-    void (async () => {
-      const date = window.prompt('Requested new date (YYYY-MM-DD):');
-      if (!date) return;
-      const time = window.prompt('Requested appointment time (for example, 09:30 AM):');
-      if (!time) return;
-      const access = await requireRole(['customer']);
-      if (!access) return;
-      rescheduleButton.disabled = true;
-      try {
-        const response = await fetch('api/customer-notification-event.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await access.user.getIdToken()}` },
-          body: JSON.stringify({ action: 'request_reschedule', bookingId: rescheduleButton.dataset.bookingId, requestedDate: date, requestedTime: time })
-        });
-        const result = await response.json();
-        if (!response.ok || !result.ok) throw new Error(result.message || 'Reschedule request could not be sent.');
-        alert(result.message);
-      } catch (error) {
-        alert(error.message || 'Reschedule request could not be sent.');
-      } finally {
-        rescheduleButton.disabled = false;
-      }
-    })();
+    const today = localDateInputValue();
+    if (rescheduleDateInput) {
+      rescheduleDateInput.min = today;
+      rescheduleDateInput.value = rescheduleButton.dataset.date >= today ? rescheduleButton.dataset.date : today;
+    }
+    if (rescheduleTimeInput) rescheduleTimeInput.value = rescheduleButton.dataset.time || '';
+    if (rescheduleBookingIdInput) rescheduleBookingIdInput.value = rescheduleButton.dataset.bookingId || '';
+    if (rescheduleError) { rescheduleError.textContent = ''; rescheduleError.hidden = true; }
+    rescheduleDialog?.showModal();
     return;
   }
   const row = event.target.closest('.customer-booking-row');
@@ -334,6 +377,46 @@ document.getElementById('customerBookings')?.addEventListener('click', (event) =
   details?.classList.toggle('expanded', !expanded);
   details?.setAttribute('aria-hidden', String(expanded));
   if (details) details.inert = expanded;
+});
+
+rescheduleForm?.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const requestedDate = rescheduleDateInput?.value || '';
+  const requestedTime = rescheduleTimeInput?.value || '';
+  if (!isRescheduleSelectionValid(requestedDate, requestedTime)) {
+    if (rescheduleError) {
+      rescheduleError.textContent = 'Choose a date from today onward and a valid appointment time slot.';
+      rescheduleError.hidden = false;
+    }
+    return;
+  }
+
+  const access = await requireRole(['customer']);
+  if (!access) return;
+  if (rescheduleSubmit) rescheduleSubmit.disabled = true;
+  try {
+    const response = await fetch('api/customer-notification-event.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await access.user.getIdToken()}` },
+      body: JSON.stringify({
+        action: 'request_reschedule',
+        bookingId: rescheduleBookingIdInput?.value || '',
+        requestedDate,
+        requestedTime
+      })
+    });
+    const result = await response.json();
+    if (!response.ok || !result.ok) throw new Error(result.message || 'Reschedule request could not be sent.');
+    rescheduleDialog?.close();
+    alert(result.message);
+  } catch (error) {
+    if (rescheduleError) {
+      rescheduleError.textContent = error.message || 'Reschedule request could not be sent.';
+      rescheduleError.hidden = false;
+    }
+  } finally {
+    if (rescheduleSubmit) rescheduleSubmit.disabled = false;
+  }
 });
 if (form || document.getElementById('customerBookings')) {
   const customerPage = document.querySelector('.customer-dashboard');

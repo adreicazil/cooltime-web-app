@@ -32,14 +32,13 @@ try {
     $requestedTime = trim((string) ($input['requestedTime'] ?? ''));
     $date = DateTimeImmutable::createFromFormat('!Y-m-d', $requestedDate, new DateTimeZone('Asia/Manila'));
     $requestedTime = strtoupper(preg_replace('/\s+/', ' ', $requestedTime));
-    $requestedSlot = DateTimeImmutable::createFromFormat('!Y-m-d g:i A', $requestedDate . ' ' . $requestedTime, new DateTimeZone('Asia/Manila'));
-    $normalizedTime = preg_replace('/^0(?=\d:)/', '', $requestedTime) ?: $requestedTime;
     $dateErrors = DateTimeImmutable::getLastErrors();
+    $validTimeSlots = ['09:00 AM - 11:00 AM', '11:00 AM - 01:00 PM', '01:00 PM - 03:00 PM', '03:00 PM - 05:00 PM'];
+    $today = new DateTimeImmutable('today', new DateTimeZone('Asia/Manila'));
     if (!$date || $date->format('Y-m-d') !== $requestedDate
-        || !$requestedSlot || ($dateErrors && ($dateErrors['warning_count'] || $dateErrors['error_count']))
-        || $requestedSlot->format('Y-m-d g:i A') !== $requestedDate . ' ' . $normalizedTime
-        || $requestedSlot <= new DateTimeImmutable('now', new DateTimeZone('Asia/Manila'))) {
-        jsonResponse(['ok' => false, 'message' => 'Enter a valid future date and appointment time.'], 422);
+        || ($dateErrors && ($dateErrors['warning_count'] || $dateErrors['error_count']))
+        || $date < $today || !in_array($requestedTime, $validTimeSlots, true)) {
+        jsonResponse(['ok' => false, 'message' => 'Choose a date from today onward and a valid appointment time slot.'], 422);
     }
     $details['scheduledDate'] = $requestedDate;
     $details['scheduledTime'] = $requestedTime;

@@ -103,6 +103,25 @@
     </div>
 
   </main>
+  <dialog id="rescheduleModal" class="customer-reschedule-dialog" aria-labelledby="rescheduleTitle">
+    <form id="rescheduleForm" class="customer-reschedule-form">
+      <div class="reschedule-modal-heading"><h2 id="rescheduleTitle">Request reschedule</h2><button type="button" class="reschedule-modal-close" data-reschedule-close aria-label="Close">&times;</button></div>
+      <p>Select a new appointment date and time slot. Requests are reviewed by CoolTime staff.</p>
+      <label for="rescheduleDate">Appointment date</label>
+      <input id="rescheduleDate" name="requestedDate" type="date" required>
+      <label for="rescheduleTime">Appointment time</label>
+      <select id="rescheduleTime" name="requestedTime" required>
+        <option value="">Select a time slot</option>
+        <option>09:00 AM - 11:00 AM</option>
+        <option>11:00 AM - 01:00 PM</option>
+        <option>01:00 PM - 03:00 PM</option>
+        <option>03:00 PM - 05:00 PM</option>
+      </select>
+      <p id="rescheduleError" class="reschedule-error" role="alert" hidden></p>
+      <input id="rescheduleBookingId" name="bookingId" type="hidden">
+      <div class="reschedule-modal-actions"><button type="button" class="btn" data-reschedule-close>Cancel</button><button id="rescheduleSubmit" type="submit" class="btn btn-primary">Send request</button></div>
+    </form>
+  </dialog>
   <dialog id="notificationDetailModal" class="notification-detail-modal" aria-labelledby="notificationDetailTitle">
     <form method="dialog"><button class="notification-detail-close" aria-label="Close notification details">Close</button></form>
     <h2 id="notificationDetailTitle">Notification details</h2>
