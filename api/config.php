@@ -448,8 +448,25 @@ function firebaseServiceAccountFile(): string
 
 function isFirebaseServiceAccountJson(string $value): bool
 {
+    $escapedQuote = chr(92) . '"';
     return str_starts_with(ltrim($value), '{')
-        || (bool) preg_match('/"type"\\s*:\\s*"service_account"/', $value);
+        || str_starts_with(ltrim($value), '{' . $escapedQuote)
+        || str_contains($value, '"type"')
+        || str_contains($value, $escapedQuote . 'type' . $escapedQuote);
+}
+
+function decodeFirebaseServiceAccount(string $json, string $source): ?array
+{
+    $candidates = [$json];
+    $unescapedQuotes = str_replace(chr(92) . '"', '"', $json);
+    if ($unescapedQuotes !== $json) $candidates[] = $unescapedQuotes;
+
+    foreach ($candidates as $candidateJson) {
+        $account = json_decode($candidateJson, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($account)) return $account;
+        error_log('Firebase service-account JSON decode failed for ' . $source . ': ' . json_last_error_msg());
+    }
+    return null;
 }
 
 function resolveFirebaseCredentialPath(string $configuredPath): string
@@ -465,49 +482,74 @@ function resolveFirebaseCredentialPath(string $configuredPath): string
 function firebaseServiceAccount(): array
 {
     $account = null;
+    $privateKeyParseFailed = false;
+    $configuredProjectId = environment('FIREBASE_PROJECT_ID', false);
     foreach ([
-        environment('FIREBASE_SERVICE_ACCOUNT', false),
-        environment('FIREBASE_CREDENTIALS', false),
-        environment('FIREBASE_SERVICE_ACCOUNT_JSON', false),
-        environment('FIREBASE_SERVICE_ACCOUNT_FILE', false),
-    ] as $value) {
+        ['FIREBASE_SERVICE_ACCOUNT', environment('FIREBASE_SERVICE_ACCOUNT', false)],
+        ['FIREBASE_CREDENTIALS', environment('FIREBASE_CREDENTIALS', false)],
+        ['FIREBASE_SERVICE_ACCOUNT_JSON', environment('FIREBASE_SERVICE_ACCOUNT_JSON', false)],
+        ['FIREBASE_SERVICE_ACCOUNT_FILE', environment('FIREBASE_SERVICE_ACCOUNT_FILE', false)],
+    ] as [$source, $value]) {
         if ($value === '') continue;
         if (isFirebaseServiceAccountJson($value)) {
             $json = $value;
         } else {
             $path = resolveFirebaseCredentialPath($value);
-            if (!file_exists($path) || !is_file($path) || !is_readable($path)) continue;
+            if (!file_exists($path) || !is_file($path) || !is_readable($path)) {
+                error_log('Firebase service-account file configured by ' . $source . ' was not found or readable.');
+                continue;
+            }
             $json = @file_get_contents($path);
-            if (!is_string($json)) continue;
+            if (!is_string($json)) {
+                error_log('Firebase service-account file configured by ' . $source . ' could not be read.');
+                continue;
+            }
         }
-        $candidate = json_decode($json, true);
-        if (is_array($candidate) && !empty($candidate['client_email']) && !empty($candidate['private_key'])) {
-            $account = $candidate;
-            break;
+        $candidate = decodeFirebaseServiceAccount($json, $source);
+        if (!is_array($candidate)) continue;
+        if (empty($candidate['client_email']) || empty($candidate['private_key'])) {
+            error_log('Firebase service-account data from ' . $source . ' is missing client_email or private_key.');
+            continue;
         }
+
+        $projectId = $configuredProjectId ?: (string) ($candidate['project_id'] ?? '');
+        if ($projectId === '') {
+            error_log('Firebase service-account data from ' . $source . ' has no project_id and FIREBASE_PROJECT_ID is unset.');
+            continue;
+        }
+        $rawKey = trim((string) $candidate['private_key']);
+        $escapedQuote = chr(92) . '"';
+        if (str_starts_with($rawKey, $escapedQuote) && str_ends_with($rawKey, $escapedQuote)) {
+            $rawKey = substr($rawKey, 2, -2);
+        } elseif (str_starts_with($rawKey, '"') && str_ends_with($rawKey, '"')) {
+            $rawKey = substr($rawKey, 1, -1);
+        }
+        $privateKey = normalizeFirebasePrivateKey($rawKey);
+        $parsedKey = openssl_pkey_get_private($privateKey);
+        if ($parsedKey === false) {
+            $alternateKey = alternateFirebasePrivateKeyHeader($privateKey);
+            if ($alternateKey !== $privateKey) {
+                $parsedKey = openssl_pkey_get_private($alternateKey);
+                if ($parsedKey !== false) $privateKey = $alternateKey;
+            }
+        }
+        if ($parsedKey === false) {
+            logFirebaseOpenSslError('Firebase service-account private key from ' . $source . ' could not be parsed');
+            $privateKeyParseFailed = true;
+            continue;
+        }
+
+        $account = $candidate;
+        $account['project_id'] = $projectId;
+        $account['private_key'] = $privateKey;
+        break;
     }
-    if (!is_array($account) || empty($account['client_email']) || empty($account['private_key'])) {
+    if (!is_array($account) && $privateKeyParseFailed) {
+        jsonResponse(['ok' => false, 'message' => 'The server Firebase credentials are invalid.'], 500);
+    }
+    if (!is_array($account)) {
         throw new RuntimeException('Firebase service account configuration is missing or invalid.');
     }
-    $projectId = environment('FIREBASE_PROJECT_ID', false) ?: (string) ($account['project_id'] ?? '');
-    if ($projectId === '') {
-        throw new RuntimeException('Firebase project ID is missing from configuration.');
-    }
-    $account['project_id'] = $projectId;
-    $rawKey = (string) ($account['private_key'] ?? '');
-    $privateKey = normalizeFirebasePrivateKey($rawKey);
-    $parsedKey = openssl_pkey_get_private($privateKey);
-    if ($parsedKey === false) {
-        $alternateKey = alternateFirebasePrivateKeyHeader($privateKey);
-        if ($alternateKey !== $privateKey) {
-            $parsedKey = openssl_pkey_get_private($alternateKey);
-            if ($parsedKey !== false) $privateKey = $alternateKey;
-        }
-    }
-    if ($parsedKey === false) {
-        respondToInvalidFirebasePrivateKey('Firebase service-account private key could not be parsed');
-    }
-    $account['private_key'] = $privateKey;
     return $account;
 }
 
