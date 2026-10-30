@@ -79,6 +79,17 @@ if (registerForm) {
     const username = getInputValue(registerForm, '#username');
     const email = getInputValue(registerForm, '#email');
     const password = getPasswordValue(registerForm, '#password');
+    const confirmPassword = getPasswordValue(registerForm, '#confirmPassword');
+    if (!confirmPassword) {
+      showMessage('Please confirm your password.');
+      registerForm.querySelector('#confirmPassword')?.focus();
+      return;
+    }
+    if (password !== confirmPassword) {
+      showMessage('Passwords do not match.');
+      registerForm.querySelector('#confirmPassword')?.focus();
+      return;
+    }
     const security = window.SecurityValidator;
     if (security?.isDisposableEmail(email)) {
       showMessage('Please use a permanent email address to create your account.');
