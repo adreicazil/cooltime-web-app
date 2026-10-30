@@ -59,10 +59,20 @@
 
 .form-card .password-input-wrap { position: relative; width: 100%; }
 .form-card .password-input-wrap input { width: 100%; margin: 0; padding-right: 46px; }
+/* Disable default browser password reveal icons */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
+input[type="password"]::-webkit-contacts-auto-fill-button,
+input[type="password"]::-webkit-credentials-auto-fill-button {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
 .form-card .toggle-password {
   position: absolute;
   top: 50%;
-  right: 8px;
+  right: 12px;
+  z-index: 10;
   display: grid;
   width: 32px;
   height: 32px;

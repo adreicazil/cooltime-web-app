@@ -78,16 +78,20 @@ if (registerForm) {
     event.preventDefault();
     const username = getInputValue(registerForm, '#username');
     const email = getInputValue(registerForm, '#email');
-    const password = getPasswordValue(registerForm, '#password');
-    const confirmPassword = getPasswordValue(registerForm, '#confirmPassword');
+    const password = getPasswordValue(registerForm, '#password').trim();
+    const confirmPassword = getPasswordValue(registerForm, '#confirm-password').trim();
     if (!confirmPassword) {
+      event.preventDefault();
+      event.stopPropagation();
       showMessage('Please confirm your password.');
-      registerForm.querySelector('#confirmPassword')?.focus();
+      registerForm.querySelector('#confirm-password')?.focus();
       return;
     }
     if (password !== confirmPassword) {
+      event.preventDefault();
+      event.stopPropagation();
       showMessage('Passwords do not match.');
-      registerForm.querySelector('#confirmPassword')?.focus();
+      registerForm.querySelector('#confirm-password')?.focus();
       return;
     }
     const security = window.SecurityValidator;
