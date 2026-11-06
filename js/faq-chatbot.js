@@ -27,17 +27,27 @@
   addMessage('Hello! I can help with CoolTime services, branches, hours, and bookings.', 'bot');
   const quick = root.querySelector('.ct-quick');
   ['Services offered', 'Branch locations', 'Operating hours', 'How to book'].forEach(label => { const button = document.createElement('button'); button.type = 'button'; button.className = 'ct-chip'; button.textContent = label; button.addEventListener('click', () => sendMessage(label)); quick.append(button); });
+  function localAnswer(message) {
+    const normalized = message.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
+    if (/^(services offered|what services( do you offer| are offered)?)$/.test(normalized) || /\b(services offered|services do you offer|what services|aircon cleaning|freon charging|leak detection)\b/.test(normalized)) return 'CoolTime offers car aircon cleaning, repair, freon charging, leak detection, and genuine aircon parts.';
+    if (/^(branch locations|where are (your )?branches|where are the branches)$/.test(normalized) || /\b(branch locations|branch address|where is your branch|where are your branches)\b/.test(normalized)) return 'CoolTime has a Cabuyao Main Branch and a Santa Rosa Branch.';
+    if (/^(operating hours|hours|business hours|what are your hours|what time do you open)$/.test(normalized) || /\b(operating hours|business hours|opening hours|what time do you open|what time do you close)\b/.test(normalized)) return 'Both CoolTime branches are open from 8 AM to 5 PM, Monday through Sunday.';
+    if (/^(how to book|how do i book|how can i book|book an appointment)$/.test(normalized) || /\b(how (do|can) i book|how to book|book an appointment|make a booking)\b/.test(normalized)) return 'Use the Book Now option to request an appointment, or contact CoolTime through the Contact page. Include your preferred branch, date, and time.';
+    return '';
+  }
   async function sendMessage(value) {
     const message = value.trim(); if (!message || send.disabled) return;
     addMessage(message, 'user'); input.value = ''; send.disabled = true; input.disabled = true;
     const typing = document.createElement('div'); typing.className = 'ct-msg bot'; typing.setAttribute('aria-label', 'Assistant is typing'); typing.innerHTML = '<span class="ct-typing"><i></i><i></i><i></i></span>'; messages.append(typing); messages.scrollTop = messages.scrollHeight;
+    const answer = localAnswer(message);
+    if (answer) { typing.remove(); addMessage(answer, 'bot'); send.disabled = false; input.disabled = false; input.focus(); return; }
     try {
       const response = await fetch('api/chatbot.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message }) });
       const data = await response.json(); typing.remove();
       const reply = data && data.success && typeof data.reply === 'string' ? data.reply : (data && typeof data.error === 'string' ? data.error : 'Sorry, the chat is temporarily unavailable.');
       const cleanedReply = reply.replace(/\*\*(.*?)\*\*/g, '$1').replace(/^\s*-\s+/gm, '• ');
       addMessage(cleanedReply, 'bot');
-    } catch (_) { typing.remove(); addMessage('Sorry, I could not connect. Please try again.', 'bot'); }
+    } catch (_) { typing.remove(); addMessage(localAnswer(message) || 'Sorry, I could not connect. Please try again.', 'bot'); }
     finally { send.disabled = false; input.disabled = false; input.focus(); }
   }
   form.addEventListener('submit', e => { e.preventDefault(); sendMessage(input.value); });
