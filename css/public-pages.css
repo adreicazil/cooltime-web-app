@@ -935,3 +935,10 @@ body.feedback-public .feedback-form .form-feedback { min-height:1.2em; margin:6p
     top:170px; left:60px; right:60px; width:calc(100% - 120px); max-width:none;
   }
 }
+
+/* Show bullets for the homepage service benefits */
+.home-public .hero-section .hero-features { list-style:disc; padding-left:1.2em; }
+
+
+.home-public .hero-section .hero-features .hero-wifi { list-style:none; }
+
