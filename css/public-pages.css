@@ -942,3 +942,9 @@ body.feedback-public .feedback-form .form-feedback { min-height:1.2em; margin:6p
 
 .home-public .hero-section .hero-features .hero-wifi { list-style:none; }
 
+
+/* Keep bullets visible on the circled benefits while leaving Wi-Fi unbulleted */
+.home-public .hero-section .hero-features { list-style:none; padding-left:0; }
+.home-public .hero-section .hero-features li:not(.hero-wifi) { position:relative; padding-left:1.15em; }
+.home-public .hero-section .hero-features li:not(.hero-wifi)::before { content:'\2022'; position:absolute; left:0; }
+
