@@ -68,6 +68,8 @@ if (inquiryModalElement) {
 if (bookingModalElement && paymentModalElement && bookingForm) {
   const bookingModal = window.bootstrap?.Modal.getOrCreateInstance(bookingModalElement);
   const paymentModal = window.bootstrap?.Modal.getOrCreateInstance(paymentModalElement);
+  const otcModalElement = document.getElementById('otc-receipt-modal');
+  const otcModal = otcModalElement ? window.bootstrap?.Modal.getOrCreateInstance(otcModalElement) : null;
   const serviceSelect = document.getElementById('guest-service-select');
   const dateInput = document.getElementById('guest-date');
   const branchInput = document.getElementById('guest-branch-select');
@@ -119,18 +121,55 @@ if (bookingModalElement && paymentModalElement && bookingForm) {
         bookingForm.elements.namedItem('name')?.focus();
         return;
       }
-      // The payment UI is prepared here. Booking/payment must be created by the
-      // server so guest data and PayMongo credentials are never trusted in-browser.
-      document.getElementById('guest-payment-notice').textContent =
-        'Guest checkout is not enabled on the server yet. Please sign in and book from your customer dashboard.';
+      document.getElementById('guest-payment-notice').textContent = '';
       bookingModal.hide();
       paymentModal.show();
     });
 
     document.querySelectorAll('[data-payment-method]').forEach((button) => {
-      button.addEventListener('click', () => {
-        document.getElementById('guest-payment-notice').textContent =
-          'Payment could not be started because guest checkout is not enabled on the server.';
+      button.addEventListener('click', async () => {
+        const notice = document.getElementById('guest-payment-notice');
+        const buttons = [...paymentModalElement.querySelectorAll('[data-payment-method]')];
+        buttons.forEach((item) => { item.disabled = true; });
+        notice.textContent = 'Saving your booking…';
+        try {
+          const form = new FormData(bookingForm);
+          const response = await fetch('api/create-walkin-booking.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: form.get('name'), email: form.get('email'), service: form.get('service'), branch: form.get('branch'),
+              date: form.get('date'), timeSlot: form.get('timeSlot'), plateNumber: form.get('plateNumber'),
+              vehicleMake: form.get('vehicleMake'), vehicleModel: form.get('vehicleModel'), vehicleYear: form.get('vehicleYear'),
+              paymentMethod: button.dataset.paymentMethod,
+            }),
+          });
+          const booking = await response.json();
+          if (!response.ok || !booking.ok) throw new Error(booking.message || 'Booking could not be saved.');
+          if (button.dataset.paymentMethod === 'cash') {
+            document.getElementById('otc-reference').textContent = booking.referenceNumber;
+            document.getElementById('otc-customer').textContent = booking.customerName;
+            document.getElementById('otc-branch').textContent = booking.branch;
+            document.getElementById('otc-service').textContent = booking.serviceName;
+            document.getElementById('otc-amount').textContent = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(booking.amount);
+            const qr = document.getElementById('otc-qrcode');
+            qr.replaceChildren();
+            if (!window.QRCode) throw new Error('The receipt QR code could not be loaded. Please keep your reference: ' + booking.referenceNumber);
+            new window.QRCode(qr, { text: booking.referenceNumber, width: 200, height: 200, correctLevel: window.QRCode.CorrectLevel.M });
+            paymentModal.hide(); otcModal?.show();
+            return;
+          }
+          notice.textContent = 'Opening secure PayMongo checkout…';
+          const checkoutResponse = await fetch('api/create-checkout-session.php', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ invoiceId: booking.invoiceId }),
+          });
+          const checkout = await checkoutResponse.json();
+          if (!checkoutResponse.ok || !checkout.ok || !checkout.checkoutUrl) throw new Error(checkout.message || 'Payment checkout could not be started.');
+          window.location.href = checkout.checkoutUrl;
+        } catch (error) {
+          notice.textContent = error instanceof Error ? error.message : 'Payment could not be started. Please try again.';
+          buttons.forEach((item) => { item.disabled = false; });
+        }
       });
     });
   }

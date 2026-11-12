@@ -87,14 +87,20 @@ try {
     $data = requestData();
     $invoiceId = trim((string) ($data['invoiceId'] ?? ''));
     if (!preg_match('/^[A-Za-z0-9_-]{1,150}$/', $invoiceId)) jsonResponse(['ok' => false, 'message' => 'A valid invoice is required.'], 400);
-    $user = firebaseUserFromToken(authorizationToken());
-    requireOtpSession($user);
     $account = firebaseServiceAccount();
     $invoice = firestoreReadDocument($account, 'invoices', $invoiceId);
-    $profile = firestoreReadDocument($account, 'users', $user['uid']);
-    $isAdmin = in_array(strtolower((string) ($profile['role'] ?? '')), ['admin', 'super_admin'], true);
-    if (!$invoice || (($invoice['customerId'] ?? '') !== $user['uid'] && !$isAdmin)) {
+    if (!$invoice) {
         jsonResponse(['ok' => false, 'message' => 'Invoice not found.'], 404);
+    }
+    $isGuestWalkIn = strtolower((string)($invoice['source'] ?? '')) === 'walk_in_pos' && (bool)($invoice['is_guest'] ?? false);
+    $user = null;
+    $isAdmin = false;
+    if (!$isGuestWalkIn) {
+        $user = firebaseUserFromToken(authorizationToken());
+        requireOtpSession($user);
+        $profile = firestoreReadDocument($account, 'users', $user['uid']);
+        $isAdmin = in_array(strtolower((string) ($profile['role'] ?? '')), ['admin', 'super_admin'], true);
+        if (($invoice['customerId'] ?? '') !== $user['uid'] && !$isAdmin) jsonResponse(['ok' => false, 'message' => 'Invoice not found.'], 404);
     }
     if (strtolower((string) ($invoice['status'] ?? 'open')) === 'paid') jsonResponse(['ok' => false, 'message' => 'This invoice is already paid.'], 409);
     $secret = environment('PAYMONGO_SECRET_KEY', false);
@@ -119,21 +125,19 @@ try {
     $amountCentavos = (int) round($amountPesos * 100);
     if ($amountCentavos < 100) jsonResponse(['ok' => false, 'message' => 'Invoice amount must be at least ₱1.00.'], 400);
     $returnUrl = environment('PAYMONGO_RETURN_URL', false);
-    if (filter_var($returnUrl, FILTER_VALIDATE_URL) === false || !str_starts_with($returnUrl, 'https://')) {
-        jsonResponse(['ok' => false, 'message' => 'Online payment return URL is not configured.'], 503);
-    }
+    if (filter_var($returnUrl, FILTER_VALIDATE_URL) === false || !str_starts_with($returnUrl, 'https://')) $returnUrl = 'https://www.cooltimeautoaircon.online';
     $returnParts = parse_url($returnUrl);
     $returnOrigin = ($returnParts['scheme'] ?? 'https') . '://' . ($returnParts['host'] ?? '');
     if (!empty($returnParts['port'])) $returnOrigin .= ':' . $returnParts['port'];
     $returnPath = (string) ($returnParts['path'] ?? '');
-    $successBase = preg_match('/\.html?$/i', $returnPath) ? $returnUrl : $returnOrigin . '/customer-dashboard.html';
+    $successBase = rtrim($returnUrl, '/') . '/services.html';
     $returnNonce = bin2hex(random_bytes(16));
     $cancelSignature = hash_hmac('sha256', $invoiceId . '|' . $returnNonce, $secret);
-    $successUrl = $successBase . '?status=success&invoice=' . rawurlencode($invoiceId);
+    $successUrl = $successBase . '?payment=success&invoice=' . rawurlencode($invoiceId);
     $cancelUrl = $returnOrigin . '/api/payment-return.php?status=cancelled&invoice=' . rawurlencode($invoiceId) . '&nonce=' . rawurlencode($returnNonce) . '&signature=' . rawurlencode($cancelSignature);
     $result = httpJsonRequest('https://api.paymongo.com/v1/checkout_sessions', ['data' => ['attributes' => [
         'line_items' => [['currency' => 'PHP', 'amount' => $amountCentavos, 'name' => 'CoolTime invoice ' . $invoiceId, 'quantity' => 1]],
-        'payment_method_types' => ['card', 'gcash', 'grab_pay', 'paymaya', 'qrph'],
+        'payment_method_types' => ['qrph', 'gcash', 'paymaya'],
         'description' => 'CoolTime service invoice ' . $invoiceId,
         'reference_number' => $invoiceId,
         'metadata' => ['invoiceId' => $invoiceId],
@@ -150,7 +154,7 @@ try {
     $paymentId = 'paymongo_' . preg_replace('/[^A-Za-z0-9_-]/', '', $session['id']);
     firestorePatchDocument($account, 'payments', $paymentId, [
         'invoiceId' => ['stringValue' => $invoiceId],
-        'customerId' => ['stringValue' => (string) ($invoice['customerId'] ?? $user['uid'])],
+        'customerId' => ['stringValue' => (string) ($invoice['customerId'] ?? ($user['uid'] ?? ''))],
         'branchId' => ['stringValue' => (string) ($invoice['branchId'] ?? '')],
         'amount' => ['integerValue' => (string) $amountCentavos],
         'currency' => ['stringValue' => 'PHP'],

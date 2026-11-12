@@ -10,6 +10,7 @@ export function setActiveNavigation() {
 
 export function preventPlaceholderForms() {
   document.querySelectorAll('form').forEach((form) => {
+    if (form.id === 'guest-booking-form') return;
     form.addEventListener('submit', (event) => {
       event.preventDefault();
       alert('Frontend placeholder only. Firebase logic will be added in the next phase.');
