@@ -1,6 +1,7 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { collection, onSnapshot, query, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
-import { auth, db } from './firebase-config.js';
+import { auth, authReady, db } from './firebase-config.js';
+import { hasOtpVerification } from './auth-guard.js';
 
 const dashboard = document.querySelector('.customer-dashboard');
 const viewLinks = [...document.querySelectorAll('[data-dashboard-view]')];
@@ -80,25 +81,43 @@ notificationList?.addEventListener('click', (event) => {
   if (row) showCustomerNotification(customerNotifications[Number(row.dataset.notificationIndex)]);
 });
 
-onAuthStateChanged(auth, (user) => {
+function showNotificationLoadError(error) {
+  console.error('Customer notifications could not be loaded:', {
+    code: error?.code || 'unknown',
+    message: error?.message || String(error)
+  });
+  if (!notificationList) return;
+  const message = error?.code === 'permission-denied'
+    ? 'Your secure sign-in session has expired. Please log out and sign in again to view notifications.'
+    : 'Notifications are temporarily unavailable. Please try again later.';
+  notificationList.textContent = message;
+}
+
+authReady.then(() => onAuthStateChanged(auth, (user) => {
   if (!notificationList) return;
   stopCustomerNotificationListener?.();
   stopCustomerNotificationListener = null;
+  customerNotifications = [];
   if (!user) {
-    customerNotifications = [];
-    renderCustomerNotifications();
+    notificationList.textContent = 'Sign in to view your notifications.';
     return;
   }
+  // Firestore rules require an active server-side MFA session. Do not issue a
+  // query before the dashboard's OTP gate has completed.
+  if (!hasOtpVerification(user)) {
+    notificationList.textContent = 'Complete email verification to view your notifications.';
+    return;
+  }
+  notificationList.textContent = 'Loading notifications…';
   const customerNotificationsQuery = query(collection(db, 'notifications'), where('userId', '==', user.uid));
   stopCustomerNotificationListener = onSnapshot(customerNotificationsQuery, (snapshot) => {
     customerNotifications = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
       .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
     renderCustomerNotifications();
   }, (error) => {
-    console.error('Customer notifications could not be loaded:', error);
-    notificationList.innerHTML = '<p class="customer-notification-empty">Notifications are temporarily unavailable.</p>';
+    showNotificationLoadError(error);
   });
-});
+}), showNotificationLoadError).catch(showNotificationLoadError);
 
 function invoiceInfo(invoice) {
   const total = Number(invoice.runningTotal ?? invoice.totalAmount ?? invoice.finalAmount ?? 0);
