@@ -102,8 +102,11 @@ export async function updateAvailableSlots(dateInput, branchInput, slotSelectEle
         }
         options.push(option);
       });
+      const selectedTimeSlot = slotSelectElement.value;
       slotSelectElement.replaceChildren(...options);
       slotSelectElement.disabled = false;
+      const stillAvailable = [...slotSelectElement.options].find((option) => option.value === selectedTimeSlot && !option.disabled);
+      if (stillAvailable) slotSelectElement.value = selectedTimeSlot;
       syncSubmitButton(slotSelectElement);
       if (!hasAvailable) {
         const notice = slotSelectElement.form?.querySelector('[role="status"].availability-notice, #guest-booking-notice');

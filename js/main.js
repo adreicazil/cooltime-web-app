@@ -103,14 +103,20 @@ if (bookingModalElement && paymentModalElement && bookingForm) {
 
     bookingForm.addEventListener('submit', (event) => {
       event.preventDefault();
+      const notice = document.getElementById('guest-booking-notice');
+      if (!slotSelect?.value || slotSelect.disabled || slotSelect.selectedOptions[0]?.disabled) {
+        notice.textContent = 'Please select an available time slot before continuing.';
+        slotSelect?.focus();
+        return;
+      }
       if (!bookingForm.checkValidity()) {
+        notice.textContent = 'Please complete all required booking details before continuing.';
         bookingForm.reportValidity();
         return;
       }
       const security = window.SecurityValidator;
       const email = bookingForm.elements.namedItem('email')?.value?.trim() || '';
       const name = bookingForm.elements.namedItem('name')?.value?.trim() || '';
-      const notice = document.getElementById('guest-booking-notice');
       if (security?.isDisposableEmail(email)) {
         notice.textContent = 'Please use a permanent email address.';
         bookingForm.elements.namedItem('email')?.focus();
@@ -130,22 +136,40 @@ if (bookingModalElement && paymentModalElement && bookingForm) {
       button.addEventListener('click', async () => {
         const notice = document.getElementById('guest-payment-notice');
         const buttons = [...paymentModalElement.querySelectorAll('[data-payment-method]')];
+        const selectedMethod = String(button.dataset.paymentMethod || '').toLowerCase().replaceAll('-', '_');
+        const isCash = ['cash', 'cash_otc', 'otc'].includes(selectedMethod);
         buttons.forEach((item) => { item.disabled = true; });
         notice.textContent = 'Saving your booking…';
         try {
+          if (!bookingForm.checkValidity() || !slotSelect?.value || slotSelect.disabled || slotSelect.selectedOptions[0]?.disabled) {
+            buttons.forEach((item) => { item.disabled = false; });
+            paymentModal.hide(); bookingModal.show();
+            const bookingNotice = document.getElementById('guest-booking-notice');
+            if (!slotSelect?.value || slotSelect.disabled || slotSelect.selectedOptions[0]?.disabled) {
+              bookingNotice.textContent = 'Please select an available time slot before continuing.';
+              slotSelect?.focus();
+            } else {
+              bookingNotice.textContent = 'Please complete all required booking details before continuing.';
+              bookingForm.reportValidity();
+            }
+            return;
+          }
           const form = new FormData(bookingForm);
+          const bookingPayload = {
+            name: form.get('name'), email: form.get('email'), service: form.get('service'), branch: form.get('branch'),
+            date: form.get('date'), timeSlot: slotSelect.value, plateNumber: form.get('plateNumber'),
+            vehicleMake: form.get('vehicleMake'), vehicleModel: form.get('vehicleModel'), vehicleYear: form.get('vehicleYear'),
+            paymentMethod: isCash ? 'cash_otc' : 'e_wallet',
+          };
+          const phoneInput = bookingForm.elements.namedItem('phone');
+          if (phoneInput?.value?.trim()) bookingPayload.phone = phoneInput.value.trim();
           const response = await fetch('api/create-walkin-booking.php', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: form.get('name'), email: form.get('email'), service: form.get('service'), branch: form.get('branch'),
-              date: form.get('date'), timeSlot: form.get('timeSlot'), plateNumber: form.get('plateNumber'),
-              vehicleMake: form.get('vehicleMake'), vehicleModel: form.get('vehicleModel'), vehicleYear: form.get('vehicleYear'),
-              paymentMethod: button.dataset.paymentMethod,
-            }),
+            body: JSON.stringify(bookingPayload),
           });
           const booking = await response.json();
           if (!response.ok || !booking.ok) throw new Error(booking.message || 'Booking could not be saved.');
-          if (button.dataset.paymentMethod === 'cash') {
+          if (isCash) {
             document.getElementById('otc-reference').textContent = booking.referenceNumber;
             document.getElementById('otc-customer').textContent = booking.customerName;
             document.getElementById('otc-branch').textContent = booking.branch;
