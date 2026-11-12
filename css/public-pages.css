@@ -18,7 +18,7 @@
 .public-wide,.public-page .content-page,.public-page .contact-page { width:100%; max-width:none; margin:0; }
 .about-layout { display:grid; grid-template-columns:minmax(280px,.95fr) minmax(420px,1.3fr); gap:clamp(28px,6vw,90px); align-items:stretch; padding:clamp(28px,4vw,58px) clamp(24px,5vw,78px); background:#fff; }
 .about-copy h1 { display:none; }
-.about-copy p { max-width:66ch; margin:0 0 1.25em; color:#637580; font-size:clamp(.95rem,1.15vw,1.08rem); font-style:normal; line-height:1.55; text-align:left; }
+.about-copy p { max-width:66ch; margin:0 0 1.25em; color:#637580; font-size:clamp(.95rem,1.15vw,1.08rem); font-style:normal; line-height:1.55; text-align:justify; }
 .about-collage { grid-template-columns:repeat(3,minmax(0,1fr)); grid-auto-rows:clamp(110px,14vw,180px); gap:4px; align-content:stretch; }
 .about-collage .photo-placeholder { min-height:0; border-radius:0; color:#f8fdff; font-size:clamp(.62rem,1vw,.86rem); text-shadow:0 1px 5px #001629; background:linear-gradient(135deg,rgba(3,29,52,.15),rgba(2,19,44,.48)),radial-gradient(ellipse at 72% 35%,#38a5c2,#14527c 40%,#092641 78%); }
 .about-collage .photo-placeholder:nth-child(3n+2) { background:linear-gradient(135deg,rgba(3,29,52,.1),rgba(2,19,44,.48)),radial-gradient(ellipse at 35% 52%,#9ab6bd,#30667c 46%,#0b2948); }
