@@ -448,24 +448,39 @@ function firebaseServiceAccountFile(): string
 
 function isFirebaseServiceAccountJson(string $value): bool
 {
+    $value = trim($value);
+    if (strlen($value) >= 2 && (($value[0] === '"' && $value[-1] === '"') || ($value[0] === "'" && $value[-1] === "'"))) {
+        $value = trim(substr($value, 1, -1));
+    }
     $escapedQuote = chr(92) . '"';
-    return str_starts_with(ltrim($value), '{')
-        || str_starts_with(ltrim($value), '{' . $escapedQuote)
-        || str_contains($value, '"type"')
-        || str_contains($value, $escapedQuote . 'type' . $escapedQuote);
+    if (str_starts_with($value, '{') || str_starts_with($value, '{' . $escapedQuote)
+        || str_contains($value, '"type"') || str_contains($value, $escapedQuote . 'type' . $escapedQuote)) return true;
+    $decoded = base64_decode($value, true);
+    return is_string($decoded) && str_starts_with(ltrim($decoded), '{');
 }
 
 function decodeFirebaseServiceAccount(string $json, string $source): ?array
 {
-    $candidates = [$json];
-    $unescapedQuotes = str_replace(chr(92) . '"', '"', $json);
-    if ($unescapedQuotes !== $json) $candidates[] = $unescapedQuotes;
+    $raw = trim($json);
+    if (strlen($raw) >= 2 && (($raw[0] === '"' && $raw[-1] === '"') || ($raw[0] === "'" && $raw[-1] === "'"))) {
+        $raw = trim(substr($raw, 1, -1));
+    }
+    $candidates = [$raw];
+    $unescapedQuotes = str_replace(chr(92) . '"', '"', $raw);
+    if ($unescapedQuotes !== $raw) $candidates[] = $unescapedQuotes;
+    $base64 = base64_decode($raw, true);
+    if (is_string($base64)) $candidates[] = trim($base64);
 
     foreach ($candidates as $candidateJson) {
         $account = json_decode($candidateJson, true);
         if (json_last_error() === JSON_ERROR_NONE && is_array($account)) return $account;
-        error_log('Firebase service-account JSON decode failed for ' . $source . ': ' . json_last_error_msg());
+        // Some deployment systems serialize JSON as a quoted JSON string.
+        if (json_last_error() === JSON_ERROR_NONE && is_string($account)) {
+            $nested = json_decode($account, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($nested)) return $nested;
+        }
     }
+    error_log('Firebase service-account JSON decode failed for ' . $source . ': ' . json_last_error_msg());
     return null;
 }
 
@@ -517,7 +532,8 @@ function firebaseServiceAccount(): array
             error_log('Firebase service-account data from ' . $source . ' has no project_id and FIREBASE_PROJECT_ID is unset.');
             continue;
         }
-        $rawKey = trim((string) $candidate['private_key']);
+        $candidate['private_key'] = str_replace(['\\n', "\r\n"], "\n", trim((string) $candidate['private_key']));
+        $rawKey = $candidate['private_key'];
         $escapedQuote = chr(92) . '"';
         if (str_starts_with($rawKey, $escapedQuote) && str_ends_with($rawKey, $escapedQuote)) {
             $rawKey = substr($rawKey, 2, -2);
