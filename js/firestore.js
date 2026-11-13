@@ -2,6 +2,7 @@ import {
   collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where, writeBatch
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { db } from './firebase-config.js';
+import { createReferenceNumber } from './reference-number.js';
 
 export const BRANCHES = Object.freeze({
   // Seed defaults. Branch admins may customize these fields in Firestore.
@@ -82,11 +83,13 @@ export async function createBooking({ customerId, branchId, serviceId, date, tim
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
+  const referenceNumber = createReferenceNumber('PMO', branchId);
   const batch = writeBatch(db);
   batch.set(vehicleRef, vehicleData);
   batch.set(bookingRef, {
     customerId, branchId: required(branchId, 'Branch'), serviceId: required(serviceId, 'Service'),
     vehicleId: vehicleRef.id, date: required(date, 'Appointment date'), timeSlot: required(timeSlot, 'Time slot'),
+    referenceNumber, invoiceNumber: referenceNumber,
     status: 'pending', createdAt: serverTimestamp(), updatedAt: serverTimestamp()
   });
   await batch.commit();

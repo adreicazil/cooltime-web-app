@@ -2,6 +2,7 @@ import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/fi
 import { collection, doc, getDocs, serverTimestamp, setDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { auth, authReady, db } from './firebase-config.js';
 import { SERVICES } from './firestore.js';
+import { createReferenceNumber } from './reference-number.js';
 import { getUserProfile } from './firestore.js';
 import { logoutUser } from './auth.js';
 import { hasOtpVerification } from './auth-guard.js';
@@ -67,9 +68,10 @@ async function checkout() {
   const invoiceRef = doc(collection(db, 'invoices'));
   const paymentMethod = document.getElementById('paymentMethod').value;
   const customerName = document.getElementById('walkInName').value.trim() || 'Walk-in customer';
+  const referenceNumber = createReferenceNumber(paymentMethod === 'cash' ? 'OTC' : 'PMO', branchId);
   const paymentRef = paymentMethod === 'cash' ? doc(collection(db, 'payments')) : null;
   const invoice = {
-    invoiceId: invoiceRef.id, customerId: 'walk-in', customerName, branchId,
+    invoiceId: invoiceRef.id, invoiceNumber: referenceNumber, referenceNumber, customerId: 'walk-in', customerName, branchId,
     source: 'pos', bookingId: null, servicesAdded: lines.map((line) => line.id), serviceDetails: lines,
     runningTotal: total, finalAmount: total, totalAmount: total,
     status: paymentMethod === 'cash' ? 'paid' : 'pending',
@@ -82,7 +84,7 @@ async function checkout() {
     if (paymentMethod === 'cash') {
       batch.set(paymentRef, {
         invoiceId: invoiceRef.id, customerId: 'walk-in', branchId, amount: total, currency: 'PHP',
-        amountUnit: 'pesos', method: 'cash', status: 'paid', referenceNumber: invoiceRef.id,
+        amountUnit: 'pesos', method: 'cash', status: 'paid', referenceNumber,
         createdAt: serverTimestamp(), paidAt: serverTimestamp()
       });
     }
@@ -99,7 +101,7 @@ async function checkout() {
       payLink.href = result.checkoutUrl;
       payLink.hidden = false;
     }
-    statusRoot.textContent = `${paymentMethod === 'cash' ? 'Paid' : 'Pending payment'} invoice ${invoiceRef.id} saved.`;
+    statusRoot.textContent = `${paymentMethod === 'cash' ? 'Paid' : 'Pending payment'} invoice ${referenceNumber} saved.`;
     cart.clear();
     renderCart();
   } catch (error) {
@@ -113,7 +115,7 @@ async function checkout() {
 function renderReceipt(id, invoice) {
   const preview = document.getElementById('receiptPreview');
   document.getElementById('receiptPayLink').hidden = true;
-  document.getElementById('receiptBody').innerHTML = `<p><strong>CoolTime Auto Aircon</strong><br>Branch: ${escapeHtml(invoice.branchId === 'cabuyao' ? 'Cabuyao Main' : 'Santa Rosa')}</p><p>Invoice: ${escapeHtml(id)}<br>Customer: ${escapeHtml(invoice.customerName)}<br>Status: ${escapeHtml(invoice.status)}</p><table><thead><tr><th>Service</th><th>Qty</th><th>Amount</th></tr></thead><tbody>${invoice.serviceDetails.map((line) => `<tr><td>${escapeHtml(line.name)}</td><td>${line.quantity}</td><td>${money(line.lineTotal)}</td></tr>`).join('')}</tbody><tfoot><tr><th colspan="2">Total</th><th>${money(invoice.totalAmount)}</th></tr></tfoot></table><p>Thank you for choosing CoolTime.</p>`;
+  document.getElementById('receiptBody').innerHTML = `<p><strong>CoolTime Auto Aircon</strong><br>Branch: ${escapeHtml(invoice.branchId === 'cabuyao' ? 'Cabuyao Main' : 'Santa Rosa')}</p><p>Reference ID: <strong>${escapeHtml(invoice.referenceNumber || invoice.invoiceNumber || id)}</strong> <button type="button" class="btn btn-dark" data-copy-reference="${escapeHtml(invoice.referenceNumber || invoice.invoiceNumber || id)}">Copy</button><br>Invoice ID: ${escapeHtml(id)}<br>Customer: ${escapeHtml(invoice.customerName)}<br>Status: ${escapeHtml(invoice.status)}</p><table><thead><tr><th>Service</th><th>Qty</th><th>Amount</th></tr></thead><tbody>${invoice.serviceDetails.map((line) => `<tr><td>${escapeHtml(line.name)}</td><td>${line.quantity}</td><td>${money(line.lineTotal)}</td></tr>`).join('')}</tbody><tfoot><tr><th colspan="2">Total</th><th>${money(invoice.totalAmount)}</th></tr></tfoot></table><p>Thank you for choosing CoolTime.</p>`;
   preview.hidden = false;
   preview.scrollIntoView({ behavior: 'smooth' });
 }

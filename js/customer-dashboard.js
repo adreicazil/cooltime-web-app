@@ -144,7 +144,8 @@ function renderInvoiceSummary() {
   summaryInvoices.innerHTML = overviewInvoices.length ? overviewInvoices.map((invoice, index) => {
     const info = invoiceInfo(invoice);
     const statusKey = String(info.status || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    return `<article class="customer-summary-row customer-invoice-summary-row"><span class="invoice-summary-index">${index + 1}</span><div class="invoice-meta-col"><span class="invoice-id-text">${escapeHtml(invoice.id)}</span><span class="invoice-date-text">${escapeHtml(info.date)}</span></div><span class="invoice-summary-total">${money(info.total)}</span><span class="summary-status ${escapeHtml(statusKey)}">${escapeHtml(info.status)}</span></article>`;
+    const referenceNumber = invoice.referenceNumber || invoice.invoiceNumber || invoice.id;
+    return `<article class="customer-summary-row customer-invoice-summary-row"><span class="invoice-summary-index">${index + 1}</span><div class="invoice-meta-col"><span class="invoice-id-text">${escapeHtml(referenceNumber)}</span><span class="invoice-date-text">${escapeHtml(info.date)}</span></div><button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${escapeHtml(referenceNumber)}">Copy</button><span class="invoice-summary-total">${money(info.total)}</span><span class="summary-status ${escapeHtml(statusKey)}">${escapeHtml(info.status)}</span></article>`;
   }).join('') : '<p class="customer-summary-empty">No pending bills.</p>';
   summaryInvoices.querySelectorAll('.customer-invoice-summary-row .summary-status').forEach((element) => {
     const status = element.textContent.toLowerCase();

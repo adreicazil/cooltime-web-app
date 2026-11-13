@@ -130,9 +130,11 @@ function loadEnvironmentFile(string $path): void
             continue;
         }
         [$name, $value] = explode('=', $line, 2);
+        $name = preg_replace('/^export\s+/', '', trim($name)) ?? trim($name);
         $name = trim($name);
         $value = trim($value);
-        if ($name === '' || getenv($name) !== false) {
+        $existing = getenv($name);
+        if ($name === '' || ($existing !== false && trim((string)$existing) !== '')) {
             continue;
         }
         if (strlen($value) >= 2 && (($value[0] === '"' && $value[-1] === '"') || ($value[0] === "'" && $value[-1] === "'"))) {
@@ -140,7 +142,49 @@ function loadEnvironmentFile(string $path): void
         }
         putenv("{$name}={$value}");
         $_ENV[$name] = $value;
+        $_SERVER[$name] = $value;
     }
+}
+
+function paymongoReturnOrigin(): string
+{
+    $configured = trim(environment('PAYMONGO_RETURN_URL', false));
+    if ($configured !== '' && filter_var($configured, FILTER_VALIDATE_URL) !== false) {
+        $parts = parse_url($configured);
+        if (is_array($parts) && isset($parts['scheme'], $parts['host'])
+            && in_array(strtolower((string)$parts['scheme']), ['http', 'https'], true)) {
+            $origin = strtolower((string)$parts['scheme']) . '://' . $parts['host'];
+            if (!empty($parts['port'])) $origin .= ':' . (int)$parts['port'];
+            return rtrim($origin, '/');
+        }
+    }
+
+    $hostHeader = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+    $host = strtolower((string)parse_url('http://' . $hostHeader, PHP_URL_HOST));
+    if (in_array($host, ['localhost', '127.0.0.1', '::1', '[::1]'], true)
+        && preg_match('/^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i', $hostHeader)) {
+        return 'http://' . $hostHeader;
+    }
+    return 'https://www.cooltimeautoaircon.online';
+}
+
+function cooltimeReferenceNumber(string $paymentSource, string $branch, ?DateTimeImmutable $createdAt = null): string
+{
+    $source = strtoupper(trim($paymentSource));
+    if (!in_array($source, ['OTC', 'PMO'], true)) throw new InvalidArgumentException('Unsupported payment source for reference number.');
+    $normalized = strtolower(preg_replace('/[^a-z]/i', '', $branch) ?? '');
+    $branchCode = match ($normalized) {
+        'cabuyao', 'cabuyaomain', 'cabuyaobranch', 'cabuyaomainbranch' => 'CBY',
+        'santarosa', 'santarosabranch' => 'RSA',
+        default => strtoupper(substr($normalized, 0, 3)),
+    };
+    if (!preg_match('/^[A-Z]{3}$/', $branchCode)) throw new InvalidArgumentException('A 3-letter branch code could not be determined.');
+    $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    $code = '';
+    for ($i = 0; $i < 4; $i++) $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
+    $date = ($createdAt ?? new DateTimeImmutable('now', new DateTimeZone('Asia/Manila')))
+        ->setTimezone(new DateTimeZone('Asia/Manila'))->format('Ymd');
+    return $source . '-' . $branchCode . '-' . $date . '-' . $code;
 }
 
 function authorizationToken(): string
@@ -343,7 +387,7 @@ function withSessionOtpRecord(string $purpose, string $subject, callable $callba
     return $result['response'];
 }
 
-function sendResendEmail(string $email, string $subject, string $html, string $text): void
+function sendResendEmail(string $email, string $subject, string $html, string $text, bool $allowLocalTlsFallback = false): void
 {
     if (!function_exists('curl_init')) {
         throw new RuntimeException('Resend email delivery requires the PHP cURL extension.');
@@ -382,6 +426,17 @@ function sendResendEmail(string $email, string $subject, string $html, string $t
     $response = curl_exec($curl);
     $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
     $curlError = curl_error($curl);
+    $curlErrorNumber = curl_errno($curl);
+    if ($response === false && $allowLocalTlsFallback
+        && (in_array($curlErrorNumber, [60, 77, 83], true)
+            || stripos($curlError, 'certificate') !== false || stripos($curlError, 'CA cert') !== false)) {
+        // Windows PHP installations sometimes lack a CA bundle for local dev.
+        // Retry without peer verification only for a confirmed local request.
+        curl_setopt_array($curl, [CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0]);
+        $response = curl_exec($curl);
+        $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        $curlError = curl_error($curl);
+    }
     curl_close($curl);
 
     if ($response === false) {
@@ -394,7 +449,7 @@ function sendResendEmail(string $email, string $subject, string $html, string $t
     }
 }
 
-function sendOtpEmail(string $email, string $code, string $purpose = 'login'): void
+function sendOtpEmail(string $email, string $code, string $purpose = 'login', bool $allowLocalTlsFallback = false): void
 {
     $isPasswordReset = $purpose === 'password_reset';
     $action = $isPasswordReset ? 'password reset' : 'sign-in verification';
@@ -405,7 +460,7 @@ function sendOtpEmail(string $email, string $code, string $purpose = 'login'): v
         . '<h1 style="color:#38bdf8;font-size:32px">' . $escapedCode . '</h1>'
         . '<p>This code expires in 5 minutes. Do not share it with anyone.</p></div>';
     sendResendEmail($email, "Your CoolTime {$action} code", $html,
-        "Your CoolTime {$action} code is: {$code}\n\nThis code expires in 5 minutes. Do not share it with anyone.");
+        "Your CoolTime {$action} code is: {$code}\n\nThis code expires in 5 minutes. Do not share it with anyone.", $allowLocalTlsFallback);
 }
 
 function sendConfiguredEmail(string $email, string $subject, string $htmlBody, string $textBody = ''): void

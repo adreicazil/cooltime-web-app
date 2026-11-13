@@ -109,7 +109,7 @@ try {
     $paymentStatus=$method==='cash_otc'?'unpaid':'pending';
     $bookingId='walkin_'.bin2hex(random_bytes(12)); $invoiceId='walkin_inv_'.bin2hex(random_bytes(12));
     $now=gmdate('Y-m-d\\TH:i:s\\Z');
-    $reference='OTC-'.(new DateTimeImmutable('now',$timezone))->format('Ymd').'-'.strtoupper(bin2hex(random_bytes(2)));
+    $reference=cooltimeReferenceNumber($method==='cash_otc'?'OTC':'PMO',$branch);
     $bookingFields=[
       'bookingId'=>['stringValue'=>$bookingId],'customerId'=>['stringValue'=>''],'customerName'=>['stringValue'=>$name],'customerEmail'=>['stringValue'=>$email],
       'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'branchId'=>['stringValue'=>$branchId],'branch'=>['stringValue'=>$branch],
@@ -123,6 +123,7 @@ try {
       'source'=>['stringValue'=>'walk_in_pos'],'is_guest'=>['booleanValue'=>true],'status'=>['stringValue'=>'pending'],
       'paymentStatus'=>['stringValue'=>$paymentStatus],'paymentMethod'=>['stringValue'=>$methodName],
       'payment_status'=>['stringValue'=>$paymentStatus],'payment_method'=>['stringValue'=>$methodName],
+      'referenceNumber'=>['stringValue'=>$reference],'invoiceNumber'=>['stringValue'=>$reference],
       'invoiceId'=>['stringValue'=>$invoiceId],'createdAt'=>['timestampValue'=>$now],'updatedAt'=>['timestampValue'=>$now],
     ];
     if ($phone!=='') $bookingFields['phone']=['stringValue'=>$phone];
@@ -133,7 +134,7 @@ try {
       'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'source'=>['stringValue'=>'walk_in_pos'],'is_guest'=>['booleanValue'=>true],
       'paymentMethod'=>['stringValue'=>$methodName],'paymentStatus'=>['stringValue'=>$paymentStatus],
       'payment_method'=>['stringValue'=>$methodName],'payment_status'=>['stringValue'=>$paymentStatus],
-      'referenceNumber'=>['stringValue'=>$reference],'servicesAdded'=>['arrayValue'=>['values'=>[['stringValue'=>$serviceId]]]],
+      'referenceNumber'=>['stringValue'=>$reference],'invoiceNumber'=>['stringValue'=>$reference],'servicesAdded'=>['arrayValue'=>['values'=>[['stringValue'=>$serviceId]]]],
       'serviceDetails'=>['arrayValue'=>['values'=>[['mapValue'=>['fields'=>['id'=>['stringValue'=>$serviceId],'name'=>['stringValue'=>$serviceName],'price'=>['doubleValue'=>$price],'quantity'=>['integerValue'=>'1'],'lineTotal'=>['doubleValue'=>$price]]]]]]],
       'runningTotal'=>['doubleValue'=>$price],'finalAmount'=>['doubleValue'=>$price],'totalAmount'=>['doubleValue'=>$price],
       'downpaymentAmount'=>['doubleValue'=>0],'serviceStatus'=>['stringValue'=>'pending'],'status'=>['stringValue'=>$paymentStatus],

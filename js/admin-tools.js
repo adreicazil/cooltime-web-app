@@ -38,6 +38,10 @@ function bookingServiceName(booking) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase()) || 'Service';
 }
 
+function invoiceForBooking(booking) {
+  return invoices.find((item) => item.bookingId === booking.id || item.id === `web_${booking.id}` || item.id === booking.invoiceId);
+}
+
 function bookingVehicleDetails(booking, vehicleRecord = {}) {
   const nested = booking.vehicle && typeof booking.vehicle === 'object' ? booking.vehicle : {};
   const value = (...items) => items.find((item) => item !== undefined && item !== null && String(item).trim() !== '');
@@ -352,6 +356,7 @@ async function initialize() {
   on('#pos-end-date', 'change', renderPos);
   on('#pos-method-filter', 'change', renderPos);
   on('#pos-cashier-search', 'input', renderPos);
+  on('#pos-reference-search', 'input', renderPos);
   on('#pos-status-filter', 'change', renderPos);
   on('#posResults', 'click', (event) => {
     const superAction = event.target.closest('[data-super-pos-action]');
@@ -546,17 +551,20 @@ function renderBookings() {
   const statusFilter = normalizeBookingFilterStatus($('#booking-status-filter').value);
   const rows = bookings.filter((booking) => {
     const user = usersById[booking.customerId] || { name: booking.customerName, email: booking.customerEmail, phone: booking.contactNumber };
+    const invoice = invoiceForBooking(booking);
+    const reference = booking.referenceNumber || booking.invoiceNumber || invoice?.referenceNumber || invoice?.invoiceNumber || '';
     const status = normalizeBookingFilterStatus(booking.status || 'pending');
     const matchesStatus = !statusFilter || status === statusFilter;
     const bookingDate = String(booking.date || '').slice(0, 10);
     const matchesDateRange = (!startDate || (bookingDate && bookingDate >= startDate))
       && (!endDate || (bookingDate && bookingDate <= endDate));
-    return matchesStatus && matchesDateRange && (!search || `${user.name || user.username || ''} ${user.email || ''}`.toLowerCase().includes(search));
+    return matchesStatus && matchesDateRange && (!search || `${user.name || user.username || ''} ${user.email || ''} ${reference}`.toLowerCase().includes(search));
   });
   const renderedRows = rows.map((booking) => {
     const user = usersById[booking.customerId] || { name: booking.customerName, email: booking.customerEmail, phone: booking.contactNumber };
     const service = bookingServiceName(booking);
-    const invoice = invoices.find((item) => item.id === `web_${booking.id}` || item.bookingId === booking.id);
+    const invoice = invoiceForBooking(booking);
+    const reference = booking.referenceNumber || booking.invoiceNumber || invoice?.referenceNumber || invoice?.invoiceNumber || booking.id;
     const sessionId = String(invoice?.latestPaymentSessionId || '');
     const checkout = payments.find((item) => item.id === `paymongo_${sessionId}` || item.checkoutSessionId === sessionId);
     const activeCheckout = Boolean(sessionId && String(checkout?.status || '').toLowerCase() === 'pending');
@@ -599,7 +607,7 @@ function renderBookings() {
         <div class="booking-row-summary">
           <div class="booking-row-customer"><strong>${esc(customerName)}</strong></div>
           <div class="booking-row-email">${esc(customerEmail || '—')}</div>
-          <div class="booking-service-info"><span class="service-title">${esc(service)}</span><span class="service-datetime">${esc(booking.date)} - ${esc(booking.timeSlot)}</span></div>
+          <div class="booking-service-info"><span class="service-title">${esc(service)}</span><span class="service-datetime">${esc(booking.date)} - ${esc(booking.timeSlot)} ? ${esc(reference)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button></span></div>
           <div class="booking-row-branch">${esc(branchName || '—')}</div>
           <span class="booking-status-pill status ${esc(bookingStatusKey)}">${esc(bookingStatus.replaceAll('_', ' '))}</span>
           ${actionColumnHtml}
@@ -607,6 +615,7 @@ function renderBookings() {
         <div class="booking-details-accordion" id="${expandedId}" aria-hidden="true"><div class="booking-details-grid">
           ${field('Customer name', user.name || user.username || booking.customerName || booking.customerId)}
           ${field('Customer email', user.email || booking.customerEmail)}
+          <div class="booking-detail-field"><span>Reference ID</span><strong>${esc(reference)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button></strong></div>
           ${field('Branch', branch.name || booking.branchId)}
           ${field('Branch address', branch.address)}
           ${field('Service price', money(serviceRecord.price))}
@@ -889,12 +898,13 @@ function transactionMethod(invoice, payment) {
 }
 
 function renderPos() {
-  const from = $('#pos-start-date').value, to = $('#pos-end-date').value, method = $('#pos-method-filter').value, cashierSearch = $('#pos-cashier-search').value.trim().toLowerCase(), status = $('#pos-status-filter').value.toLowerCase();
+  const from = $('#pos-start-date').value, to = $('#pos-end-date').value, method = $('#pos-method-filter').value, cashierSearch = $('#pos-cashier-search').value.trim().toLowerCase(), referenceSearch = ($('#pos-reference-search')?.value || '').trim().toLowerCase(), status = $('#pos-status-filter').value.toLowerCase();
   const rows = invoices.filter((invoice) => invoice.source === 'pos').filter((invoice) => {
     const date = invoiceDate(invoice); const payment = paymentsByInvoice[invoice.id];
     const cashier = usersById[invoice.createdBy]?.name || usersById[invoice.createdBy]?.email || invoice.createdBy || '';
     return (!from || (date && date >= new Date(`${from}T00:00:00`))) && (!to || (date && date <= new Date(`${to}T23:59:59`)))
       && (!method || transactionMethod(invoice, payment) === method) && (!cashierSearch || String(cashier).toLowerCase().includes(cashierSearch))
+      && (!referenceSearch || `${invoice.referenceNumber || ''} ${invoice.invoiceNumber || ''}`.toLowerCase().includes(referenceSearch))
       && (!status || String(invoice.status || '').toLowerCase() === status);
   });
   $('#posResults').innerHTML = rows.map((invoice) => {
@@ -919,7 +929,8 @@ function renderPos() {
     const responsibleName = invoice.lastAuditByName || usersById[responsibleId]?.name || usersById[responsibleId]?.username || usersById[responsibleId]?.email || responsibleId || 'Unknown admin';
     const auditAt = invoice.lastAuditAt || invoice.voidedAt || invoice.flaggedAt || invoice.updatedAt || invoice.createdAt;
     const auditFooter = isSuperAdminDashboard ? `<div class="pos-audit-expanded-footer"><div class="audit-trail-info"><div><strong>Audit Trail:</strong> Processed by Admin (${esc(responsibleName)})</div><div><strong>Last Audit Timestamp:</strong> ${esc(formatAuditTimestamp(auditAt))}</div><div><strong>Flag Status:</strong> ${invoice.isFlagged ? '🚩 Flagged' : 'Normal'}${invoice.flagReason ? ` · ${esc(invoice.flagReason)}` : ''}</div></div><details class="pos-audit-actions"><summary class="btn-super-pos-actions">Actions ▾</summary><div class="pos-audit-actions-menu"><button type="button" class="audit-action-flag" data-super-pos-action="flag" data-invoice-id="${esc(invoice.id)}">⚑ ${invoice.isFlagged ? 'Remove Flag' : 'Toggle Flag'}</button><button type="button" class="audit-action-void" data-super-pos-action="void" data-invoice-id="${esc(invoice.id)}"${isPaid ? '' : ' disabled'}>Void Transaction</button><button type="button" data-super-pos-action="export" data-invoice-id="${esc(invoice.id)}">Export Audit Summary</button></div></details></div>` : '';
-    return `<tr class="pos-main-row" tabindex="0"><td><strong class="pos-invoice-id">${esc(invoice.id)}</strong><span class="pos-invoice-time">${esc(dateText)}</span></td><td>${esc(branchesById[invoice.branchId]?.name || invoice.branchId || '—')}</td><td>${esc(cashier)}</td><td>${esc(transactionMethod(invoice, payment))}</td><td><span class="pos-status-text ${esc(statusKey)}">${esc(invoice.status || 'unknown')}</span></td><td class="pos-amount">${money(total)}</td><td>${rowAction}</td></tr><tr class="pos-detail-row"><td colspan="7"><div class="pos-accordion-panel"><p class="pos-accordion-summary">Customer: ${esc(customer)} · Cashier: ${esc(cashier)}</p><div class="pos-detail-table-scroll"><table class="pos-detail-table"><thead><tr><th>Service</th><th>Qty</th><th>Unit</th><th>Line total</th></tr></thead><tbody>${serviceRows}</tbody></table></div><strong class="pos-total-summary">Total ${money(total)}</strong>${payment?.referenceNumber || invoice.paymentReference ? `<p class="pos-payment-reference">Payment reference: ${esc(payment?.referenceNumber || invoice.paymentReference)}</p>` : ''}${auditFooter}</div></td></tr>`;
+    const reference = invoice.referenceNumber || invoice.invoiceNumber || invoice.id;
+    return `<tr class="pos-main-row" tabindex="0"><td><strong class="pos-invoice-id">${esc(reference)}</strong><button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button><span class="pos-invoice-time">ID ${esc(invoice.id)} · ${esc(dateText)}</span></td><td>${esc(branchesById[invoice.branchId]?.name || invoice.branchId || '—')}</td><td>${esc(cashier)}</td><td>${esc(transactionMethod(invoice, payment))}</td><td><span class="pos-status-text ${esc(statusKey)}">${esc(invoice.status || 'unknown')}</span></td><td class="pos-amount">${money(total)}</td><td>${rowAction}</td></tr><tr class="pos-detail-row"><td colspan="7"><div class="pos-accordion-panel"><p class="pos-accordion-summary">Reference ID: ${esc(reference)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button></p><p>Customer: ${esc(customer)} · Cashier: ${esc(cashier)}</p><div class="pos-detail-table-scroll"><table class="pos-detail-table"><thead><tr><th>Service</th><th>Qty</th><th>Unit</th><th>Line total</th></tr></thead><tbody>${serviceRows}</tbody></table></div><strong class="pos-total-summary">Total ${money(total)}</strong>${payment?.referenceNumber || invoice.paymentReference ? `<p class="pos-payment-reference">Payment reference: ${esc(payment?.referenceNumber || invoice.paymentReference)}</p>` : ''}${auditFooter}</div></td></tr>`;
   }).join('') || '<tr><td class="pos-empty-state" colspan="7">No POS transactions match these filters.</td></tr>';
   if (isDashboardPage && modulePaginators.pos) {
     const renderedItems = [];

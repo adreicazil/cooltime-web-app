@@ -630,7 +630,8 @@ try {
                 'invoiceId' => ['stringValue' => $invoiceId], 'customerId' => ['stringValue' => (string) ($booking['customerId'] ?? '')],
                 'branchId' => ['stringValue' => (string) ($booking['branchId'] ?? '')], 'amount' => ['integerValue' => (string) (int) round($downpayment * 100)],
                 'amountUnit' => ['stringValue' => 'centavos'], 'currency' => ['stringValue' => 'PHP'], 'method' => ['stringValue' => $method],
-                'status' => ['stringValue' => 'paid'], 'referenceNumber' => ['stringValue' => $paymentId], 'paidAt' => ['timestampValue' => $now],
+                'status' => ['stringValue' => 'paid'], 'referenceNumber' => ['stringValue' => (string)($invoice['referenceNumber'] ?? $invoice['invoiceNumber'] ?? $invoiceId)],
+                'providerReference' => ['stringValue' => $paymentId], 'paidAt' => ['timestampValue' => $now],
             ]];
             $writes[1]['fields']['downpaymentPaymentId'] = ['stringValue' => $paymentId];
         }

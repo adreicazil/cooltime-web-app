@@ -51,6 +51,29 @@ function webhookReadDocument(array $account, string $collection, string $id): ?a
     return $fields;
 }
 
+function webhookFindInvoiceByReference(array $account, string $reference): ?array
+{
+    foreach (['referenceNumber', 'invoiceNumber'] as $fieldPath) {
+        $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id']) . '/databases/(default)/documents:runQuery';
+        $query = ['structuredQuery' => ['from' => [['collectionId' => 'invoices']], 'where' => ['fieldFilter' => [
+            'field' => ['fieldPath' => $fieldPath], 'op' => 'EQUAL', 'value' => ['stringValue' => $reference],
+        ]], 'limit' => 1]];
+        $context = stream_context_create(['http' => [
+            'method' => 'POST', 'header' => "Authorization: Bearer " . firebaseAdminAccessToken() . "\r\nContent-Type: application/json",
+            'content' => json_encode($query, JSON_THROW_ON_ERROR), 'timeout' => 15, 'ignore_errors' => true,
+        ]]);
+        $response = @file_get_contents($url, false, $context);
+        $rows = is_string($response) ? json_decode($response, true) : null;
+        $documentName = $rows[0]['document']['name'] ?? '';
+        if (is_string($documentName) && preg_match('~/invoices/([^/]+)$~', $documentName, $matches)) {
+            $id = rawurldecode($matches[1]);
+            $invoice = webhookReadDocument($account, 'invoices', $id);
+            if ($invoice) { $invoice['id'] = $id; return $invoice; }
+        }
+    }
+    return null;
+}
+
 function webhookFirestoreCommit(array $account, array $updates): void
 {
     $writes = [];
@@ -117,7 +140,8 @@ try {
 
     $account = firebaseServiceAccount();
     $sessionId = str_starts_with($eventType, 'checkout_session.') ? (string) ($resource['id'] ?? '') : '';
-    $reference = (string) ($resourceAttributes['reference_number'] ?? $resourceAttributes['external_reference_number'] ?? '');
+    $referenceNumber = (string) ($resourceAttributes['reference_number'] ?? $resourceAttributes['external_reference_number'] ?? '');
+    $reference = (string)($resourceAttributes['metadata']['invoiceId'] ?? $referenceNumber);
     $paymentIntentId = (string) ($resourceAttributes['payment_intent_id'] ?? $resourceAttributes['payment_intent']['id'] ?? '');
     $paymentRecord = null;
     $intentLink = null;
@@ -137,9 +161,6 @@ try {
         }
     }
 
-    if ($reference === '' && isset($resourceAttributes['metadata']['invoiceId'])) {
-        $reference = (string) $resourceAttributes['metadata']['invoiceId'];
-    }
     if ($reference === '' && preg_match('/^CoolTime service invoice ([A-Za-z0-9_-]+)$/', (string) ($resourceAttributes['description'] ?? ''), $matches)) {
         $reference = $matches[1];
     }
@@ -148,6 +169,10 @@ try {
     }
 
     $invoice = webhookReadDocument($account, 'invoices', $reference);
+    if (!$invoice && $reference === $referenceNumber && preg_match('/^(?:OTC|PMO)-[A-Z]{3}-\d{8}-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/', $reference)) {
+        $invoice = webhookFindInvoiceByReference($account, $reference);
+        if ($invoice) $reference = (string)$invoice['id'];
+    }
     if (!$invoice) webhookResponse(['ok' => false, 'message' => 'Invoice not found.'], 404);
     if ($paymentRecord && ($paymentRecord['invoiceId'] ?? '') !== $reference) {
         webhookResponse(['ok' => false, 'message' => 'Payment does not match invoice.'], 409);
@@ -164,7 +189,8 @@ try {
             'amount' => ['integerValue' => (string) ($paymentRecord['amount'] ?? 0)], 'amountUnit' => ['stringValue' => 'centavos'],
             'method' => ['stringValue' => 'paymongo_checkout'], 'status' => ['stringValue' => 'failed'],
             'failureReason' => ['stringValue' => substr($failureReason, 0, 500)], 'eventType' => ['stringValue' => $eventType],
-            'referenceNumber' => ['stringValue' => $sessionId ?: (string) ($resource['id'] ?? $reference)],
+            'referenceNumber' => ['stringValue' => (string)($invoice['referenceNumber'] ?? $invoice['invoiceNumber'] ?? $reference)],
+            'providerReference' => ['stringValue' => $sessionId ?: (string) ($resource['id'] ?? '')],
             'createdAt' => ['timestampValue' => $now],
         ];
         $alreadyPaid = strtolower((string) ($invoice['status'] ?? '')) === 'paid';
@@ -251,7 +277,8 @@ try {
         'currency' => ['stringValue' => (string) ($paymentAttributes['currency'] ?? 'PHP')],
         'method' => ['stringValue' => $paymentMethod],
         'status' => ['stringValue' => 'paid'],
-        'referenceNumber' => ['stringValue' => $paymongoPaymentId !== '' ? $paymongoPaymentId : ($sessionId ?: $reference)],
+        'referenceNumber' => ['stringValue' => (string)($invoice['referenceNumber'] ?? $invoice['invoiceNumber'] ?? $reference)],
+        'providerReference' => ['stringValue' => $paymongoPaymentId !== '' ? $paymongoPaymentId : ($sessionId ?: '')],
         'paidAt' => ['timestampValue' => $paidAt],
         'updatedAt' => ['timestampValue' => gmdate('Y-m-d\TH:i:s\Z')],
     ];
@@ -266,7 +293,8 @@ try {
     if ($linkedPaymentId !== '' && preg_match('/^[A-Za-z0-9_-]+$/', $linkedSessionId) && $linkedPaymentId !== $paymentDocId) {
         $paymentUpdates[$linkedPaymentId] = [
             'status' => ['stringValue' => 'paid'],
-            'referenceNumber' => ['stringValue' => $paymongoPaymentId !== '' ? $paymongoPaymentId : $reference],
+            'referenceNumber' => ['stringValue' => (string)($invoice['referenceNumber'] ?? $invoice['invoiceNumber'] ?? $reference)],
+            'providerReference' => ['stringValue' => $paymongoPaymentId !== '' ? $paymongoPaymentId : $reference],
             'paidAt' => ['timestampValue' => $paidAt],
             'updatedAt' => ['timestampValue' => gmdate('Y-m-d\\TH:i:s\\Z')],
         ];

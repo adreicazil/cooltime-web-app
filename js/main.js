@@ -171,6 +171,7 @@ if (bookingModalElement && paymentModalElement && bookingForm) {
           if (!response.ok || !booking.ok) throw new Error(booking.message || 'Booking could not be saved.');
           if (isCash) {
             document.getElementById('otc-reference').textContent = booking.referenceNumber;
+            document.getElementById('otc-copy-reference')?.setAttribute('data-copy-reference', booking.referenceNumber);
             document.getElementById('otc-customer').textContent = booking.customerName;
             document.getElementById('otc-branch').textContent = booking.branch;
             document.getElementById('otc-service').textContent = booking.serviceName;

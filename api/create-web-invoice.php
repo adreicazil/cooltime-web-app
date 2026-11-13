@@ -40,7 +40,19 @@ try {
     // lost its response before receiving the invoice ID.
     $invoiceId = 'web_' . $bookingId;
     $existing = invoiceReadFields($account, 'invoices', $invoiceId);
-    if ($existing) jsonResponse(['ok' => true, 'invoiceId' => $invoiceId]);
+    if ($existing) {
+        $referenceNumber = (string)($existing['referenceNumber'] ?? $existing['invoiceNumber'] ?? $booking['referenceNumber'] ?? $booking['invoiceNumber'] ?? '');
+        if ($referenceNumber === '') {
+            $referenceNumber = cooltimeReferenceNumber('PMO', (string)($booking['branchId'] ?? ''));
+            firestorePatchDocument($account, 'invoices', $invoiceId, [
+                'referenceNumber' => ['stringValue' => $referenceNumber], 'invoiceNumber' => ['stringValue' => $referenceNumber],
+            ]);
+        }
+        if (empty($booking['referenceNumber'])) firestorePatchDocument($account, 'bookings', $bookingId, [
+            'referenceNumber' => ['stringValue' => $referenceNumber], 'invoiceNumber' => ['stringValue' => $referenceNumber],
+        ]);
+        jsonResponse(['ok' => true, 'invoiceId' => $invoiceId, 'referenceNumber' => $referenceNumber]);
+    }
 
     $serviceId = (string) ($booking['serviceId'] ?? '');
     if (!preg_match('/^[A-Za-z0-9_-]{1,150}$/', $serviceId)) jsonResponse(['ok' => false, 'message' => 'Booking service is invalid.'], 422);
@@ -58,8 +70,14 @@ try {
     $price = (float) $service['price'];
     $serviceName = (string) ($service['name'] ?? $serviceId);
     $now = gmdate('Y-m-d\TH:i:s\Z');
+    $referenceNumber = (string)($booking['referenceNumber'] ?? $booking['invoiceNumber'] ?? '');
+    if (!preg_match('/^PMO-[A-Z]{3}-\d{8}-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/', $referenceNumber)) {
+        $referenceNumber = cooltimeReferenceNumber('PMO', (string)($booking['branchId'] ?? $branchId));
+    }
     firestorePatchDocument($account, 'invoices', $invoiceId, [
         'invoiceId' => ['stringValue' => $invoiceId],
+        'referenceNumber' => ['stringValue' => $referenceNumber],
+        'invoiceNumber' => ['stringValue' => $referenceNumber],
         'bookingId' => ['stringValue' => $bookingId],
         'customerId' => ['stringValue' => $user['uid']],
         'branchId' => ['stringValue' => $branchId],
@@ -78,7 +96,10 @@ try {
         'createdAt' => ['timestampValue' => $now],
         'updatedAt' => ['timestampValue' => $now],
     ]);
-    jsonResponse(['ok' => true, 'invoiceId' => $invoiceId]);
+    firestorePatchDocument($account, 'bookings', $bookingId, [
+        'referenceNumber' => ['stringValue' => $referenceNumber], 'invoiceNumber' => ['stringValue' => $referenceNumber],
+    ]);
+    jsonResponse(['ok' => true, 'invoiceId' => $invoiceId, 'referenceNumber' => $referenceNumber]);
 } catch (Throwable $error) {
     error_log('Web invoice creation failed: ' . $error->getMessage());
     jsonResponse(['ok' => false, 'message' => 'Booking was saved, but its invoice could not be created. Please contact the branch.'], 500);

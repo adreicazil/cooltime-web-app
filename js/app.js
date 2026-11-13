@@ -59,7 +59,7 @@ if (bookingForm) {
         window.location.assign(invoice.checkoutUrl);
         return;
       }
-      alert(`Booking submitted. Invoice: ${invoice.invoiceId}. ${invoice.checkoutError || 'Checkout is available from your dashboard.'}`);
+      alert(`Booking submitted. Reference ID: ${invoice.referenceNumber || invoice.invoiceId}. ${invoice.checkoutError || 'Checkout is available from your dashboard.'}`);
       bookingForm.reset();
     } catch (error) {
       alert(`Booking failed: ${error.message}`);

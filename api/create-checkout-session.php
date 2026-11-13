@@ -124,23 +124,27 @@ try {
     }
     $amountCentavos = (int) round($amountPesos * 100);
     if ($amountCentavos < 100) jsonResponse(['ok' => false, 'message' => 'Invoice amount must be at least ₱1.00.'], 400);
-    $returnUrl = environment('PAYMONGO_RETURN_URL', false);
-    if (filter_var($returnUrl, FILTER_VALIDATE_URL) === false || !str_starts_with($returnUrl, 'https://')) $returnUrl = 'https://www.cooltimeautoaircon.online';
-    $returnParts = parse_url($returnUrl);
-    $returnOrigin = ($returnParts['scheme'] ?? 'https') . '://' . ($returnParts['host'] ?? '');
-    if (!empty($returnParts['port'])) $returnOrigin .= ':' . $returnParts['port'];
-    $returnPath = (string) ($returnParts['path'] ?? '');
-    $successBase = rtrim($returnUrl, '/') . '/services.html';
+    $referenceNumber = (string)($invoice['referenceNumber'] ?? $invoice['invoiceNumber'] ?? '');
+    if (!preg_match('/^PMO-[A-Z]{3}-\d{8}-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/', $referenceNumber)) {
+        $referenceNumber = cooltimeReferenceNumber('PMO', (string)($invoice['branchId'] ?? ''));
+        $referenceFields = ['referenceNumber' => ['stringValue' => $referenceNumber], 'invoiceNumber' => ['stringValue' => $referenceNumber]];
+        firestorePatchDocument($account, 'invoices', $invoiceId, $referenceFields);
+        $bookingId = (string)($invoice['bookingId'] ?? '');
+        if ($bookingId !== '' && preg_match('/^[A-Za-z0-9_-]{1,150}$/', $bookingId)) {
+            firestorePatchDocument($account, 'bookings', $bookingId, $referenceFields);
+        }
+    }
+    $returnOrigin = paymongoReturnOrigin();
     $returnNonce = bin2hex(random_bytes(16));
     $cancelSignature = hash_hmac('sha256', $invoiceId . '|' . $returnNonce, $secret);
-    $successUrl = $successBase . '?payment=success&invoice=' . rawurlencode($invoiceId);
+    $successUrl = $returnOrigin . '/services.html?payment=success&invoice=' . rawurlencode($invoiceId);
     $cancelUrl = $returnOrigin . '/api/payment-return.php?status=cancelled&invoice=' . rawurlencode($invoiceId) . '&nonce=' . rawurlencode($returnNonce) . '&signature=' . rawurlencode($cancelSignature);
     $result = httpJsonRequest('https://api.paymongo.com/v1/checkout_sessions', ['data' => ['attributes' => [
-        'line_items' => [['currency' => 'PHP', 'amount' => $amountCentavos, 'name' => 'CoolTime invoice ' . $invoiceId, 'quantity' => 1]],
+        'line_items' => [['currency' => 'PHP', 'amount' => $amountCentavos, 'name' => 'CoolTime invoice ' . $referenceNumber, 'quantity' => 1]],
         'payment_method_types' => ['qrph', 'gcash', 'paymaya'],
-        'description' => 'CoolTime service invoice ' . $invoiceId,
-        'reference_number' => $invoiceId,
-        'metadata' => ['invoiceId' => $invoiceId],
+        'description' => 'CoolTime service invoice ' . $referenceNumber,
+        'reference_number' => $referenceNumber,
+        'metadata' => ['invoiceId' => $invoiceId, 'referenceNumber' => $referenceNumber],
         'success_url' => $successUrl,
         'cancel_url' => $cancelUrl,
         'send_email_receipt' => false,
@@ -154,13 +158,15 @@ try {
     $paymentId = 'paymongo_' . preg_replace('/[^A-Za-z0-9_-]/', '', $session['id']);
     firestorePatchDocument($account, 'payments', $paymentId, [
         'invoiceId' => ['stringValue' => $invoiceId],
+        'invoiceReferenceNumber' => ['stringValue' => $referenceNumber],
         'customerId' => ['stringValue' => (string) ($invoice['customerId'] ?? ($user['uid'] ?? ''))],
         'branchId' => ['stringValue' => (string) ($invoice['branchId'] ?? '')],
         'amount' => ['integerValue' => (string) $amountCentavos],
         'currency' => ['stringValue' => 'PHP'],
         'method' => ['stringValue' => 'paymongo_checkout'],
         'status' => ['stringValue' => 'pending'],
-        'referenceNumber' => ['stringValue' => (string) $session['id']],
+        'referenceNumber' => ['stringValue' => $referenceNumber],
+        'providerReference' => ['stringValue' => (string) $session['id']],
         'createdAt' => ['timestampValue' => gmdate('Y-m-d\TH:i:s\Z')],
     ]);
     $paymentIntentId = (string) ($session['attributes']['payment_intent']['id'] ?? $session['attributes']['payment_intent_id'] ?? '');

@@ -65,7 +65,8 @@ try {
             'branchId' => ['stringValue' => (string) ($invoice['branchId'] ?? '')], 'amount' => ['integerValue' => (string) (int) round($amount * 100)],
             'amountUnit' => ['stringValue' => 'centavos'], 'currency' => ['stringValue' => 'PHP'], 'method' => ['stringValue' => 'paymongo_checkout'],
             'status' => ['stringValue' => 'abandoned'], 'failureReason' => ['stringValue' => 'Customer returned from checkout without confirmed payment.'],
-            'referenceNumber' => ['stringValue' => $attemptId], 'createdAt' => ['timestampValue' => $now],
+            'referenceNumber' => ['stringValue' => (string)($invoice['referenceNumber'] ?? $invoice['invoiceNumber'] ?? $invoiceId)],
+            'providerReference' => ['stringValue' => $attemptId], 'createdAt' => ['timestampValue' => $now],
         ]],
         ['collection' => 'activity_logs', 'id' => 'payment_return_' . bin2hex(random_bytes(8)), 'fields' => [
             'type' => ['stringValue' => 'payment_checkout_abandoned'], 'invoiceId' => ['stringValue' => $invoiceId], 'createdAt' => ['timestampValue' => $now],

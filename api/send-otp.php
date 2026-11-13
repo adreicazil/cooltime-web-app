@@ -37,12 +37,16 @@ try {
     requirePost();
     $user = firebaseUserFromToken(authorizationToken());
     $now = time();
+    $requestHost = strtolower((string)parse_url('http://' . (string)($_SERVER['HTTP_HOST'] ?? ''), PHP_URL_HOST));
+    $remoteAddress = strtolower((string)($_SERVER['REMOTE_ADDR'] ?? ''));
+    $isLocalDevelopment = in_array($requestHost, ['localhost', '127.0.0.1'], true)
+        && in_array($remoteAddress, ['localhost', '127.0.0.1', '::1', '::ffff:127.0.0.1'], true);
 // Revoke any prior verified session where Firebase permits it. This also clears
 // the local PHP-session copy and does not prevent issuing a fresh OTP if Firebase
 // service-account credentials are unavailable.
     revokeOtpSession($user['uid']);
 
-    $response = withOtpRecord('login', $user['uid'], function (array $record) use ($user, $now): array {
+    $response = withOtpRecord('login', $user['uid'], function (array $record) use ($user, $now, $isLocalDevelopment): array {
     $windowStartedAt = (int) ($record['window_started_at'] ?? $now);
     $requestCount = (int) ($record['request_count'] ?? 0);
     if ($now - $windowStartedAt >= OTP_REQUEST_WINDOW_SECONDS) {
@@ -58,11 +62,15 @@ try {
     }
 
     $code = (string) random_int(100000, 999999);
+    $emailSent = true;
     try {
-        sendOtpEmail($user['email'], $code, 'login');
+        sendOtpEmail($user['email'], $code, 'login', $isLocalDevelopment);
     } catch (Throwable $error) {
         error_log('CoolTime OTP email failed: ' . $error->getMessage());
-        jsonResponse(['ok' => false, 'message' => 'We could not send a verification email. Please try again later.'], 503);
+        if (!$isLocalDevelopment) {
+            jsonResponse(['ok' => false, 'message' => 'We could not send a verification email. Please try again later.'], 503);
+        }
+        $emailSent = false;
     }
 
     $codeHash = password_hash($code, PASSWORD_DEFAULT);
@@ -76,13 +84,14 @@ try {
             'window_started_at' => $windowStartedAt,
             'request_count' => $requestCount + 1,
         ],
-        'response' => [
+        'response' => array_filter([
             'ok' => true,
             'success' => true,
-            'message' => 'OTP sent successfully',
+            'message' => $emailSent ? 'OTP sent successfully' : 'Email delivery failed; use the development code below.',
             'email' => maskedEmail($user['email']),
             'expiresIn' => OTP_TTL_SECONDS,
-        ],
+            'dev_otp' => !$emailSent && $isLocalDevelopment ? $code : null,
+        ], static fn ($value) => $value !== null),
     ];
     });
 
