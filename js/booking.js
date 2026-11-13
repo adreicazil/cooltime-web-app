@@ -268,7 +268,14 @@ function renderCustomerBookings(records, serviceCatalog, vehicleData, branchCata
     const status = statusKey === 'ongoing' ? 'Ongoing' : statusKey.charAt(0).toUpperCase() + statusKey.slice(1).replaceAll('-', ' ');
     const branchKey = String(booking.branchId || '').toLowerCase().replace(/[- ]/g, '_');
     const branch = booking.branchName || ({ santarosa: 'Sta. Rosa', santa_rosa: 'Sta. Rosa', cabuyao: 'Cabuyao' }[branchKey]) || booking.branchId || 'Branch unavailable';
-    const vehicle = booking.vehicle || {};
+    const nestedVehicle = booking.vehicle && typeof booking.vehicle === 'object' ? booking.vehicle : {};
+    const storedVehicle = vehicleData[booking.vehicleId || booking.vehicle_id] || {};
+    const vehicle = {
+      plateNumber: nestedVehicle.plateNumber || nestedVehicle.plate_number || booking.plateNumber || booking.plate_number || storedVehicle.plateNumber || storedVehicle.plate_number,
+      make: nestedVehicle.make || nestedVehicle.vehicleMake || nestedVehicle.vehicle_make || booking.vehicleMake || booking.vehicle_make || booking.make || storedVehicle.make || storedVehicle.vehicleMake || storedVehicle.vehicle_make,
+      model: nestedVehicle.model || nestedVehicle.vehicleModel || nestedVehicle.vehicle_model || booking.vehicleModel || booking.vehicle_model || booking.model || storedVehicle.model || storedVehicle.vehicleModel || storedVehicle.vehicle_model,
+      year: nestedVehicle.year || nestedVehicle.vehicleYear || nestedVehicle.vehicle_year || booking.vehicleYear || booking.vehicle_year || booking.year || storedVehicle.year || storedVehicle.vehicleYear || storedVehicle.vehicle_year,
+    };
     const subject = `Cancellation request for booking ${booking.id}`;
     const body = `Name: ${name}\nBooking ID: ${booking.id}\nDate: ${booking.date || ''}\nTime: ${booking.timeSlot || ''}\nService: ${booking.serviceName}\n\nPlease review my cancellation request.`;
     const href = `mailto:cooltimeautoaircon@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -279,8 +286,8 @@ function renderCustomerBookings(records, serviceCatalog, vehicleData, branchCata
       ['Branch', branch], ['Branch address', booking.branchAddress || 'Address unavailable'],
       ['Service', booking.serviceName], ['Appointment date', booking.date || 'Date unavailable'], ['Preferred time', booking.timeSlot || 'Time unavailable'],
       ['Service price', `₱${Number(booking.servicePrice || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`],
-      ['Vehicle plate number', vehicle.plateNumber || 'Plate unavailable'], ['Vehicle make', vehicle.make || 'Make unavailable'],
-      ['Vehicle model', vehicle.model || 'Model unavailable'], ['Vehicle year', vehicle.year || 'Year unavailable']
+      ['Vehicle plate number', vehicle.plateNumber || '—'], ['Vehicle make', vehicle.make || '—'],
+      ['Vehicle model', vehicle.model || '—'], ['Vehicle year', vehicle.year || '—']
     ].map(([label, value]) => `<div class="booking-detail-field"><div class="booking-detail-label">${escapeHtml(label)}</div><div class="booking-detail-value">${escapeHtml(value)}</div></div>`).join('');
     const rescheduleControl = ['pending', 'confirmed'].includes(statusKey)
       ? `<button class="booking-reschedule-link" type="button" data-booking-id="${escapeHtml(booking.id)}" data-date="${escapeHtml(booking.date || '')}" data-time="${escapeHtml(booking.timeSlot || '')}">Request reschedule</button>` : '';

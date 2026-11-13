@@ -38,6 +38,17 @@ function bookingServiceName(booking) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase()) || 'Service';
 }
 
+function bookingVehicleDetails(booking, vehicleRecord = {}) {
+  const nested = booking.vehicle && typeof booking.vehicle === 'object' ? booking.vehicle : {};
+  const value = (...items) => items.find((item) => item !== undefined && item !== null && String(item).trim() !== '');
+  return {
+    plateNumber: value(nested.plateNumber, nested.plate_number, booking.plateNumber, booking.plate_number, vehicleRecord.plateNumber, vehicleRecord.plate_number),
+    make: value(nested.make, nested.vehicleMake, nested.vehicle_make, booking.vehicleMake, booking.vehicle_make, booking.make, vehicleRecord.make, vehicleRecord.vehicleMake, vehicleRecord.vehicle_make),
+    model: value(nested.model, nested.vehicleModel, nested.vehicle_model, booking.vehicleModel, booking.vehicle_model, booking.model, vehicleRecord.model, vehicleRecord.vehicleModel, vehicleRecord.vehicle_model),
+    year: value(nested.year, nested.vehicleYear, nested.vehicle_year, booking.vehicleYear, booking.vehicle_year, booking.year, vehicleRecord.year, vehicleRecord.vehicleYear, vehicleRecord.vehicle_year),
+  };
+}
+
 function setupModulePagination(config) {
   const container = document.getElementById(config.listContainerId);
   const card = document.getElementById(config.cardContainerId);
@@ -563,6 +574,7 @@ function renderBookings() {
 
     if (isDashboardPage) {
       const vehicle = vehiclesById[booking.vehicleId] || {};
+      const vehicleDetails = bookingVehicleDetails(booking, vehicle);
       const branch = branchesById[booking.branchId] || {};
       const serviceRecord = servicesById[bookingServiceId(booking)] || {};
       const branchKey = String(booking.branchId || '').toLowerCase().replace(/[\s-]+/g, '_');
@@ -598,10 +610,10 @@ function renderBookings() {
           ${field('Branch', branch.name || booking.branchId)}
           ${field('Branch address', branch.address)}
           ${field('Service price', money(serviceRecord.price))}
-          ${field('Vehicle plate number', vehicle.plateNumber)}
-          ${field('Vehicle make', vehicle.make)}
-          ${field('Vehicle model', vehicle.model)}
-          ${field('Vehicle year', vehicle.year)}
+          ${field('Vehicle plate number', vehicleDetails.plateNumber)}
+          ${field('Vehicle make', vehicleDetails.make)}
+          ${field('Vehicle model', vehicleDetails.model)}
+          ${field('Vehicle year', vehicleDetails.year)}
           ${reasonField('Cancellation request reason', booking.cancellationRequestReason)}
           ${reasonField('Admin cancellation reason', booking.cancellationReason)}
         </div></div>
@@ -661,9 +673,10 @@ async function bookingAction(event) {
   if (button.classList.contains('booking-details')) {
     const user = usersById[booking.customerId] || {};
     const vehicle = vehiclesById[booking.vehicleId] || {};
+    const vehicleDetails = bookingVehicleDetails(booking, vehicle);
     const branch = branchesById[booking.branchId] || {};
     const serviceRecord = servicesById[bookingServiceId(booking)] || {};
-    $('#detailContent').innerHTML = `<h2>Booking ${esc(booking.id)}</h2><dl>${[['Customer', user.name || user.username], ['Email', user.email], ['Contact', user.phone || user.contact], ['Date', booking.date], ['Time', booking.timeSlot], ['Service', bookingServiceName(booking)], ['Service price', money(serviceRecord.price)], ['Branch', branch.name || booking.branchId], ['Branch address', branch.address], ['Status', booking.status], ['Vehicle plate', vehicle.plateNumber], ['Vehicle', `${vehicle.make || ''} ${vehicle.model || ''} ${vehicle.year || ''}`], ['Cancellation request reason', booking.cancellationRequestReason], ['Admin cancellation reason', booking.cancellationReason]].map(([key, val]) => `<dt>${esc(key)}</dt><dd>${esc(val || '—')}</dd>`).join('')}</dl>`;
+    $('#detailContent').innerHTML = `<h2>Booking ${esc(booking.id)}</h2><dl>${[['Customer', user.name || user.username || booking.customerName], ['Email', user.email || booking.customerEmail], ['Contact', user.phone || user.contact || booking.phone], ['Date', booking.date], ['Time', booking.timeSlot], ['Service', bookingServiceName(booking)], ['Service price', money(serviceRecord.price)], ['Branch', branch.name || booking.branch || booking.branchId], ['Branch address', branch.address], ['Status', booking.status], ['Vehicle plate number', vehicleDetails.plateNumber], ['Vehicle make', vehicleDetails.make], ['Vehicle model', vehicleDetails.model], ['Vehicle year', vehicleDetails.year], ['Cancellation request reason', booking.cancellationRequestReason], ['Admin cancellation reason', booking.cancellationReason]].map(([key, val]) => `<dt>${esc(key)}</dt><dd>${esc(val || '—')}</dd>`).join('')}</dl>`;
     $('#detailDialog').showModal(); return;
   }
   if (button.classList.contains('reject-cancellation')) {

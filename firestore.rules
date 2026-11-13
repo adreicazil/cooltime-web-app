@@ -13,7 +13,10 @@ service cloud.firestore {
     function getUserData() { return get(userProfilePath()).data; }
     function hasRole(role) {
       return isSignedIn() && exists(userProfilePath())
-        && getUserData().role == role && getUserData().get('status', 'active') == 'active';
+        && getUserData().get('status', 'active') == 'active'
+        && (getUserData().get('role', '') == role
+          || (role == 'admin' && getUserData().get('role', '') in ['Admin', 'ADMIN'])
+          || (role == 'super_admin' && getUserData().get('role', '') in ['Super_Admin', 'SUPER_ADMIN', 'super-admin', 'Super-Admin', 'super admin', 'Super Admin']));
     }
     function isAdmin() { return hasRole('admin') || hasRole('super_admin'); }
     function isSuperAdmin() { return hasRole('super_admin'); }
@@ -63,7 +66,12 @@ service cloud.firestore {
     match /paymongo_intents/{intentId} { allow read, write: if isAdmin(); }
     match /feedback/{ticketId} { allow read, write: if isAdmin(); }
     match /inquiries/{ticketId} { allow read, write: if isAdmin(); }
-    match /reports/{reportId} { allow read, write: if isAdmin(); }
+    // Report history is queried with a collection listener, so admins need both
+    // document and collection-list access while holding an active OTP session.
+    match /reports/{reportId} {
+      allow get, list: if isAdmin();
+      allow create, update, delete: if isAdmin();
+    }
     match /activity_logs/{logId} { allow read, write: if isAdmin(); }
     match /system_settings/{settingId} { allow read: if isAdmin(); allow write: if isSuperAdmin(); }
     // The server writes and revokes these short-lived records after OTP checks.

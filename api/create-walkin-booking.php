@@ -115,6 +115,11 @@ try {
       'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'branchId'=>['stringValue'=>$branchId],'branch'=>['stringValue'=>$branch],
       'date'=>['stringValue'=>$date],'timeSlot'=>['stringValue'=>$time],'plateNumber'=>['stringValue'=>$plate],
       'vehicleMake'=>['stringValue'=>$make],'vehicleModel'=>['stringValue'=>$model],'vehicleYear'=>['integerValue'=>$year],
+      'plate_number'=>['stringValue'=>$plate],'vehicle_make'=>['stringValue'=>$make],'vehicle_model'=>['stringValue'=>$model],'vehicle_year'=>['integerValue'=>$year],
+      'vehicle'=>['mapValue'=>['fields'=>[
+        'plateNumber'=>['stringValue'=>$plate],'make'=>['stringValue'=>$make],
+        'model'=>['stringValue'=>$model],'year'=>['integerValue'=>$year],
+      ]]],
       'source'=>['stringValue'=>'walk_in_pos'],'is_guest'=>['booleanValue'=>true],'status'=>['stringValue'=>'pending'],
       'paymentStatus'=>['stringValue'=>$paymentStatus],'paymentMethod'=>['stringValue'=>$methodName],
       'payment_status'=>['stringValue'=>$paymentStatus],'payment_method'=>['stringValue'=>$methodName],
