@@ -948,3 +948,44 @@ body.feedback-public .feedback-form .form-feedback { min-height:1.2em; margin:6p
 .home-public .hero-section .hero-features li:not(.hero-wifi) { position:relative; padding-left:1.15em; }
 .home-public .hero-section .hero-features li:not(.hero-wifi)::before { content:'\2022'; position:absolute; left:0; }
 
+/* Shared public header and home hero phone layout. */
+@media (max-width: 768px) {
+  body.public-page .site-header { position: relative; }
+  body.public-page .brand-bar {
+    min-height: 58px;
+    height: 58px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 5px 14px;
+  }
+  body.public-page .brand-bar .logo { width: 44px; height: 44px; }
+  body.public-page .brand-bar .tagline { display: none; }
+  body.public-page .main-nav {
+    min-height: 46px;
+    height: 46px;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 2px;
+    padding: 0 16px 0 8px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    font-size: .78rem;
+  }
+  body.public-page .main-nav::-webkit-scrollbar { display: none; }
+  body.public-page .main-nav > a { flex: 0 0 auto; min-height: 42px; padding: 7px 11px; }
+  body.public-page .main-nav .auth-nav-container { flex: 0 0 auto; width: auto; min-width: max-content; margin-left: 0; }
+  body.public-page .main-nav .auth-nav-container > a { width: auto; min-width: max-content; padding-inline: 11px; }
+  .home-public .hero-section .hero-copy { top: 5%; left: 8%; width: 84%; }
+  .home-public .hero-section #homeSlogan {
+    top: 20px; left: 8%; width: 84%; max-width: 84%;
+    font-size: clamp(1.25rem, 5.8vw, 1.8rem); line-height: 1.12;
+    white-space: normal; overflow-wrap: anywhere;
+  }
+  .home-public .hero-section .hero-subheadline {
+    top: 86px; left: 8%; width: 84%; max-width: none;
+    font-size: clamp(.75rem, 3vw, .9rem); line-height: 1.35; overflow-wrap: anywhere;
+  }
+}
+

@@ -14,6 +14,7 @@
     .ct-form{display:flex;gap:8px;padding:10px 12px;border-top:1px solid #edf0f4}.ct-input{min-width:0;flex:1;border:1px solid #cbd5e1;border-radius:20px;padding:10px 13px;font:inherit}.ct-send{border:0;border-radius:20px;padding:0 14px;background:#0878d1;color:#fff;font-weight:600}.ct-send:disabled{opacity:.6;cursor:wait}
     .ct-typing{display:flex;gap:4px;align-items:center;height:18px}.ct-typing i{width:6px;height:6px;border-radius:50%;background:#7d8da0;animation:ctblink 1s infinite alternate}.ct-typing i:nth-child(2){animation-delay:.2s}.ct-typing i:nth-child(3){animation-delay:.4s}@keyframes ctblink{to{opacity:.2;transform:translateY(-3px)}}
     @media(max-width:480px){#cooltime-chatbot{right:16px;bottom:16px}.ct-panel{position:fixed;right:10px;bottom:84px;width:calc(100vw - 20px);height:min(580px,calc(100dvh - 110px))}}
+    @media(max-width:768px){#cooltime-chatbot{right:14px;bottom:14px}.ct-launch{width:50px;height:50px;font-size:22px}.ct-badge{right:56px;bottom:12px;padding:5px 9px;font-size:11px}}
   `;
   document.head.append(style);
   const root = document.createElement('div'); root.id = 'cooltime-chatbot';
