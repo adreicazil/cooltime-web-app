@@ -18,6 +18,7 @@ const cart = new Map();
 const money = (amount) => `₱${Number(amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[character]));
 let currentUser;
+let currentProfile;
 
 async function loadCatalog() {
   try {
@@ -72,13 +73,18 @@ async function checkout() {
   const customerName = document.getElementById('walkInName').value.trim() || 'Walk-in customer';
   const referenceNumber = createReferenceNumber(paymentMethod === 'cash' ? 'OTC' : 'PMO', branchId);
   const paymentRef = paymentMethod === 'cash' ? doc(collection(db, 'payments')) : null;
+  const cashierName = String(currentProfile?.name || currentProfile?.displayName || currentProfile?.username || currentUser.email || 'Administrator');
+  const cashierFields = paymentMethod === 'cash' ? {
+    cashierId: currentUser.uid, cashierName, cashier: cashierName,
+    processedBy: currentUser.uid, processedByName: cashierName
+  } : {};
   const invoice = {
     invoiceId: invoiceRef.id, invoiceNumber: referenceNumber, referenceNumber, customerId: 'walk-in', customerName, branchId, branch,
     source: 'pos', bookingId: null, servicesAdded: lines.map((line) => line.id), serviceDetails: lines,
     runningTotal: total, finalAmount: total, totalAmount: total,
     status: paymentMethod === 'cash' ? 'paid' : 'pending',
     paymentMethod, ...(paymentRef ? { paymentId: paymentRef.id } : {}),
-    createdBy: currentUser.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    createdBy: currentUser.uid, ...cashierFields, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
   };
   try {
     const batch = writeBatch(db);
@@ -86,7 +92,7 @@ async function checkout() {
     if (paymentMethod === 'cash') {
       batch.set(paymentRef, {
         invoiceId: invoiceRef.id, customerId: 'walk-in', branchId, branch, amount: total, currency: 'PHP',
-        amountUnit: 'pesos', method: 'cash', status: 'paid', referenceNumber,
+        amountUnit: 'pesos', method: 'cash', status: 'paid', referenceNumber, ...cashierFields,
         createdAt: serverTimestamp(), paidAt: serverTimestamp()
       });
     }
@@ -142,6 +148,7 @@ authReady.then(() => new Promise((resolve) => {
   const profile = await getUserProfile(user.uid);
   if (!['admin', 'super_admin'].includes(String(profile?.role || '').toLowerCase())) { window.location.replace('login.html'); return; }
   currentUser = user;
+  currentProfile = profile || {};
   layout.hidden = false;
   await loadCatalog();
 }).catch((error) => {

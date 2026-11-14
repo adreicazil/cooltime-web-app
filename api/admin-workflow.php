@@ -269,9 +269,33 @@ try {
             jsonResponse(['ok' => false, 'message' => 'Administrator access is required.'], 403);
         }
         $now = gmdate('Y-m-d\TH:i:s\Z');
+        $cashierName = trim((string) ($actorProfile['name'] ?? $actorProfile['displayName'] ?? $actorProfile['username'] ?? ''));
+        if ($cashierName === '') $cashierName = (string) ($actor['email'] ?? 'Administrator');
+        $recordMethod = strtolower((string) ($record['paymentMethod'] ?? $record['payment_method'] ?? $record['method'] ?? $invoice['paymentMethod'] ?? $invoice['payment_method'] ?? ''));
+        $isCounterCash = preg_match('/^OTC-/i', $reference) === 1 || str_contains($recordMethod, 'cash');
+        $transactionWrites = [];
+        if ($isCounterCash) {
+            $cashierFields = [
+                'cashierId' => ['stringValue' => (string) $actor['uid']],
+                'cashierName' => ['stringValue' => $cashierName],
+                'cashier' => ['stringValue' => $cashierName],
+                'processedBy' => ['stringValue' => (string) $actor['uid']],
+                'processedByName' => ['stringValue' => $cashierName],
+                'updatedAt' => ['timestampValue' => $now],
+            ];
+            $transactionWrites[] = ['collection' => $collection, 'id' => $id, 'fields' => $cashierFields];
+            if ($collection !== 'invoices' && $invoice) {
+                $transactionWrites[] = ['collection' => 'invoices', 'id' => $invoiceId, 'fields' => $cashierFields];
+            }
+            $linkedPaymentId = (string) ($record['paymentId'] ?? $record['payment_id'] ?? $invoice['paymentId'] ?? $invoice['payment_id'] ?? '');
+            if ($linkedPaymentId !== '' && !($collection === 'payments' && $id === $linkedPaymentId)) {
+                $transactionWrites[] = ['collection' => 'payments', 'id' => $linkedPaymentId, 'fields' => $cashierFields];
+            }
+        }
         $amount = (float) ($record['totalAmount'] ?? $record['finalAmount'] ?? $record['runningTotal'] ?? 0);
-        adminWorkflowCommit($account, [adminWorkflowAuditWrite($actor, $actorProfile, 'Walk-in POS Recorded', $reference,
-            'Walk-in POS transaction recorded; amount PHP ' . number_format($amount, 2) . '.', $now)]);
+        $transactionWrites[] = adminWorkflowAuditWrite($actor, $actorProfile, 'Walk-in POS Recorded', $reference,
+            'Walk-in POS transaction recorded; amount PHP ' . number_format($amount, 2) . '.', $now);
+        adminWorkflowCommit($account, $transactionWrites);
         jsonResponse(['ok' => true]);
     }
     if ($action === 'list_manageable_accounts') {
@@ -866,6 +890,9 @@ try {
         if ($downpayment > 0 && strtolower((string) ($invoice['status'] ?? '')) === 'paid') jsonResponse(['ok' => false, 'message' => 'This invoice is already paid; do not record another downpayment.'], 409);
         if ($downpayment > 0 && (float) ($invoice['downpaymentAmount'] ?? 0) > 0) jsonResponse(['ok' => false, 'message' => 'A downpayment is already recorded for this invoice.'], 409);
         $now = gmdate('Y-m-d\TH:i:s\Z');
+        $cashierName = trim((string) ($actorProfile['name'] ?? $actorProfile['displayName'] ?? $actorProfile['username'] ?? ''));
+        if ($cashierName === '') $cashierName = (string) ($actor['email'] ?? 'Administrator');
+        $recordedAtCounter = $cashSettlementAmount > 0 || ($downpayment > 0 && $method === 'cash');
         $invoiceDownpayment = ($checkoutPaid || $cashSettlementAmount > 0) ? (float) ($invoice['downpaymentAmount'] ?? 0) : $downpayment;
         $balance = ($checkoutPaid || $cashSettlementAmount > 0) ? 0 : max(0, $total - $downpayment);
         $bookingBranchId = normalizeBranchId((string) ($booking['branchId'] ?? $booking['branch'] ?? ''));
@@ -896,6 +923,15 @@ try {
                 'downpaymentAmount' => ['doubleValue' => $downpayment], 'createdAt' => ['timestampValue' => $now],
             ]],
         ];
+        if ($recordedAtCounter) {
+            $writes[1]['fields'] += [
+                'cashierId' => ['stringValue' => (string) $actor['uid']],
+                'cashierName' => ['stringValue' => $cashierName],
+                'cashier' => ['stringValue' => $cashierName],
+                'processedBy' => ['stringValue' => (string) $actor['uid']],
+                'processedByName' => ['stringValue' => $cashierName],
+            ];
+        }
         if ($downpayment > 0) {
             $paymentId = 'downpayment_' . $bookingId;
             $writes[] = ['collection' => 'payments', 'id' => $paymentId, 'fields' => [
@@ -904,6 +940,11 @@ try {
                 'amountUnit' => ['stringValue' => 'centavos'], 'currency' => ['stringValue' => 'PHP'], 'method' => ['stringValue' => $method],
                 'status' => ['stringValue' => 'paid'], 'referenceNumber' => ['stringValue' => (string)($invoice['referenceNumber'] ?? $invoice['invoiceNumber'] ?? $invoiceId)],
                 'providerReference' => ['stringValue' => $paymentId], 'paidAt' => ['timestampValue' => $now],
+                ...($method === 'cash' ? [
+                    'cashierId' => ['stringValue' => (string) $actor['uid']], 'cashierName' => ['stringValue' => $cashierName],
+                    'cashier' => ['stringValue' => $cashierName], 'processedBy' => ['stringValue' => (string) $actor['uid']],
+                    'processedByName' => ['stringValue' => $cashierName],
+                ] : []),
             ]];
             $writes[1]['fields']['downpaymentPaymentId'] = ['stringValue' => $paymentId];
         }
@@ -916,6 +957,9 @@ try {
                 'amountUnit' => ['stringValue' => 'centavos'], 'currency' => ['stringValue' => 'PHP'], 'method' => ['stringValue' => 'cash'],
                 'status' => ['stringValue' => 'paid'], 'referenceNumber' => ['stringValue' => (string) ($invoice['referenceNumber'] ?? $invoice['invoiceNumber'] ?? $invoiceId)],
                 'providerReference' => ['stringValue' => $paymentId], 'paidAt' => ['timestampValue' => $now],
+                'cashierId' => ['stringValue' => (string) $actor['uid']], 'cashierName' => ['stringValue' => $cashierName],
+                'cashier' => ['stringValue' => $cashierName], 'processedBy' => ['stringValue' => (string) $actor['uid']],
+                'processedByName' => ['stringValue' => $cashierName],
             ]];
         }
         $settlementDetails = 'Service completed; downpayment PHP ' . number_format($invoiceDownpayment, 2)

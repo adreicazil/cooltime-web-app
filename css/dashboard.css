@@ -2656,7 +2656,6 @@ td {
 }
 .super-dashboard-body #posMonitoring .pos-detail-table th { color: rgba(255, 255, 255, .7); font-size: .82rem; }
 .super-dashboard-body #posMonitoring .pos-total-summary { display: block; margin-top: 10px; color: #fff; }
-.super-dashboard-body #posMonitoring .pos-payment-reference { margin: 8px 0 0; color: rgba(255, 255, 255, .65); font-size: .85rem; }
 .super-dashboard-body #posMonitoring .pos-empty-state { padding: 18px 8px; color: rgba(255, 255, 255, .72); }
 @media (max-width: 640px) {
   .super-dashboard-body #posMonitoring.pos-card-container { padding: 20px 16px !important; }
@@ -3761,17 +3760,33 @@ body.super-dashboard-body #posMonitoring .pos-void-request-details p { margin: 5
 .pos-audit-trail-card h3 { margin: 0 0 6px; color: #eaf6ff; }
 .pos-audit-trail-card > p { color: #9fb4cc; }
 .pos-audit-trail-filters { display: flex; justify-content: flex-end; margin: 12px 0; }
-.pos-audit-trail-filters input { width: min(360px, 100%); }
-.pos-audit-trail-table { width: 100%; border-collapse: collapse; color: #dceaff; }
-.pos-audit-trail-table th, .pos-audit-trail-table td { padding: 11px 12px; border-bottom: 1px solid rgba(255, 255, 255, .08); text-align: left; vertical-align: top; }
-.pos-audit-trail-table th { color: #8fd5ff; font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; }
-.pos-audit-trail-table td small { display: block; color: #91a8c1; }
+.pos-audit-trail-filters input {
+  box-sizing: border-box; width: min(360px, 100%); min-height: 38px; padding: 8px 15px;
+  border: 1px solid #d1d5db; border-radius: 999px; background: rgba(255, 255, 255, .96); color: #172334;
+}
+.pos-audit-trail-filters input::placeholder { color: #7b8491; opacity: 1; }
+.pos-audit-trail-scroll { width: 100%; max-width: 100%; overflow-x: hidden; }
+.pos-audit-trail-table { width: 100%; max-width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0 7px; color: #dceaff; }
+.pos-audit-trail-table tbody { width: 100%; }
+.pos-audit-trail-table .pos-audit-row { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1.7fr); width: 100%; }
+.pos-audit-trail-table td { min-width: 0; padding: 10px 12px; border: 0; text-align: left; vertical-align: top; white-space: normal; overflow-wrap: anywhere; }
+.pos-audit-trail-table td small { display: block; margin-top: 3px; color: #91a8c1; }
+.pos-audit-trail-table .pos-audit-action > strong,
+.pos-audit-trail-table .pos-audit-action small strong,
+.pos-audit-trail-table .pos-audit-admin small strong { color: #eaf6ff; }
+.pos-audit-trail-table .pos-audit-details { white-space: normal; word-break: break-word; overflow-wrap: anywhere; }
+.pos-audit-trail-table .pos-audit-empty { grid-column: 1 / -1; }
 .request-decision-state { color: #9fb4cc; }
 @media (max-width: 768px) {
   .pos-audit-trail-card { padding: 12px; margin-top: 16px; }
   .pos-audit-trail-filters { justify-content: stretch; }
   .pos-audit-trail-filters input { width: 100%; }
-  .pos-audit-trail-table { min-width: 760px; }
+  .pos-audit-trail-table .pos-audit-row { grid-template-columns: minmax(0, .9fr) minmax(0, 1.2fr); }
+  .pos-audit-trail-table .pos-audit-time,
+  .pos-audit-trail-table .pos-audit-action,
+  .pos-audit-trail-table .pos-audit-admin,
+  .pos-audit-trail-table .pos-audit-details { padding: 8px; }
+  .pos-audit-trail-table .pos-audit-details { grid-column: 1 / -1; padding-top: 0; }
   body.admin-dashboard-body #posMonitoring .pos-audit-actions-menu,
   body.super-dashboard-body #posMonitoring .pos-audit-actions-menu { right: 0; }
 }

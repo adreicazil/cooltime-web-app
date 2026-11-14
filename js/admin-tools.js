@@ -295,7 +295,7 @@ function ensureAuditTrailUI() {
   const section = document.createElement('section');
   section.className = 'panel pos-audit-trail-card super-only';
   section.id = 'posAuditTrail';
-  setHTML(section, `<h3>Audit Trail</h3><p>Recorded administrator actions across bookings, customer requests, and POS transactions.</p><div class="pos-audit-trail-filters"><input type="search" id="posAuditSearch" class="form-control" placeholder="Search Reference ID or Admin name" aria-label="Search audit trail by reference or administrator"></div><div class="table-scroll"><table class="pos-audit-trail-table"><thead><tr><th>Date &amp; time</th><th>Action</th><th>Reference ID</th><th>Administrator</th><th>Role</th><th>Details</th></tr></thead><tbody id="posAuditResults"><tr><td colspan="6">Loading audit trail…</td></tr></tbody></table></div><div class="table-pagination-footer"><button type="button" class="btn-pagination-chevron btn-prev-page" title="Previous Page" aria-label="Previous page">&lt;</button><span class="pagination-page-display">Page <span class="current-page-num" title="Click to jump to page">1</span> of <span class="total-pages-num">1</span></span><button type="button" class="btn-pagination-chevron btn-next-page" title="Next Page" aria-label="Next page">&gt;</button></div>`);
+  setHTML(section, `<h3>Audit Trail</h3><p>Recorded administrator actions across bookings, customer requests, and POS transactions.</p><div class="pos-audit-trail-filters"><input type="search" id="posAuditSearch" class="form-control" placeholder="Search reference id or admin" aria-label="Search audit trail by reference or administrator"></div><div class="table-scroll pos-audit-trail-scroll"><table class="pos-audit-trail-table"><tbody id="posAuditResults"><tr class="pos-audit-row"><td class="pos-audit-empty" colspan="4">Loading audit trail...</td></tr></tbody></table></div><div class="table-pagination-footer"><button type="button" class="btn-pagination-chevron btn-prev-page" title="Previous Page" aria-label="Previous page">&lt;</button><span class="pagination-page-display">Page <span class="current-page-num" title="Click to jump to page">1</span> of <span class="total-pages-num">1</span></span><button type="button" class="btn-pagination-chevron btn-next-page" title="Next Page" aria-label="Next page">&gt;</button></div>`);
   monitor.append(section);
   on('#posAuditSearch', 'input', renderAuditTrail);
 }
@@ -329,7 +329,7 @@ function renderAuditTrail() {
   modulePaginators.posAudit.setItems(rows.map((item) => {
     const date = item.createdAt?.toDate?.() || (item.createdAt ? new Date(item.createdAt) : null);
     const stamp = date && !Number.isNaN(date.getTime()) ? date.toLocaleString('en-PH') : 'Timestamp unavailable';
-    return `<tr><td>${esc(stamp)}</td><td><strong>${esc(item.action || 'Action')}</strong></td><td>${esc(item.referenceId || '—')}</td><td>${esc(item.actorName || item.actorEmail || 'Unknown admin')}<small>${esc(item.actorEmail || '')}</small></td><td>${esc(String(item.actorRole || 'admin').replaceAll('_', ' '))}</td><td>${esc(item.details || '')}</td></tr>`;
+    return `<tr class="pos-audit-row"><td class="pos-audit-time">${esc(stamp)}</td><td class="pos-audit-action"><strong>${esc(item.action || 'Action')}</strong><small><strong>${esc(item.referenceId || '—')}</strong></small></td><td class="pos-audit-admin"><span>${esc(item.actorName || item.actorEmail || 'Unknown admin')}</span><small>${esc(item.actorEmail || '')}</small><small><strong>${esc(String(item.actorRole || 'admin').replaceAll('_', ' '))}</strong></small></td><td class="pos-audit-details">${esc(item.details || '')}</td></tr>`;
   }));
 }
 
@@ -371,7 +371,7 @@ async function initialize() {
       ensureAuditTrailUI();
       modulePaginators.posAudit = setupModulePagination({
         cardContainerId: 'posAuditTrail', listContainerId: 'posAuditResults',
-        emptyHtml: '<tr><td colspan="6" class="pos-empty-state">No audit actions found.</td></tr>'
+        emptyHtml: '<tr class="pos-audit-row"><td colspan="4" class="pos-audit-empty">No audit actions found.</td></tr>'
       });
     }
   }
@@ -1212,8 +1212,22 @@ function buildPosTransactions() {
 }
 
 function posCashier(transaction) {
-  const id = transaction.cashierId || transaction.createdBy || transaction.adminId || transaction.userId || '';
-  return transaction.cashierName || transaction.createdByName || transaction.cashier || usersById[id]?.name || usersById[id]?.username || usersById[id]?.email || id || '—';
+  const explicitName = transaction.cashierName || transaction.processedByName || transaction.cashier || '';
+  if (explicitName) return String(explicitName);
+  const id = transaction.cashierId || transaction.processedBy || transaction.adminId || '';
+  const profileName = usersById[id]?.name || usersById[id]?.username || usersById[id]?.email;
+  if (profileName) return profileName;
+  const payment = transaction._payment || paymentsByInvoice[transaction.invoiceId || transaction.id];
+  const reference = String(transaction._reference || transaction.referenceNumber || transaction.invoiceNumber || transaction.referenceId || '');
+  const method = transactionMethod(transaction, payment).toLowerCase();
+  const online = /^(?:PMO)-/i.test(reference)
+    || /paymongo|online|e-wallet|gcash|paymaya|qrph|grabpay/.test(method)
+    || /paymongo|online/.test(String(transaction.paymentMethod || transaction.payment_method || payment?.method || '').toLowerCase());
+  if (online) return 'PayMongo (Online)';
+  const creatorId = transaction.createdBy || '';
+  const creatorName = transaction.createdByName || usersById[creatorId]?.name || usersById[creatorId]?.username || usersById[creatorId]?.email;
+  if (creatorName) return creatorName;
+  return id || '—';
 }
 
 function posActionData(transaction) {
@@ -1234,7 +1248,9 @@ function renderPos() {
       && (!to || (date && date <= new Date(`${to}T23:59:59`)))
       && (!method || transactionMethod(transaction, payment) === method)
       && (!cashierSearch || posCashier(transaction).toLowerCase().includes(cashierSearch))
-      && (!referenceSearch || String(transaction._reference || '').toLowerCase().includes(referenceSearch))
+      && (!referenceSearch || [transaction._reference, transaction.referenceNumber, transaction.invoiceNumber,
+        transaction.referenceId, transaction.id, transaction.documentId, transaction._payment?.referenceNumber]
+        .filter(Boolean).join(' ').toLowerCase().includes(referenceSearch))
       && (!status || displayStatus === status || String(transaction.status || '').toLowerCase().replaceAll(' ', '_') === status);
   });
   const renderedItems = rows.map((transaction) => {
@@ -1265,7 +1281,7 @@ function renderPos() {
     const branch = normalizeBranchLabel(branchesById[transaction.branchId]?.name || transaction.branchName || transaction.branch || transaction.branchId);
     const stamp = date ? `${date.toLocaleDateString('en-PH')} ${date.toLocaleTimeString('en-PH')}` : 'Timestamp unavailable';
     const customer = transaction.customerName || (transaction.customerId ? usersById[transaction.customerId]?.name || transaction.customerId : 'Walk-in customer');
-    return `<tr class="pos-main-row" tabindex="0"><td><strong class="pos-invoice-id">${esc(reference)}</strong><button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button><span class="pos-invoice-time">ID ${esc(transaction.id)} · ${esc(stamp)}</span></td><td>${esc(branch)}</td><td>${esc(cashier)}</td><td>${esc(transactionMethod(transaction, payment))}</td><td><span class="pos-status-text ${esc(statusKey)}">${esc(displayStatus)}</span></td><td class="pos-amount">${money(total)}</td><td>${rowAction}</td></tr><tr class="pos-detail-row"><td colspan="7"><div class="pos-accordion-panel"><p class="pos-accordion-summary">Reference ID: ${esc(reference)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button></p><p>Customer: ${esc(customer)} · Cashier: ${esc(cashier)} · Branch: ${esc(branch)}</p>${requestDetails}<div class="pos-detail-table-scroll"><table class="pos-detail-table"><thead><tr><th>Service</th><th>Qty</th><th>Unit</th><th>Line total</th></tr></thead><tbody>${serviceRows}</tbody></table></div><strong class="pos-total-summary">Total ${money(total)}</strong>${payment?.referenceNumber || transaction.paymentReference ? `<p class="pos-payment-reference">Payment reference: ${esc(payment?.referenceNumber || transaction.paymentReference)}</p>` : ''}</div></td></tr>`;
+    return `<tr class="pos-main-row" tabindex="0"><td><strong class="pos-invoice-id">${esc(reference)}</strong><span class="pos-invoice-time">${esc(stamp)}</span></td><td>${esc(branch)}</td><td>${esc(cashier)}</td><td>${esc(transactionMethod(transaction, payment))}</td><td><span class="pos-status-text ${esc(statusKey)}">${esc(displayStatus)}</span></td><td class="pos-amount">${money(total)}</td><td>${rowAction}</td></tr><tr class="pos-detail-row"><td colspan="7"><div class="pos-accordion-panel"><p class="pos-accordion-summary">Reference ID: ${esc(reference)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button></p><p>Customer: ${esc(customer)} · Cashier: ${esc(cashier)} · Branch: ${esc(branch)}</p>${requestDetails}<div class="pos-detail-table-scroll"><table class="pos-detail-table"><thead><tr><th>Service</th><th>Qty</th><th>Unit</th><th>Line total</th></tr></thead><tbody>${serviceRows}</tbody></table></div><strong class="pos-total-summary">Total ${money(total)}</strong></div></td></tr>`;
   });
   if (modulePaginators.pos) modulePaginators.pos.setItems(renderedItems);
   else setHTML($('#posResults'), renderedItems.join('') || '<tr><td class="pos-empty-state" colspan="7">No POS transactions match these filters.</td></tr>');
