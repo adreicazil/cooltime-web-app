@@ -56,7 +56,16 @@ if (loginForm) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await credential.user.getIdToken(true)}` },
         body: JSON.stringify({})
       });
-      const result = await response.json();
+      const responseText = await response.text();
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        if ([502, 504, 524].includes(response.status) || /^\s*</.test(responseText)) {
+          throw new Error('Server is waking up. Please click Send OTP again in a few seconds.');
+        }
+        throw new Error('The server returned an unreadable response. Please try again.');
+      }
       if (!response.ok || !result.ok) throw new Error(result.message || 'A verification code could not be sent.');
       sessionStorage.setItem('cooltimeOtpPendingEmail', result.email || credential.user.email || '');
       window.location.replace('otp.html');

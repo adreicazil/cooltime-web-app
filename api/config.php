@@ -327,12 +327,12 @@ function createOtpSession(string $uid, int $expiresAt): void
 
 function otpStoragePath(string $purpose, string $subject): string
 {
-    $directory = environment('OTP_STORAGE_DIR', false);
-    if ($directory === '') {
-        $directory = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'cooltime-otp';
-    }
-    if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
+    $directory = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . 'cooltime_otp';
+    if (!@is_dir($directory) && !@mkdir($directory, 0700, true) && !@is_dir($directory)) {
         throw new RuntimeException('Unable to prepare OTP file storage.');
+    }
+    if (!@is_dir($directory) || !@is_writable($directory)) {
+        throw new RuntimeException('OTP file storage is not writable.');
     }
     return rtrim($directory, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . hash('sha256', "{$purpose}|{$subject}") . '.json';
 }
@@ -432,8 +432,8 @@ function sendResendEmail(string $email, string $subject, string $html, string $t
             'Content-Type: application/json',
         ],
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CONNECTTIMEOUT => 5,
-        CURLOPT_TIMEOUT => 15,
+        CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_TIMEOUT => 12,
         CURLOPT_SSL_VERIFYPEER => true,
         CURLOPT_SSL_VERIFYHOST => 2,
     ]);
@@ -776,7 +776,7 @@ function secureHttpRequest(string $url, string $method = 'GET', array $headers =
     if ($curl === false) throw new RuntimeException('Could not initialize an HTTPS request.');
     $options = [
         CURLOPT_CUSTOMREQUEST => strtoupper($method), CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CONNECTTIMEOUT => min(8, $timeout), CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_TIMEOUT => 12,
         CURLOPT_HTTPHEADER => $headers, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2,
     ];
     if ($content !== null) $options[CURLOPT_POSTFIELDS] = $content;
