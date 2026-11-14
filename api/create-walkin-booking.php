@@ -109,7 +109,7 @@ try {
     $paymentStatus=$method==='cash_otc'?'unpaid':'pending';
     $bookingId='walkin_'.bin2hex(random_bytes(12)); $invoiceId='walkin_inv_'.bin2hex(random_bytes(12));
     $now=gmdate('Y-m-d\\TH:i:s\\Z');
-    $reference=cooltimeReferenceNumber($method==='cash_otc'?'OTC':'PMO',$branch);
+    $reference=cooltimeReferenceNumber($method==='cash_otc'?'OTC':'PMO',$branch,$date);
     $bookingFields=[
       'bookingId'=>['stringValue'=>$bookingId],'customerId'=>['stringValue'=>''],'customerName'=>['stringValue'=>$name],'customerEmail'=>['stringValue'=>$email],
       'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'branchId'=>['stringValue'=>$branchId],'branch'=>['stringValue'=>$branch],

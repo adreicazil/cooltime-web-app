@@ -37,6 +37,8 @@ if (bookingForm) {
       }
       const result = await createBooking({
         customerId: user.uid,
+        userId: user.uid,
+        email: String(user.email || '').toLowerCase(),
         customerEmail: user.email,
         branchId: formData.get('branchId'),
         serviceId: formData.get('serviceType'),

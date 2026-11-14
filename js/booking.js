@@ -130,16 +130,45 @@ function escapeHtml(value) {
 let billServices = [];
 let latestInvoiceSnapshot = null;
 let stopInvoiceListener = null;
+let runningBillsCurrentPage = 1;
+let runningBillsHasInitialSnapshot = false;
+let runningBillsKnownIds = new Set();
 const billMoney = (amount) => `PHP ${Number(amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function renderInvoices(snapshot) {
   latestInvoiceSnapshot = snapshot;
-  window.dispatchEvent(new CustomEvent('customer:invoices', { detail: snapshot.docs.map((item) => ({ ...item.data(), id: item.id })) }));
+  const invoiceRecords = snapshot.docs.map((item) => ({ id: item.id, data: item.data() }));
+  const addedIds = invoiceRecords.filter(({ id }) => !runningBillsKnownIds.has(id)).map(({ id }) => id);
+  const justAdded = runningBillsHasInitialSnapshot && addedIds.length > 0;
+  runningBillsKnownIds = new Set(invoiceRecords.map(({ id }) => id));
+  runningBillsHasInitialSnapshot = true;
+  const pendingTimestamp = Date.now();
+  const createdAtMillis = (invoice) => {
+    const value = Object.hasOwn(invoice, 'createdAt') ? invoice.createdAt : invoice.created_at;
+    if (value == null) return pendingTimestamp;
+    if (typeof value?.toMillis === 'function') return value.toMillis();
+    if (typeof value?.toDate === 'function') return value.toDate().getTime();
+    if (typeof value === 'number') return Math.abs(value) < 1e12 ? value * 1000 : value;
+    if (typeof value === 'string') {
+      const numeric = Number(value);
+      if (value.trim() && Number.isFinite(numeric)) return Math.abs(numeric) < 1e12 ? numeric * 1000 : numeric;
+      const parsed = Date.parse(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    return pendingTimestamp;
+  };
+  invoiceRecords.sort((a, b) => createdAtMillis(a.data) - createdAtMillis(b.data));
+  const totalPages = Math.max(1, Math.ceil(invoiceRecords.length / PAGE_SIZE));
+  if (justAdded) runningBillsCurrentPage = totalPages;
+  else runningBillsCurrentPage = Math.min(Math.max(1, runningBillsCurrentPage), totalPages);
+  const pagination = document.getElementById('customerInvoicesPagination');
+  if (pagination) pagination.innerHTML = renderCustomerPagination(runningBillsCurrentPage, totalPages);
+  window.dispatchEvent(new CustomEvent('customer:invoices', { detail: invoiceRecords.map(({ id, data }) => ({ ...data, id })) }));
   const list = document.getElementById('customerInvoices');
   if (!list) return;
-  if (snapshot.empty) { list.textContent = 'No running bills yet. A bill will appear after you submit a booking.'; return; }
-  list.innerHTML = snapshot.docs.map((item, index) => {
-    const invoice = item.data();
+  if (!invoiceRecords.length) { list.textContent = 'No running bills yet. A bill will appear after you submit a booking.'; return; }
+  const firstIndex = (runningBillsCurrentPage - 1) * PAGE_SIZE;
+  list.innerHTML = invoiceRecords.slice(firstIndex, firstIndex + PAGE_SIZE).map(({ id, data: invoice }, index) => {
     const amount = Number(invoice.runningTotal ?? invoice.totalAmount ?? invoice.finalAmount ?? 0);
     const rawStatus = String(invoice.status || 'pending');
     const serviceStatus = String(invoice.serviceStatus || 'pending').toLowerCase();
@@ -152,13 +181,13 @@ function renderInvoices(snapshot) {
     const closed = paid || cancelled;
     const balance = paid || cancelled ? 0 : Math.max(0, balanceDue);
     const lines = Array.isArray(invoice.serviceDetails) ? invoice.serviceDetails : [];
-    const referenceNumber = invoice.referenceNumber || invoice.invoiceNumber || item.id;
+    const referenceNumber = invoice.referenceNumber || invoice.invoiceNumber || id;
     const lineHtml = lines.map((line) => `<li>${escapeHtml(line.name || line.id)} <span>x ${Number(line.quantity || 1)} · ${billMoney(line.lineTotal ?? Number(line.price || 0) * Number(line.quantity || 1))}</span></li>`).join('');
-    const addControl = closed ? '' : `<div class="bill-add-service"><label for="add-service-${escapeHtml(item.id)}">Add a service</label><div class="bill-add-controls" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;"><select id="add-service-${escapeHtml(item.id)}" class="bill-service-select"><option value="">Choose service</option>${billServices.map((service) => `<option value="${escapeHtml(service.id)}">${escapeHtml(service.name)} - ${billMoney(service.price)}</option>`).join('')}</select><button class="btn btn-secondary bill-add" data-invoice-id="${escapeHtml(item.id)}" type="button">Add to bill</button></div></div>`;
+    const addControl = closed ? '' : `<div class="bill-add-service"><label for="add-service-${escapeHtml(id)}">Add a service</label><div class="bill-add-controls" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;"><select id="add-service-${escapeHtml(id)}" class="bill-service-select"><option value="">Choose service</option>${billServices.map((service) => `<option value="${escapeHtml(service.id)}">${escapeHtml(service.name)} - ${billMoney(service.price)}</option>`).join('')}</select><button class="btn btn-secondary bill-add" data-invoice-id="${escapeHtml(id)}" type="button">Add to bill</button></div></div>`;
     const created = invoice.createdAt?.toDate?.() || (invoice.createdAt ? new Date(invoice.createdAt) : null);
     const date = created && !Number.isNaN(created.getTime()) ? created.toISOString().slice(0, 10) : (invoice.date || 'Date unavailable');
-    const detailId = `invoice-details-${escapeHtml(item.id)}`;
-    return `<article class="invoice-row running-bill" data-invoice-id="${escapeHtml(item.id)}"><div class="bill-summary"><span class="bill-index">${index + 1}</span><button class="bill-invoice-toggle" type="button" aria-expanded="false" aria-controls="${detailId}" aria-label="Show details for invoice ${escapeHtml(referenceNumber)}"><span class="invoice-meta-col"><span class="invoice-id-text">${escapeHtml(referenceNumber)}</span><span class="invoice-date-text">${escapeHtml(date)}</span></span></button><strong class="bill-amount">${billMoney(amount)}</strong><span class="bill-status ${escapeHtml(statusKey)}">${escapeHtml(status)}</span>${!closed ? `<button class="btn btn-primary invoice-pay bill-summary-pay" type="button" data-invoice-id="${escapeHtml(item.id)}">Pay balance</button>` : '<span class="bill-summary-pay-placeholder" aria-hidden="true"></span>'}</div><div class="bill-breakdown-panel" id="${detailId}" aria-hidden="true" inert><p><strong>Reference ID:</strong> ${escapeHtml(referenceNumber)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${escapeHtml(referenceNumber)}">Copy</button></p><ul class="bill-lines">${lineHtml || '<li>No services added.</li>'}</ul><div class="bill-totals"><span>Running total</span><strong>${billMoney(amount)}</strong>${downpayment > 0 ? `<span>Downpayment credited</span><strong>- ${billMoney(downpayment)}</strong>` : ''}<span>Balance due</span><strong>${billMoney(balance)}</strong></div>${addControl}</div></article>`;
+    const detailId = `invoice-details-${escapeHtml(id)}`;
+    return `<article class="invoice-row running-bill" data-invoice-id="${escapeHtml(id)}"><div class="bill-summary"><span class="bill-index">${firstIndex + index + 1}</span><button class="bill-invoice-toggle" type="button" aria-expanded="false" aria-controls="${detailId}" aria-label="Show details for invoice ${escapeHtml(referenceNumber)}"><span class="invoice-meta-col"><span class="invoice-id-text">${escapeHtml(referenceNumber)}</span><span class="invoice-date-text">${escapeHtml(date)}</span></span></button><strong class="bill-amount">${billMoney(amount)}</strong><span class="bill-status ${escapeHtml(statusKey)}">${escapeHtml(status)}</span>${!closed ? `<button class="btn btn-primary invoice-pay bill-summary-pay" type="button" data-invoice-id="${escapeHtml(id)}">Pay balance</button>` : '<span class="bill-summary-pay-placeholder" aria-hidden="true"></span>'}</div><div class="bill-breakdown-panel" id="${detailId}" aria-hidden="true" inert><p><strong>Reference ID:</strong> ${escapeHtml(referenceNumber)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${escapeHtml(referenceNumber)}">Copy</button></p><ul class="bill-lines">${lineHtml || '<li>No services added.</li>'}</ul><div class="bill-totals"><span>Running total</span><strong>${billMoney(amount)}</strong>${downpayment > 0 ? `<span>Downpayment credited</span><strong>- ${billMoney(downpayment)}</strong>` : ''}<span>Balance due</span><strong>${billMoney(balance)}</strong></div>${addControl}</div></article>`;
   }).join('');
 }
 
@@ -235,16 +264,46 @@ async function refreshInvoicesFromServer(user) {
 }
 
 let stopCustomerServiceCatalog = null;
-let stopCustomerBookingListener = null;
-let currentBookingPage = 1;
+let stopCustomerBookingListeners = [];
+let bookingsCurrentPage = 1;
 const PAGE_SIZE = 15;
 let currentBookingCount = 0;
 let rerenderCustomerBookings = null;
 let latestSubmittedBookingId = null;
+const optimisticBookingRecords = new Map();
 
 function readableServiceFallback(serviceId) {
   return String(serviceId || '').replace(/^svc[_-]?/i, '').replace(/[_-]+/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase()) || 'Service';
+}
+
+function bookingCreatedAtMs(booking, pendingTimestamp) {
+  const raw = Object.hasOwn(booking, 'createdAt') ? booking.createdAt : (booking.created_at ?? booking.timestamp);
+  if (raw == null) return pendingTimestamp;
+  if (typeof raw?.toMillis === 'function') return raw.toMillis();
+  if (typeof raw?.toDate === 'function') return raw.toDate().getTime();
+  if (typeof raw === 'number') return Math.abs(raw) < 1e12 ? raw * 1000 : raw;
+  if (typeof raw === 'string') {
+    const numeric = Number(raw);
+    if (raw.trim() && Number.isFinite(numeric)) return Math.abs(numeric) < 1e12 ? numeric * 1000 : numeric;
+    const parsed = Date.parse(raw);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return pendingTimestamp;
+}
+
+function bookingCreatedDate(booking) {
+  const raw = booking.createdAt ?? booking.created_at ?? booking.timestamp;
+  let date = null;
+  if (raw?.toDate && typeof raw.toDate === 'function') date = raw.toDate();
+  else if (typeof raw === 'number') date = new Date(raw);
+  else if (typeof raw === 'string' && raw.trim()) date = new Date(raw);
+  if (!date || Number.isNaN(date.getTime())) date = new Date();
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
 }
 
 function renderCustomerBookings(records, serviceCatalog, vehicleData, branchCatalog, user, profile, target) {
@@ -267,21 +326,13 @@ function renderCustomerBookings(records, serviceCatalog, vehicleData, branchCata
   });
   window.dispatchEvent(new CustomEvent('customer:bookings', { detail: bookingData }));
   const pagination = document.getElementById('customerBookingsPagination');
-  const pageInput = document.getElementById('customerBookingsPage');
   const totalPages = Math.max(1, Math.ceil(bookingData.length / PAGE_SIZE));
   currentBookingCount = bookingData.length;
-  currentBookingPage = Math.min(Math.max(1, currentBookingPage), totalPages);
-  if (pagination) pagination.hidden = bookingData.length <= PAGE_SIZE;
-  if (pageInput) { pageInput.max = String(totalPages); pageInput.value = String(currentBookingPage); }
-  const totalPagesLabel = document.getElementById('customerBookingsTotalPages');
-  if (totalPagesLabel) totalPagesLabel.textContent = String(totalPages);
-  const previous = pagination?.querySelector('[data-page-step="-1"]');
-  const next = pagination?.querySelector('[data-page-step="1"]');
-  if (previous) previous.disabled = currentBookingPage <= 1;
-  if (next) next.disabled = currentBookingPage >= totalPages;
+  bookingsCurrentPage = Math.min(Math.max(1, bookingsCurrentPage), totalPages);
+  if (pagination) pagination.innerHTML = renderCustomerPagination(bookingsCurrentPage, totalPages);
   if (!bookingData.length) { target.innerHTML = '<p class="customer-bookings-empty">No bookings yet.</p>'; return; }
   const name = profile?.name || profile?.username || 'Customer';
-  const pageBookings = bookingData.slice((currentBookingPage - 1) * PAGE_SIZE, currentBookingPage * PAGE_SIZE);
+  const pageBookings = bookingData.slice((bookingsCurrentPage - 1) * PAGE_SIZE, bookingsCurrentPage * PAGE_SIZE);
   target.innerHTML = pageBookings.map((booking, index) => {
     const rawStatus = String(booking.status || 'pending');
     const rawStatusKey = rawStatus.toLowerCase().replace(/[^a-z0-9-]/g, '-');
@@ -302,6 +353,7 @@ function renderCustomerBookings(records, serviceCatalog, vehicleData, branchCata
     const href = `mailto:cooltimeautoaircon@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     const cancelControl = statusKey === 'ongoing' ? `<a class="btn booking-cancel-link" href="${href}">Cancel</a>` : '<span class="booking-action-spacer" aria-hidden="true"></span>';
     const detailsId = `booking-details-${escapeHtml(booking.id)}`;
+    const createdDate = bookingCreatedDate(booking);
     const referenceNumber = booking.referenceNumber || booking.invoiceNumber || booking.id;
     const details = [
       ['Reference ID', referenceNumber], ['Customer name', booking.customerName || name], ['Customer email', booking.customerEmail || 'Email unavailable'],
@@ -313,7 +365,7 @@ function renderCustomerBookings(records, serviceCatalog, vehicleData, branchCata
     ].map(([label, value]) => `<div class="booking-detail-field"><div class="booking-detail-label">${escapeHtml(label)}</div><div class="booking-detail-value">${escapeHtml(value)}</div></div>`).join('');
     const rescheduleControl = ['pending', 'confirmed'].includes(statusKey)
       ? `<button class="booking-reschedule-link" type="button" data-booking-id="${escapeHtml(booking.id)}" data-date="${escapeHtml(booking.date || '')}" data-time="${escapeHtml(booking.timeSlot || '')}">Request reschedule</button>` : '';
-    return `<article class="customer-booking-row booking-status-${escapeHtml(statusKey)}" data-booking-id="${escapeHtml(booking.id)}"><div class="booking-row-main"><button class="booking-summary-toggle" type="button" aria-expanded="false" aria-controls="${detailsId}"><span class="booking-index">${(currentBookingPage - 1) * PAGE_SIZE + index + 1}</span><span class="booking-summary-meta"><strong>${escapeHtml(booking.serviceName)}</strong><small>${escapeHtml(booking.date || 'Date unavailable')} - ${escapeHtml(booking.timeSlot || '')}</small></span></button><span class="customer-booking-status ${escapeHtml(statusKey)}">${escapeHtml(status)}</span>${cancelControl}</div><div class="booking-details-panel" id="${detailsId}" aria-hidden="true" inert><div class="booking-details booking-expanded-grid">${details}</div><p><strong>Reference ID:</strong> ${escapeHtml(referenceNumber)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${escapeHtml(referenceNumber)}">Copy</button></p>${rescheduleControl}</div></article>`;
+    return `<article class="customer-booking-row booking-status-${escapeHtml(statusKey)}" data-booking-id="${escapeHtml(booking.id)}"><div class="booking-row-main"><button class="booking-summary-toggle" type="button" aria-expanded="false" aria-controls="${detailsId}"><span class="booking-index">${(bookingsCurrentPage - 1) * PAGE_SIZE + index + 1}</span><span class="booking-summary-meta"><strong>${escapeHtml(booking.serviceName)}</strong><small>${escapeHtml(createdDate)}</small></span></button><span class="customer-booking-status ${escapeHtml(statusKey)}">${escapeHtml(status)}</span>${cancelControl}</div><div class="booking-details-panel" id="${detailsId}" aria-hidden="true" inert><div class="booking-details booking-expanded-grid">${details}</div><p><strong>Reference ID:</strong> ${escapeHtml(referenceNumber)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${escapeHtml(referenceNumber)}">Copy</button></p>${rescheduleControl}</div></article>`;
   }).join('');
 }
 
@@ -330,7 +382,6 @@ async function loadCustomerBookings(user, profile) {
     let records = [];
     let serviceCatalog = {};
     const render = () => renderCustomerBookings(records, serviceCatalog, vehicleData, branchCatalog, user, profile, target);
-    rerenderCustomerBookings = render;
     stopCustomerServiceCatalog?.();
     stopCustomerServiceCatalog = onSnapshot(collection(db, 'services'), (snapshot) => {
       serviceCatalog = Object.fromEntries(snapshot.docs.map((item) => [item.id, { ...item.data() }]));
@@ -340,42 +391,124 @@ async function loadCustomerBookings(user, profile) {
       serviceCatalog = {};
       render();
     });
-    stopCustomerBookingListener?.();
-    stopCustomerBookingListener = onSnapshot(query(collection(db, 'bookings'), where('customerId', '==', user.uid)), (snapshot) => {
-      records = snapshot.docs.map((item) => ({ id: item.id, data: item.data() }))
+    stopCustomerBookingListeners.forEach((stop) => stop());
+    const normalizedEmail = String(user.email || profile?.email || '').trim().toLowerCase();
+    const emailValues = [...new Set([String(user.email || profile?.email || '').trim(), normalizedEmail].filter(Boolean))];
+    const bookingQueries = [
+      query(collection(db, 'bookings'), where('customerId', '==', user.uid)),
+      query(collection(db, 'bookings'), where('userId', '==', user.uid)),
+      ...emailValues.flatMap((email) => [
+        query(collection(db, 'bookings'), where('email', '==', email)),
+        query(collection(db, 'bookings'), where('customerEmail', '==', email))
+      ])
+    ];
+    const snapshotsByQuery = new Map();
+    const renderMerged = () => {
+      const uniqueRecords = new Map();
+      snapshotsByQuery.forEach((snapshot) => snapshot.docs.forEach((item) => {
+        if (!uniqueRecords.has(item.id)) uniqueRecords.set(item.id, { id: item.id, data: item.data() });
+      }));
+      snapshotsByQuery.forEach((snapshot) => snapshot.docs.forEach((item) => {
+        if (!item.metadata?.hasPendingWrites) optimisticBookingRecords.delete(item.id);
+      }));
+      optimisticBookingRecords.forEach((data, id) => {
+        if (!uniqueRecords.has(id)) uniqueRecords.set(id, { id, data });
+      });
+      const pendingTimestamp = Date.now();
+      records = [...uniqueRecords.values()]
+        .map((record) => ({ ...record, createdAtMs: bookingCreatedAtMs(record.data, pendingTimestamp) }))
         .sort((a, b) => {
-          if (a.id === latestSubmittedBookingId) return -1;
-          if (b.id === latestSubmittedBookingId) return 1;
-          const timestamp = (record) => record.data.createdAt?.toMillis?.() || new Date(record.data.createdAt || record.data.date || 0).getTime() || 0;
-          return timestamp(b) - timestamp(a);
+          const chronological = a.createdAtMs - b.createdAtMs;
+          if (chronological !== 0) return chronological;
+          if (a.id === latestSubmittedBookingId && a.data.createdAt == null) return 1;
+          if (b.id === latestSubmittedBookingId && b.data.createdAt == null) return -1;
+          return 0;
         });
       render();
+    };
+    rerenderCustomerBookings = renderMerged;
+    stopCustomerBookingListeners = bookingQueries.map((bookingQuery, index) => onSnapshot(bookingQuery, (snapshot) => {
+      snapshotsByQuery.set(index, snapshot);
+      renderMerged();
     }, (error) => {
-      console.error('Customer bookings could not be refreshed:', error);
-      target.textContent = 'Bookings are temporarily unavailable.';
-    });
+      console.error('Customer booking query could not be refreshed:', error);
+      snapshotsByQuery.delete(index);
+      renderMerged();
+      if (!snapshotsByQuery.size) target.textContent = 'Bookings are temporarily unavailable.';
+    }));
   } catch (error) {
     console.error('Customer bookings could not be loaded:', error);
     target.textContent = 'Bookings are temporarily unavailable.';
   }
 }
 
-const bookingsPagination = document.getElementById('customerBookingsPagination');
-const bookingsPageInput = document.getElementById('customerBookingsPage');
 function goToBookingPage(value) {
   const total = Math.max(1, Math.ceil(currentBookingCount / PAGE_SIZE));
   const parsed = Number.parseInt(value, 10);
-  currentBookingPage = Math.min(total, Math.max(1, Number.isFinite(parsed) ? parsed : 1));
-  if (bookingsPageInput) bookingsPageInput.value = String(currentBookingPage);
+  bookingsCurrentPage = Math.min(total, Math.max(1, Number.isFinite(parsed) ? parsed : 1));
   rerenderCustomerBookings?.();
 }
-bookingsPagination?.addEventListener('click', (event) => {
-  const button = event.target.closest('[data-page-step]');
-  if (button && !button.disabled) goToBookingPage(currentBookingPage + Number(button.dataset.pageStep));
+function goToRunningBillsPage(value) {
+  const total = Math.max(1, Math.ceil(runningBillsKnownIds.size / PAGE_SIZE));
+  const parsed = Number.parseInt(value, 10);
+  runningBillsCurrentPage = Math.min(total, Math.max(1, Number.isFinite(parsed) ? parsed : 1));
+  if (latestInvoiceSnapshot) renderInvoices(latestInvoiceSnapshot);
+}
+function renderCustomerPagination(page, total) {
+  const buttonStyle = (disabled) => `width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;border-radius:50%!important;border:1px solid rgba(255,255,255,.25)!important;background:transparent!important;color:#8da4c4!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:0!important;line-height:1!important;${disabled ? 'opacity:.3!important;cursor:not-allowed!important;' : 'cursor:pointer!important;'}`;
+  return `<div class="pagination-bottom-right-wrapper" style="display:flex!important;justify-content:flex-end!important;align-items:center!important;width:100%!important;margin-top:auto!important;padding-top:20px!important;text-align:right!important"><div style="display:inline-flex!important;align-items:center!important;gap:10px!important;margin-left:auto!important"><button type="button" class="pagination-circle-btn btn-prev-page" style="${buttonStyle(page === 1)}" ${page === 1 ? 'disabled' : ''} aria-label="Previous page"><span style="font-size:.85rem!important;line-height:1!important;font-weight:600!important">&lt;</span></button><span style="color:#fff!important;font-weight:700!important;font-size:.95rem!important;letter-spacing:.3px!important;white-space:nowrap!important;margin:0 4px!important">Page <span class="current-page-num" style="color:#38bdf8!important;text-decoration:underline!important;text-underline-offset:3px!important;cursor:pointer!important;font-weight:700!important" title="Click to jump to page">${page}</span> of ${total}</span><button type="button" class="pagination-circle-btn btn-next-page" style="${buttonStyle(page === total)}" ${page === total ? 'disabled' : ''} aria-label="Next page"><span style="font-size:.85rem!important;line-height:1!important;font-weight:600!important">&gt;</span></button></div></div>`;
+}
+
+document.getElementById('customerBookingsPagination')?.addEventListener('click', (event) => {
+  if (event.target.closest('.btn-prev-page')) { goToBookingPage(bookingsCurrentPage - 1); return; }
+  if (event.target.closest('.btn-next-page')) { goToBookingPage(bookingsCurrentPage + 1); return; }
+  const pageDisplay = event.target.closest('.current-page-num');
+  if (!pageDisplay) return;
+  const totalPages = Math.max(1, Math.ceil(currentBookingCount / PAGE_SIZE));
+  const input = document.createElement('input');
+  input.type = 'number'; input.min = '1'; input.max = String(totalPages); input.value = String(bookingsCurrentPage);
+  input.className = 'report-page-input';
+  input.setAttribute('aria-label', `Page number, 1 to ${totalPages}`);
+  input.style.cssText = 'width:45px;height:24px;font-size:.85rem;text-align:center;background:rgba(255,255,255,.15);color:#fff;border:1px solid #38bdf8;border-radius:4px;outline:none;padding:0';
+  pageDisplay.replaceWith(input); input.focus(); input.select();
+  let finished = false;
+  const finish = (commit) => {
+    if (finished) return;
+    finished = true;
+    if (commit) goToBookingPage(input.value);
+    else rerenderCustomerBookings?.();
+  };
+  input.addEventListener('keydown', (keyEvent) => {
+    if (keyEvent.key === 'Enter') { keyEvent.preventDefault(); finish(true); }
+    if (keyEvent.key === 'Escape') { keyEvent.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true), { once: true });
 });
-bookingsPageInput?.addEventListener('change', () => goToBookingPage(bookingsPageInput.value));
-bookingsPageInput?.addEventListener('keydown', (event) => {
-  if (event.key === 'Enter') { event.preventDefault(); goToBookingPage(bookingsPageInput.value); }
+
+document.getElementById('customerInvoicesPagination')?.addEventListener('click', (event) => {
+  if (event.target.closest('.btn-prev-page')) { goToRunningBillsPage(runningBillsCurrentPage - 1); return; }
+  if (event.target.closest('.btn-next-page')) { goToRunningBillsPage(runningBillsCurrentPage + 1); return; }
+  const pageDisplay = event.target.closest('.current-page-num');
+  if (!pageDisplay) return;
+  const totalPages = Math.max(1, Math.ceil(runningBillsKnownIds.size / PAGE_SIZE));
+  const input = document.createElement('input');
+  input.type = 'number'; input.min = '1'; input.max = String(totalPages); input.value = String(runningBillsCurrentPage);
+  input.className = 'report-page-input';
+  input.setAttribute('aria-label', `Page number, 1 to ${totalPages}`);
+  input.style.cssText = 'width:45px;height:24px;font-size:.85rem;text-align:center;background:rgba(255,255,255,.15);color:#fff;border:1px solid #38bdf8;border-radius:4px;outline:none;padding:0';
+  pageDisplay.replaceWith(input); input.focus(); input.select();
+  let finished = false;
+  const finish = (commit) => {
+    if (finished) return;
+    finished = true;
+    if (commit) goToRunningBillsPage(input.value);
+    else if (latestInvoiceSnapshot) renderInvoices(latestInvoiceSnapshot);
+  };
+  input.addEventListener('keydown', (keyEvent) => {
+    if (keyEvent.key === 'Enter') { keyEvent.preventDefault(); finish(true); }
+    if (keyEvent.key === 'Escape') { keyEvent.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true), { once: true });
 });
 
 const rescheduleDialog = document.getElementById('rescheduleModal');
@@ -581,8 +714,13 @@ if (form) {
     submitButton.disabled = true;
     try {
       const data = new FormData(form);
-      const result = await createBooking({ customerId: access.user.uid, branchId: data.get('branchId'), serviceId: data.get('serviceType'), date: data.get('appointmentDate'), timeSlot: data.get('timeSlot'), vehicle: { plateNumber: data.get('plateNumber'), make: data.get('vehicleMake'), model: data.get('vehicleModel'), year: data.get('vehicleYear') } });
+      const bookingEmail = String(access.user.email || '').trim().toLowerCase();
+      const result = await createBooking({ customerId: access.user.uid, userId: access.user.uid, email: bookingEmail, customerEmail: bookingEmail, branchId: data.get('branchId'), serviceId: data.get('serviceType'), date: data.get('appointmentDate'), timeSlot: data.get('timeSlot'), vehicle: { plateNumber: data.get('plateNumber'), make: data.get('vehicleMake'), model: data.get('vehicleModel'), year: data.get('vehicleYear') } });
       latestSubmittedBookingId = result.bookingId;
+      if (result.booking) optimisticBookingRecords.set(result.bookingId, result.booking);
+      rerenderCustomerBookings?.();
+      bookingsCurrentPage = Math.max(1, Math.ceil(currentBookingCount / PAGE_SIZE));
+      rerenderCustomerBookings?.();
       let invoice;
       try { invoice = await createWebInvoice(result.bookingId, access.user); }
       catch (error) { alert(`Booking ${result.bookingId} was saved, but invoice creation failed: ${error.message}`); return; }
@@ -595,7 +733,7 @@ if (form) {
       } catch (notificationError) {
         console.error('Booking notification dispatch failed:', notificationError);
       }
-      currentBookingPage = 1;
+      bookingsCurrentPage = Math.max(1, Math.ceil(currentBookingCount / PAGE_SIZE));
       rerenderCustomerBookings?.();
       await loadInvoices(access.user);
       alert(`Booking submitted. Reference ID ${invoice.referenceNumber || invoice.invoiceId} is in your running bills. You can add services there and pay when the bill is ready.`);

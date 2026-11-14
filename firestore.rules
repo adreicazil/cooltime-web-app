@@ -44,7 +44,12 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isSignedIn() && resource.data.customerId == request.auth.uid);
     }
     match /bookings/{bookingId} {
-      allow read: if isAdmin() || (isSignedIn() && resource.data.customerId == request.auth.uid);
+      allow read: if isAdmin() || (isSignedIn() && (
+        resource.data.get('customerId', '') == request.auth.uid
+        || resource.data.get('userId', '') == request.auth.uid
+        || resource.data.get('email', '') == request.auth.token.email
+        || resource.data.get('customerEmail', '') == request.auth.token.email
+      ));
       allow create: if isAdmin() || (isSignedIn() && request.resource.data.customerId == request.auth.uid);
       allow update, delete: if isAdmin();
     }

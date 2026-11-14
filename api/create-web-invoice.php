@@ -42,13 +42,14 @@ try {
     $existing = invoiceReadFields($account, 'invoices', $invoiceId);
     if ($existing) {
         $referenceNumber = (string)($existing['referenceNumber'] ?? $existing['invoiceNumber'] ?? $booking['referenceNumber'] ?? $booking['invoiceNumber'] ?? '');
-        if ($referenceNumber === '') {
-            $referenceNumber = cooltimeReferenceNumber('PMO', (string)($booking['branchId'] ?? ''));
+        $appointmentDate = (string)($booking['date'] ?? $booking['appointmentDate'] ?? '');
+        if (!preg_match('/^PMO-[A-Z]{3}-' . preg_quote(str_replace('-', '', $appointmentDate), '/') . '-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/', $referenceNumber)) {
+            $referenceNumber = cooltimeReferenceNumber('PMO', (string)($booking['branchId'] ?? ''), $appointmentDate);
             firestorePatchDocument($account, 'invoices', $invoiceId, [
                 'referenceNumber' => ['stringValue' => $referenceNumber], 'invoiceNumber' => ['stringValue' => $referenceNumber],
             ]);
         }
-        if (empty($booking['referenceNumber'])) firestorePatchDocument($account, 'bookings', $bookingId, [
+        if (($booking['referenceNumber'] ?? '') !== $referenceNumber || ($booking['invoiceNumber'] ?? '') !== $referenceNumber) firestorePatchDocument($account, 'bookings', $bookingId, [
             'referenceNumber' => ['stringValue' => $referenceNumber], 'invoiceNumber' => ['stringValue' => $referenceNumber],
         ]);
         jsonResponse(['ok' => true, 'invoiceId' => $invoiceId, 'referenceNumber' => $referenceNumber]);
@@ -71,8 +72,9 @@ try {
     $serviceName = (string) ($service['name'] ?? $serviceId);
     $now = gmdate('Y-m-d\TH:i:s\Z');
     $referenceNumber = (string)($booking['referenceNumber'] ?? $booking['invoiceNumber'] ?? '');
-    if (!preg_match('/^PMO-[A-Z]{3}-\d{8}-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/', $referenceNumber)) {
-        $referenceNumber = cooltimeReferenceNumber('PMO', (string)($booking['branchId'] ?? $branchId));
+    $appointmentDate = (string)($booking['date'] ?? $booking['appointmentDate'] ?? '');
+    if (!preg_match('/^PMO-[A-Z]{3}-' . preg_quote(str_replace('-', '', $appointmentDate), '/') . '-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/', $referenceNumber)) {
+        $referenceNumber = cooltimeReferenceNumber('PMO', (string)($booking['branchId'] ?? $branchId), $appointmentDate);
     }
     firestorePatchDocument($account, 'invoices', $invoiceId, [
         'invoiceId' => ['stringValue' => $invoiceId],

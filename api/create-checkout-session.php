@@ -124,12 +124,17 @@ try {
     }
     $amountCentavos = (int) round($amountPesos * 100);
     if ($amountCentavos < 100) jsonResponse(['ok' => false, 'message' => 'Invoice amount must be at least ₱1.00.'], 400);
+    $booking = null;
+    $bookingId = (string)($invoice['bookingId'] ?? '');
+    if ($bookingId !== '' && preg_match('/^[A-Za-z0-9_-]{1,150}$/', $bookingId)) $booking = firestoreReadDocument($account, 'bookings', $bookingId);
+    $appointmentDate = (string)($invoice['date'] ?? $invoice['appointmentDate'] ?? $booking['date'] ?? $booking['appointmentDate'] ?? '');
+    if ($appointmentDate === '') $appointmentDate = (new DateTimeImmutable('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d');
+    $expectedDateCode = preg_match('/^\d{4}-\d{2}-\d{2}$/', $appointmentDate) ? str_replace('-', '', $appointmentDate) : '';
     $referenceNumber = (string)($invoice['referenceNumber'] ?? $invoice['invoiceNumber'] ?? '');
-    if (!preg_match('/^PMO-[A-Z]{3}-\d{8}-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/', $referenceNumber)) {
-        $referenceNumber = cooltimeReferenceNumber('PMO', (string)($invoice['branchId'] ?? ''));
+    if ($expectedDateCode === '' || !preg_match('/^PMO-[A-Z]{3}-' . preg_quote($expectedDateCode, '/') . '-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/', $referenceNumber)) {
+        $referenceNumber = cooltimeReferenceNumber('PMO', (string)($invoice['branchId'] ?? $booking['branchId'] ?? ''), $appointmentDate);
         $referenceFields = ['referenceNumber' => ['stringValue' => $referenceNumber], 'invoiceNumber' => ['stringValue' => $referenceNumber]];
         firestorePatchDocument($account, 'invoices', $invoiceId, $referenceFields);
-        $bookingId = (string)($invoice['bookingId'] ?? '');
         if ($bookingId !== '' && preg_match('/^[A-Za-z0-9_-]{1,150}$/', $bookingId)) {
             firestorePatchDocument($account, 'bookings', $bookingId, $referenceFields);
         }

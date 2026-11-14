@@ -74,7 +74,7 @@ export async function getCustomerInvoices(customerId) {
   });
 }
 
-export async function createBooking({ customerId, branchId, serviceId, date, timeSlot, vehicle }) {
+export async function createBooking({ customerId, userId = customerId, email, customerEmail, branchId, serviceId, date, timeSlot, vehicle }) {
   const vehicleRef = doc(collection(db, 'vehicles'));
   const bookingRef = doc(collection(db, 'bookings'));
   const vehicleData = {
@@ -86,17 +86,26 @@ export async function createBooking({ customerId, branchId, serviceId, date, tim
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
-  const referenceNumber = createReferenceNumber('PMO', branchId);
+  const referenceNumber = createReferenceNumber('PMO', branchId, date);
+  const normalizedEmail = String(email || customerEmail || '').trim().toLowerCase();
   const batch = writeBatch(db);
   batch.set(vehicleRef, vehicleData);
   batch.set(bookingRef, {
-    customerId, branchId: required(branchId, 'Branch'), serviceId: required(serviceId, 'Service'),
+    customerId, userId: userId || customerId, email: normalizedEmail, customerEmail: normalizedEmail,
+    branchId: required(branchId, 'Branch'), serviceId: required(serviceId, 'Service'),
     vehicleId: vehicleRef.id, date: required(date, 'Appointment date'), timeSlot: required(timeSlot, 'Time slot'),
     referenceNumber, invoiceNumber: referenceNumber,
     status: 'pending', createdAt: serverTimestamp(), updatedAt: serverTimestamp()
   });
   await batch.commit();
-  return { bookingId: bookingRef.id, vehicleId: vehicleRef.id };
+  return {
+    bookingId: bookingRef.id, vehicleId: vehicleRef.id,
+    booking: {
+      id: bookingRef.id, customerId, userId: userId || customerId, email: normalizedEmail, customerEmail: normalizedEmail,
+      branchId, serviceId, date, timeSlot, vehicleId: vehicleRef.id, vehicle,
+      referenceNumber, invoiceNumber: referenceNumber, status: 'pending', createdAt: null
+    }
+  };
 }
 
 export async function seedCoreCatalog() {

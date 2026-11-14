@@ -168,7 +168,7 @@ function paymongoReturnOrigin(): string
     return 'https://www.cooltimeautoaircon.online';
 }
 
-function cooltimeReferenceNumber(string $paymentSource, string $branch, ?DateTimeImmutable $createdAt = null): string
+function cooltimeReferenceNumber(string $paymentSource, string $branch, ?string $appointmentDate = null): string
 {
     $source = strtoupper(trim($paymentSource));
     if (!in_array($source, ['OTC', 'PMO'], true)) throw new InvalidArgumentException('Unsupported payment source for reference number.');
@@ -182,8 +182,16 @@ function cooltimeReferenceNumber(string $paymentSource, string $branch, ?DateTim
     $alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     $code = '';
     for ($i = 0; $i < 4; $i++) $code .= $alphabet[random_int(0, strlen($alphabet) - 1)];
-    $date = ($createdAt ?? new DateTimeImmutable('now', new DateTimeZone('Asia/Manila')))
-        ->setTimezone(new DateTimeZone('Asia/Manila'))->format('Ymd');
+    $timezone = new DateTimeZone('Asia/Manila');
+    if ($appointmentDate !== null && trim($appointmentDate) !== '') {
+        $scheduledDate = DateTimeImmutable::createFromFormat('!Y-m-d', trim($appointmentDate), $timezone);
+        if (!$scheduledDate || $scheduledDate->format('Y-m-d') !== trim($appointmentDate)) {
+            throw new InvalidArgumentException('A valid appointment date is required for the reference number.');
+        }
+    } else {
+        $scheduledDate = new DateTimeImmutable('now', $timezone);
+    }
+    $date = $scheduledDate->format('Ymd');
     return $source . '-' . $branchCode . '-' . $date . '-' . $code;
 }
 
@@ -832,6 +840,10 @@ function firestorePatchDocument(array $account, string $collection, string $docu
     $payload = json_encode(['fields' => $fields], JSON_THROW_ON_ERROR);
     $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id'])
         . '/databases/(default)/documents/' . rawurlencode($collection) . '/' . rawurlencode($documentId);
+    if ($fields) {
+        $fieldMasks = array_map(static fn(string $fieldPath): string => 'updateMask.fieldPaths=' . rawurlencode($fieldPath), array_keys($fields));
+        $url .= '?' . implode('&', $fieldMasks);
+    }
         $context = stream_context_create(['http' => [
             'method' => 'PATCH',
             'header' => "Authorization: Bearer " . firebaseAdminAccessToken() . "\r\nContent-Type: application/json",

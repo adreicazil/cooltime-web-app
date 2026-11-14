@@ -74,11 +74,7 @@
         <div class="booking-card-heading"><div><h2 id="bookingTitle">Bookings</h2><p>Book or cancel an appointment.</p></div><button class="btn booking-add-button" id="showBookingForm" type="button">Add new booking</button></div>
         <p id="paymentReturnNotice" role="status" aria-live="polite" hidden></p>
         <div id="customerBookings" class="customer-bookings-list" aria-live="polite">Loading bookings…</div>
-        <nav id="customerBookingsPagination" class="customer-bookings-pagination" aria-label="Bookings pages" hidden>
-          <button type="button" class="booking-page-button" data-page-step="-1" aria-label="Previous page">&lt;</button>
-          <label class="booking-page-label">Page <input id="customerBookingsPage" type="number" min="1" value="1" inputmode="numeric" aria-label="Current bookings page"> <span>of <span id="customerBookingsTotalPages">1</span></span></label>
-          <button type="button" class="booking-page-button" data-page-step="1" aria-label="Next page">&gt;</button>
-        </nav>
+        <div id="customerBookingsPagination" class="customer-bookings-pagination" role="group" aria-label="Bookings pages"></div>
         <form class="booking-create-form" id="bookingForm" hidden>
           <strong class="booking-form-index" id="bookingFormIndex" aria-hidden="true"></strong>
           <div class="booking-form-fields">
@@ -103,7 +99,7 @@
       </section>
     </section>
     <section id="runningBills" class="customer-view form-page customer-bills" aria-labelledby="invoicesTitle" hidden>
-      <div class="form-card"><h2 id="invoicesTitle">Running bills</h2><p>Track your charges as you add more services.</p><div id="customerInvoices" class="running-bills-container" aria-live="polite">Loading bills…</div></div>
+      <div class="form-card"><h2 id="invoicesTitle">Running bills</h2><p>Track your charges as you add more services.</p><div id="customerInvoices" class="running-bills-container" aria-live="polite">Loading bills…</div><div id="customerInvoicesPagination" class="customer-pagination-footer" role="group" aria-label="Running bills pages"></div></div>
     </section>
     </div>
 
