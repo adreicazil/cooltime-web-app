@@ -311,6 +311,23 @@ try {
         'payments' => $paymentUpdates,
     ]);
 
+    $bookingId = (string) ($invoice['bookingId'] ?? '');
+    $customerId = (string) ($invoice['customerId'] ?? '');
+    $customer = $customerId !== '' ? webhookReadDocument($account, 'users', $customerId) : null;
+    $booking = $bookingId !== '' ? webhookReadDocument($account, 'bookings', $bookingId) : null;
+    if ($customer && $booking) {
+        $customerEmail = strtolower(trim((string) ($customer['email'] ?? $booking['customerEmail'] ?? '')));
+        if (filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+            $booking['id'] = $bookingId;
+            $details = notificationBookingDetails($account, $booking);
+            $details['invoiceId'] = $reference;
+            $details['paymentStatus'] = 'paid';
+            $details['paymentBalance'] = 0;
+            $details['message'] = 'Payment confirmed: your payment for invoice ' . (string) ($invoice['referenceNumber'] ?? $invoice['invoiceNumber'] ?? $reference) . ' was received.';
+            notifyCustomerRecipient($account, 'payment_received_' . $reference, $customerId, $customerEmail, 'payment_received', $details['message'], $details, 'CoolTime payment confirmed');
+        }
+    }
+
     webhookResponse(['ok' => true]);
 } catch (Throwable $error) {
     error_log('PayMongo webhook processing failed: ' . $error->getMessage());

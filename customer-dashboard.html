@@ -26,7 +26,7 @@
       <a href="services.html">Services</a>
       <a href="contact.html">Contact Us</a>
       
-      <div id="auth-nav-container" class="auth-nav-container dashboard-auth-links"><a class="active-dashboard-link" data-auth-bookings href="customer-dashboard.html" hidden style="color:#38bdf8!important;font-weight:800!important;font-size:1rem;">My Dashboard</a><a id="customerLogoutBtn" data-auth-session data-authenticated="true" href="#">Log out</a></div>
+      <div id="auth-nav-container" class="auth-nav-container dashboard-auth-links"><a class="active-dashboard-link" data-auth-bookings href="customer-dashboard.html" hidden style="color:#38bdf8!important;font-weight:800!important;font-size:1rem;">My Dashboard</a><div class="customer-notification-bell-wrap" id="customerNotificationBellWrap"><button class="customer-notification-bell" id="customerNotificationBell" type="button" aria-label="Open notifications" aria-expanded="false" aria-controls="customerNotificationDropdown" hidden><img src="assets/bell.png" alt=""><span class="customer-notification-dot" id="customerNotificationDot" aria-hidden="true" hidden></span></button><div class="customer-notification-dropdown" id="customerNotificationDropdown" role="region" aria-label="Recent notifications" hidden><div class="customer-notification-dropdown-heading">Recent notifications</div><div class="customer-notification-preview-list" id="customerNotificationPreviewList" aria-live="polite"></div><button class="customer-notification-view-all" id="customerNotificationViewAll" type="button">View all notifications</button></div></div><a id="customerLogoutBtn" data-auth-session data-authenticated="true" href="#">Log out</a></div>
     </nav>
   </header>
   <main class="customer-dashboard" hidden>

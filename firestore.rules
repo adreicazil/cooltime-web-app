@@ -69,7 +69,13 @@ service cloud.firestore {
     match /staff/{staffId} { allow read, write: if isAdmin(); }
     match /notifications/{notificationId} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.get('userId', '') == request.auth.uid);
-      allow write: if isAdmin();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (isSignedIn()
+        && resource.data.get('userId', '') == request.auth.uid
+        && request.resource.data.get('userId', '') == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seen', 'readAt'])
+        && request.resource.data.get('seen', false) == true
+        && request.resource.data.get('readAt', request.time) is timestamp);
     }
     match /paymongo_intents/{intentId} { allow read, write: if isAdmin(); }
     match /feedback/{ticketId} { allow read, write: if isAdmin(); }

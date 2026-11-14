@@ -23,6 +23,18 @@ try {
     $details = notificationBookingDetails($account, $booking);
     if ($action === 'booking_created') {
         notifyNewBooking($account, $details);
+        $customerEmail = strtolower(trim((string) ($profile['email'] ?? $user['email'] ?? '')));
+        $details['message'] = 'Booking submitted: your service appointment request has been received.';
+        notifyCustomerRecipient(
+            $account,
+            'booking_submitted_' . $bookingId,
+            (string) $user['uid'],
+            $customerEmail,
+            'booking_submitted',
+            $details['message'],
+            $details,
+            'CoolTime booking received'
+        );
         jsonResponse(['ok' => true]);
     }
     if (!in_array(strtolower((string) ($booking['status'] ?? '')), ['pending', 'confirmed'], true)) {

@@ -1,5 +1,5 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-import { collection, onSnapshot, query, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { auth, authReady, db } from './firebase-config.js';
 import { hasOtpVerification } from './auth-guard.js';
 
@@ -36,9 +36,18 @@ let invoices = [];
 let bookings = [];
 let customerNotifications = [];
 let stopCustomerNotificationListener = null;
+let currentNotificationUserId = '';
+let seenNotificationIds = new Set();
+let notificationFallbackTimes = new Map();
 
 const notificationList = document.getElementById('customerNotifications');
 const notificationDialog = document.getElementById('notificationDetailModal');
+const notificationBellWrap = document.getElementById('customerNotificationBellWrap');
+const notificationBell = document.getElementById('customerNotificationBell');
+const notificationDot = document.getElementById('customerNotificationDot');
+const notificationDropdown = document.getElementById('customerNotificationDropdown');
+const notificationPreviewList = document.getElementById('customerNotificationPreviewList');
+const notificationViewAll = document.getElementById('customerNotificationViewAll');
 const notificationFields = [
   ['Customer Name', 'customerName'], ['Service Performed', 'serviceName'], ['Service Cost (PHP)', 'serviceCost'],
   ['Branch Location', 'branchName'], ['Scheduled Date', 'scheduledDate'], ['Scheduled Time', 'scheduledTime'],
@@ -52,15 +61,83 @@ function formatNotificationAmount(value) {
     : Number(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function notificationTime(item) {
+  for (const value of [item?.createdAt, item?.created_at, item?.timestamp]) {
+    if (value?.toDate) {
+      try {
+        const date = value.toDate();
+        if (!Number.isNaN(date.getTime())) return date;
+      } catch { /* Try the next available timestamp field. */ }
+    }
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) return date;
+    }
+    if (typeof value === 'string' && value.trim()) {
+      const date = new Date(value);
+      if (!Number.isNaN(date.getTime())) return date;
+    }
+  }
+  return new Date(item?._receivedAtFallbackMs || Date.now());
+}
+
+function notificationTimeMs(item) {
+  const date = notificationTime(item);
+  return date && !Number.isNaN(date.getTime()) ? date.getTime() : 0;
+}
+
+function notificationTimeLabel(item) {
+  const date = notificationTime(item);
+  return date.toLocaleString('en-US', {
+    month: '2-digit', day: '2-digit', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', second: '2-digit'
+  });
+}
+
+function notificationIsSeen(item) {
+  return item.seen === true || item.read === true || Boolean(item.readAt || item.seenAt) || seenNotificationIds.has(item.id);
+}
+
+function notificationStorageKey() {
+  return currentNotificationUserId ? `cooltime:seenNotifications:${currentNotificationUserId}` : '';
+}
+
+function persistSeenNotificationIds() {
+  const key = notificationStorageKey();
+  if (!key) return;
+  try { localStorage.setItem(key, JSON.stringify([...seenNotificationIds])); }
+  catch (error) { console.warn('Notification seen state could not be saved locally.', error); }
+}
+
+function updateNotificationBell() {
+  if (!notificationBell || !notificationDot) return;
+  const unreadCount = customerNotifications.filter((item) => !notificationIsSeen(item)).length;
+  notificationDot.hidden = unreadCount === 0;
+  notificationBell.setAttribute('aria-label', unreadCount ? `Open notifications, ${unreadCount} unread` : 'Open notifications');
+}
+
+function renderNotificationPreview() {
+  if (!notificationPreviewList) return;
+  const recent = [...customerNotifications].sort((a, b) => notificationTimeMs(b) - notificationTimeMs(a)).slice(0, 5);
+  notificationPreviewList.innerHTML = recent.length ? recent.map((item) => {
+    const message = item.message || item.title || 'Notification';
+    const category = String(item.type || 'notification').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+    const stamp = notificationTimeLabel(item);
+    return `<button type="button" class="customer-notification-preview-row" data-notification-id="${escapeHtml(item.id)}"><span class="customer-notification-preview-meta"><span class="customer-notification-category">${escapeHtml(category)}</span><time>${escapeHtml(stamp)}</time></span><span class="customer-notification-preview-message">${escapeHtml(message)}</span></button>`;
+  }).join('') : '<p class="customer-notification-preview-empty">You are all caught up.</p>';
+}
+
 function renderCustomerNotifications() {
   if (!notificationList) return;
   notificationList.innerHTML = customerNotifications.length
     ? customerNotifications.map((item, index) => {
-      const date = item.createdAt?.toDate?.() || (item.createdAt ? new Date(item.createdAt) : null);
-      const stamp = date && !Number.isNaN(date.getTime()) ? date.toLocaleString('en-PH') : '';
-      return `<button type="button" class="customer-notification-row" data-notification-index="${index}"><span>${escapeHtml(item.message || item.title || 'Notification')}</span>${stamp ? `<time>${escapeHtml(stamp)}</time>` : ''}</button>`;
+      const stamp = notificationTimeLabel(item);
+      const category = String(item.type || 'notification').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+      return `<button type="button" class="customer-notification-row" data-notification-index="${index}"><span class="customer-notification-full-message"><span class="customer-notification-full-meta"><span class="customer-notification-category">${escapeHtml(category)}</span><time>${escapeHtml(stamp)}</time></span><span class="customer-notification-full-text">${escapeHtml(item.message || item.title || 'Notification')}</span></span></button>`;
     }).join('')
     : '<p class="customer-notification-empty">No notifications yet.</p>';
+  renderNotificationPreview();
+  updateNotificationBell();
 }
 
 function showCustomerNotification(item) {
@@ -81,6 +158,57 @@ notificationList?.addEventListener('click', (event) => {
   if (row) showCustomerNotification(customerNotifications[Number(row.dataset.notificationIndex)]);
 });
 
+notificationPreviewList?.addEventListener('click', (event) => {
+  const row = event.target.closest('[data-notification-id]');
+  if (!row) return;
+  const item = customerNotifications.find((notification) => notification.id === row.dataset.notificationId);
+  if (item) showCustomerNotification(item);
+});
+
+function closeNotificationDropdown() {
+  if (!notificationDropdown || !notificationBell) return;
+  notificationDropdown.hidden = true;
+  notificationBell.setAttribute('aria-expanded', 'false');
+}
+
+async function markCustomerNotificationsSeen() {
+  const unseen = customerNotifications.filter((item) => !notificationIsSeen(item));
+  unseen.forEach((item) => seenNotificationIds.add(item.id));
+  persistSeenNotificationIds();
+  updateNotificationBell();
+  await Promise.allSettled(unseen.map((item) => updateDoc(doc(db, 'notifications', item.id), {
+    seen: true,
+    readAt: serverTimestamp()
+  })));
+}
+
+notificationBell?.addEventListener('click', async () => {
+  if (!notificationDropdown) return;
+  const opening = notificationDropdown.hidden;
+  notificationDropdown.hidden = !opening;
+  notificationBell.setAttribute('aria-expanded', String(opening));
+  if (opening) {
+    const rect = notificationBell.getBoundingClientRect();
+    const maxRight = Math.max(10, window.innerWidth - Math.min(360, window.innerWidth - 20) - 10);
+    const right = Math.min(maxRight, Math.max(10, window.innerWidth - rect.right));
+    notificationDropdown.style.top = `${rect.bottom + 8}px`;
+    notificationDropdown.style.right = `${right}px`;
+    await markCustomerNotificationsSeen();
+  }
+});
+
+notificationViewAll?.addEventListener('click', () => {
+  closeNotificationDropdown();
+  activateView('notifications');
+});
+
+document.addEventListener('click', (event) => {
+  if (!notificationDropdown?.hidden && !notificationBellWrap?.contains(event.target)) closeNotificationDropdown();
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && notificationDropdown && !notificationDropdown.hidden) closeNotificationDropdown();
+});
+
 function showNotificationLoadError(error) {
   console.error('Customer notifications could not be loaded:', {
     code: error?.code || 'unknown',
@@ -98,22 +226,41 @@ authReady.then(() => onAuthStateChanged(auth, (user) => {
   stopCustomerNotificationListener?.();
   stopCustomerNotificationListener = null;
   customerNotifications = [];
+  notificationFallbackTimes = new Map();
+  closeNotificationDropdown();
+  currentNotificationUserId = user?.uid || '';
+  seenNotificationIds = new Set();
   if (!user) {
+    if (notificationBell) notificationBell.hidden = true;
+    renderNotificationPreview();
+    updateNotificationBell();
     notificationList.textContent = 'Sign in to view your notifications.';
     return;
   }
   // Firestore rules require an active server-side MFA session. Do not issue a
   // query before the dashboard's OTP gate has completed.
   if (!hasOtpVerification(user)) {
+    if (notificationBell) notificationBell.hidden = true;
+    renderNotificationPreview();
+    updateNotificationBell();
     notificationList.textContent = 'Complete email verification to view your notifications.';
     return;
   }
+  if (notificationBell) notificationBell.hidden = false;
+  try {
+    const storedIds = JSON.parse(localStorage.getItem(notificationStorageKey()) || '[]');
+    if (Array.isArray(storedIds)) seenNotificationIds = new Set(storedIds.filter((id) => typeof id === 'string'));
+  } catch (error) { console.warn('Notification seen state could not be loaded locally.', error); }
   notificationList.textContent = 'Loading notifications…';
   const customerNotificationsQuery = query(collection(db, 'notifications'), where('userId', '==', user.uid));
   stopCustomerNotificationListener = onSnapshot(customerNotificationsQuery, (snapshot) => {
-    customerNotifications = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
-      .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
+    customerNotifications = snapshot.docs.map((item) => {
+      if (!notificationFallbackTimes.has(item.id)) notificationFallbackTimes.set(item.id, Date.now());
+      return { id: item.id, ...item.data(), _receivedAtFallbackMs: notificationFallbackTimes.get(item.id) };
+    })
+      .sort((a, b) => notificationTimeMs(a) - notificationTimeMs(b));
     renderCustomerNotifications();
+    if (notificationDropdown && !notificationDropdown.hidden) markCustomerNotificationsSeen();
   }, (error) => {
     showNotificationLoadError(error);
   });

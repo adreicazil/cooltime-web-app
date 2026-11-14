@@ -219,6 +219,19 @@ try {
                 'status' => ['stringValue' => $status], 'adminId' => ['stringValue' => $actor['uid']], 'createdAt' => ['timestampValue' => $now],
             ]],
         ]);
+        $statusMessage = $status === 'active'
+            ? 'Your CoolTime customer account has been activated.'
+            : 'Your CoolTime customer account has been disabled. Contact support if you need help accessing your account.';
+        notifyCustomerRecipient(
+            $account,
+            'account_status_' . $status . '_' . bin2hex(random_bytes(6)),
+            $customerId,
+            (string) ($customer['email'] ?? ''),
+            'account_status_updated',
+            $statusMessage,
+            ['customerId' => $customerId, 'customerName' => (string) ($customer['name'] ?? $customer['username'] ?? 'Customer')],
+            'CoolTime account status updated'
+        );
         jsonResponse(['ok' => true, 'message' => 'Customer status updated.']);
     }
     if ($action === 'import_customer_records') {
@@ -467,15 +480,14 @@ try {
                 'adminId' => ['stringValue' => $actor['uid']], 'adminEmail' => ['stringValue' => $actor['email']], 'createdAt' => ['timestampValue' => $now],
             ]],
         ]);
+        $booking['id'] = $bookingId;
+        $booking['status'] = 'confirmed';
+        $details = notificationBookingDetails($account, $booking);
+        $details['bookingStatus'] = 'confirmed';
+        $details['message'] = 'Booking confirmed: your service appointment has been approved.';
         $customer = adminWorkflowRead($account, 'users', (string) ($booking['customerId'] ?? ''));
         $customerEmail = (string) ($customer['email'] ?? $booking['customerEmail'] ?? '');
-        $service = adminWorkflowRead($account, 'services', (string) ($booking['serviceId'] ?? ''));
-        $details = ' for ' . (string) ($service['name'] ?? $booking['serviceId'] ?? 'your service') . ' on ' . (string) ($booking['date'] ?? '') . ' at ' . (string) ($booking['timeSlot'] ?? '');
-        $emailSent = filter_var($customerEmail, FILTER_VALIDATE_EMAIL)
-            ? trySendConfiguredEmail($customerEmail, 'CoolTime booking confirmed',
-                '<p>Your booking ' . htmlspecialchars($bookingId, ENT_QUOTES, 'UTF-8') . htmlspecialchars($details, ENT_QUOTES, 'UTF-8') . ' is confirmed.</p>',
-                'Your booking ' . $bookingId . $details . ' is confirmed.')
-            : false;
+        $emailSent = notifyCustomerRecipient($account, 'booking_confirmed_' . $bookingId, (string) ($booking['customerId'] ?? ''), $customerEmail, 'booking_confirmed', $details['message'], $details, 'CoolTime booking confirmed');
         jsonResponse(['ok' => true, 'message' => $emailSent ? 'Booking approved and confirmation email sent.' : 'Booking approved. Email delivery was skipped or unavailable.', 'emailSent' => $emailSent]);
     }
     if ($action === 'reschedule_booking') {
@@ -637,12 +649,15 @@ try {
         }
         adminWorkflowCommit($account, $writes);
         $customer = adminWorkflowRead($account, 'users', (string) ($booking['customerId'] ?? ''));
-        if (!empty($customer['email']) && filter_var($customer['email'], FILTER_VALIDATE_EMAIL)) {
-            try { trySendConfiguredEmail($customer['email'], 'CoolTime service completed — invoice ' . $invoiceId,
-                '<p>Your service is complete. Invoice total: ₱' . number_format($total, 2) . '.</p><p>Downpayment credited: ₱' . number_format($downpayment, 2) . '. Remaining balance: ₱' . number_format($balance, 2) . '.</p>',
-                'Service completed. Total: PHP ' . number_format($total, 2) . '; downpayment credited: PHP ' . number_format($downpayment, 2) . '; balance: PHP ' . number_format($balance, 2) . '.'); }
-            catch (Throwable $mailError) { error_log('Service completion email failed: ' . $mailError->getMessage()); }
-        }
+        $booking['id'] = $bookingId;
+        $booking['status'] = 'completed';
+        $details = notificationBookingDetails($account, $booking);
+        $details['bookingStatus'] = 'completed';
+        $details['paymentBalance'] = $balance;
+        $details['paymentStatus'] = $balance <= 0 ? 'paid' : (string) ($invoice['status'] ?? 'pending');
+        $details['message'] = 'Service completed: your appointment is complete. Remaining balance: PHP ' . number_format($balance, 2) . '.';
+        $customerEmail = (string) ($customer['email'] ?? $booking['customerEmail'] ?? '');
+        notifyCustomerRecipient($account, 'service_completed_' . $bookingId, (string) ($booking['customerId'] ?? ''), $customerEmail, 'service_completed', $details['message'], $details, 'CoolTime service completed — invoice ' . $invoiceId);
         jsonResponse(['ok' => true, 'invoiceId' => $invoiceId, 'runningTotal' => $total, 'downpaymentAmount' => $downpayment, 'balanceDue' => $balance]);
     }
     if ($action === 'submission_decision') {
