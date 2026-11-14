@@ -305,7 +305,7 @@ async function initialize() {
     });
     modulePaginators.customers = setupModulePagination({
       cardContainerId: 'customerManagement', listContainerId: 'customerResults',
-      emptyHtml: '<tr><td colspan="5">No customer records.</td></tr>'
+      emptyHtml: '<tr><td colspan="6">No customer records.</td></tr>'
     });
     modulePaginators.pos = setupModulePagination({
       cardContainerId: 'posMonitoring', listContainerId: 'posResults',
@@ -1237,8 +1237,8 @@ function renderContinuousReportHistory(historyItems = reportHistoryData) {
 
 function renderCustomers() {
   const search = $('#customerSearch').value.trim().toLowerCase();
-  const rows = customers.filter((item) => `${item.name || item.username || ''} ${item.email || ''}`.toLowerCase().includes(search));
-  $('#customerResults').innerHTML = rows.map((item) => `<tr class="customer-record-row"><td>${esc(item.name || item.username)}</td><td>${esc(item.email)}</td><td>${esc(item.phone || item.contact)}</td><td>${esc(item.status || 'active')}</td><td><button class="customer-toggle ${item.status === 'disabled' ? 'btn-enable-customer' : 'btn-disable-customer'}" data-id="${esc(item.id)}">${item.status === 'disabled' ? 'Enable' : 'Disable'}</button></td></tr>`).join('') || '<tr><td colspan="5">No customer records.</td></tr>';
+  const rows = customers.filter((item) => `${item.firstName || ''} ${item.lastName || ''} ${item.name || item.username || ''} ${item.email || ''} ${item.contactNumber || item.phone || item.contact || ''}`.toLowerCase().includes(search));
+  $('#customerResults').innerHTML = rows.map((item) => `<tr class="customer-record-row"><td>${esc(item.firstName || '—')}</td><td>${esc(item.lastName || '—')}</td><td>${esc(item.email || '—')}</td><td>${esc(item.contactNumber || item.phone || item.contact || '—')}</td><td>${esc(item.status || 'active')}</td><td><button class="customer-toggle ${item.status === 'disabled' ? 'btn-enable-customer' : 'btn-disable-customer'}" data-id="${esc(item.id)}">${item.status === 'disabled' ? 'Enable' : 'Disable'}</button></td></tr>`).join('') || '<tr><td colspan="6">No customer records.</td></tr>';
   if (isDashboardPage && modulePaginators.customers) {
     const renderedItems = rows.length ? [...$('#customerResults').children].map((row) => row.outerHTML) : [];
     modulePaginators.customers.setItems(renderedItems);

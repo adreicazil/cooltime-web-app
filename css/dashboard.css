@@ -2007,8 +2007,20 @@ td {
 
 .customer-records-card-container table {
   width: 100%;
+  min-width: 900px;
   color: #fff;
   font-size: 0.9rem;
+}
+
+.customer-records-card-container thead th {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .customer-records-card-container tbody tr {
