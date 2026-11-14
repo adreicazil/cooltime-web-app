@@ -330,6 +330,14 @@ body.customer-dashboard-page .main-nav a:hover {
   color: #00a0ff;
 }
 .customer-bookings-list { display: grid; gap: 0; margin-top: 24px; }
+.customer-bookings-pagination { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 20px 0 4px; color: #dbeafe; }
+.customer-bookings-pagination[hidden] { display: none; }
+.booking-page-button { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid rgba(125,211,252,.32); border-radius: 10px; background: rgba(8,25,52,.72); color: #e0f2fe; font-size: 1.15rem; font-weight: 800; cursor: pointer; }
+.booking-page-button:hover:not(:disabled) { border-color: #38bdf8; background: rgba(14,116,144,.32); }
+.booking-page-button:disabled { opacity: .4; cursor: not-allowed; }
+.booking-page-label { display: flex; align-items: center; gap: 7px; color: #cbd5e1; font-size: .9rem; }
+.booking-page-label input { width: 58px; padding: 7px 5px; border: 1px solid rgba(125,211,252,.32); border-radius: 8px; outline: none; background: rgba(5,15,35,.8); color: #f8fafc; text-align: center; }
+.booking-page-label input:focus { border-color: #38bdf8; box-shadow: 0 0 0 2px rgba(56,189,248,.2); }
 .customer-bookings-empty { padding: 12px 0; color: rgba(255,255,255,.75); }
 .customer-booking-row { padding: 0; border-top: 1px solid rgba(255,255,255,.2); cursor: pointer; }
 .booking-row-main { display: grid; grid-template-columns: minmax(0,1fr) 112px 104px; align-items: center; gap: 12px; min-height: 96px; }
@@ -703,6 +711,10 @@ body.customer-dashboard-page div[style*="overflow"]::-webkit-scrollbar {
 
 /* Phone dashboard layout. Keep every override below the 768px breakpoint. */
 @media (max-width: 768px) {
+  .customer-bookings-pagination { gap: 10px; margin-top: 16px; }
+  .booking-page-button { width: 36px; height: 36px; }
+  .booking-page-label { gap: 5px; font-size: .82rem; }
+  .booking-page-label input { width: 52px; padding: 6px 3px; }
   body.customer-dashboard-page {
     --customer-header-height: 104px;
     overflow: hidden;

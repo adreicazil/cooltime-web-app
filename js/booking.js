@@ -235,6 +235,12 @@ async function refreshInvoicesFromServer(user) {
 }
 
 let stopCustomerServiceCatalog = null;
+let stopCustomerBookingListener = null;
+let currentBookingPage = 1;
+const PAGE_SIZE = 15;
+let currentBookingCount = 0;
+let rerenderCustomerBookings = null;
+let latestSubmittedBookingId = null;
 
 function readableServiceFallback(serviceId) {
   return String(serviceId || '').replace(/^svc[_-]?/i, '').replace(/[_-]+/g, ' ')
@@ -260,9 +266,23 @@ function renderCustomerBookings(records, serviceCatalog, vehicleData, branchCata
     };
   });
   window.dispatchEvent(new CustomEvent('customer:bookings', { detail: bookingData }));
+  const pagination = document.getElementById('customerBookingsPagination');
+  const pageInput = document.getElementById('customerBookingsPage');
+  const totalPages = Math.max(1, Math.ceil(bookingData.length / PAGE_SIZE));
+  currentBookingCount = bookingData.length;
+  currentBookingPage = Math.min(Math.max(1, currentBookingPage), totalPages);
+  if (pagination) pagination.hidden = bookingData.length <= PAGE_SIZE;
+  if (pageInput) { pageInput.max = String(totalPages); pageInput.value = String(currentBookingPage); }
+  const totalPagesLabel = document.getElementById('customerBookingsTotalPages');
+  if (totalPagesLabel) totalPagesLabel.textContent = String(totalPages);
+  const previous = pagination?.querySelector('[data-page-step="-1"]');
+  const next = pagination?.querySelector('[data-page-step="1"]');
+  if (previous) previous.disabled = currentBookingPage <= 1;
+  if (next) next.disabled = currentBookingPage >= totalPages;
   if (!bookingData.length) { target.innerHTML = '<p class="customer-bookings-empty">No bookings yet.</p>'; return; }
   const name = profile?.name || profile?.username || 'Customer';
-  target.innerHTML = bookingData.map((booking, index) => {
+  const pageBookings = bookingData.slice((currentBookingPage - 1) * PAGE_SIZE, currentBookingPage * PAGE_SIZE);
+  target.innerHTML = pageBookings.map((booking, index) => {
     const rawStatus = String(booking.status || 'pending');
     const rawStatusKey = rawStatus.toLowerCase().replace(/[^a-z0-9-]/g, '-');
     const statusKey = rawStatusKey === 'in-progress' ? 'ongoing' : rawStatusKey;
@@ -293,7 +313,7 @@ function renderCustomerBookings(records, serviceCatalog, vehicleData, branchCata
     ].map(([label, value]) => `<div class="booking-detail-field"><div class="booking-detail-label">${escapeHtml(label)}</div><div class="booking-detail-value">${escapeHtml(value)}</div></div>`).join('');
     const rescheduleControl = ['pending', 'confirmed'].includes(statusKey)
       ? `<button class="booking-reschedule-link" type="button" data-booking-id="${escapeHtml(booking.id)}" data-date="${escapeHtml(booking.date || '')}" data-time="${escapeHtml(booking.timeSlot || '')}">Request reschedule</button>` : '';
-    return `<article class="customer-booking-row booking-status-${escapeHtml(statusKey)}" data-booking-id="${escapeHtml(booking.id)}"><div class="booking-row-main"><button class="booking-summary-toggle" type="button" aria-expanded="false" aria-controls="${detailsId}"><span class="booking-index">${index + 1}</span><span class="booking-summary-meta"><strong>${escapeHtml(booking.serviceName)}</strong><small>${escapeHtml(booking.date || 'Date unavailable')} - ${escapeHtml(booking.timeSlot || '')}</small></span></button><span class="customer-booking-status ${escapeHtml(statusKey)}">${escapeHtml(status)}</span>${cancelControl}</div><div class="booking-details-panel" id="${detailsId}" aria-hidden="true" inert><div class="booking-details booking-expanded-grid">${details}</div><p><strong>Reference ID:</strong> ${escapeHtml(referenceNumber)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${escapeHtml(referenceNumber)}">Copy</button></p>${rescheduleControl}</div></article>`;
+    return `<article class="customer-booking-row booking-status-${escapeHtml(statusKey)}" data-booking-id="${escapeHtml(booking.id)}"><div class="booking-row-main"><button class="booking-summary-toggle" type="button" aria-expanded="false" aria-controls="${detailsId}"><span class="booking-index">${(currentBookingPage - 1) * PAGE_SIZE + index + 1}</span><span class="booking-summary-meta"><strong>${escapeHtml(booking.serviceName)}</strong><small>${escapeHtml(booking.date || 'Date unavailable')} - ${escapeHtml(booking.timeSlot || '')}</small></span></button><span class="customer-booking-status ${escapeHtml(statusKey)}">${escapeHtml(status)}</span>${cancelControl}</div><div class="booking-details-panel" id="${detailsId}" aria-hidden="true" inert><div class="booking-details booking-expanded-grid">${details}</div><p><strong>Reference ID:</strong> ${escapeHtml(referenceNumber)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${escapeHtml(referenceNumber)}">Copy</button></p>${rescheduleControl}</div></article>`;
   }).join('');
 }
 
@@ -301,27 +321,62 @@ async function loadCustomerBookings(user, profile) {
   const target = document.getElementById('customerBookings');
   if (!target) return;
   try {
-    const [bookings, vehicles, branches] = await Promise.all([
-      getDocs(query(collection(db, 'bookings'), where('customerId', '==', user.uid))),
+    const [vehicles, branches] = await Promise.all([
       getDocs(query(collection(db, 'vehicles'), where('customerId', '==', user.uid))),
       getDocs(collection(db, 'branches'))
     ]);
-    const records = bookings.docs.map((item) => ({ id: item.id, data: item.data() }));
     const vehicleData = Object.fromEntries(vehicles.docs.map((item) => [item.id, item.data()]));
     const branchCatalog = Object.fromEntries(branches.docs.map((item) => [item.id.toLowerCase().replace(/[- ]/g, '_'), { id: item.id, ...item.data() }]));
+    let records = [];
+    let serviceCatalog = {};
+    const render = () => renderCustomerBookings(records, serviceCatalog, vehicleData, branchCatalog, user, profile, target);
+    rerenderCustomerBookings = render;
     stopCustomerServiceCatalog?.();
     stopCustomerServiceCatalog = onSnapshot(collection(db, 'services'), (snapshot) => {
-      const serviceCatalog = Object.fromEntries(snapshot.docs.map((item) => [item.id, { ...item.data() }]));
-      renderCustomerBookings(records, serviceCatalog, vehicleData, branchCatalog, user, profile, target);
+      serviceCatalog = Object.fromEntries(snapshot.docs.map((item) => [item.id, { ...item.data() }]));
+      render();
     }, (error) => {
       console.error('Service names for customer bookings could not be refreshed:', error);
-      renderCustomerBookings(records, {}, vehicleData, branchCatalog, user, profile, target);
+      serviceCatalog = {};
+      render();
+    });
+    stopCustomerBookingListener?.();
+    stopCustomerBookingListener = onSnapshot(query(collection(db, 'bookings'), where('customerId', '==', user.uid)), (snapshot) => {
+      records = snapshot.docs.map((item) => ({ id: item.id, data: item.data() }))
+        .sort((a, b) => {
+          if (a.id === latestSubmittedBookingId) return -1;
+          if (b.id === latestSubmittedBookingId) return 1;
+          const timestamp = (record) => record.data.createdAt?.toMillis?.() || new Date(record.data.createdAt || record.data.date || 0).getTime() || 0;
+          return timestamp(b) - timestamp(a);
+        });
+      render();
+    }, (error) => {
+      console.error('Customer bookings could not be refreshed:', error);
+      target.textContent = 'Bookings are temporarily unavailable.';
     });
   } catch (error) {
     console.error('Customer bookings could not be loaded:', error);
     target.textContent = 'Bookings are temporarily unavailable.';
   }
 }
+
+const bookingsPagination = document.getElementById('customerBookingsPagination');
+const bookingsPageInput = document.getElementById('customerBookingsPage');
+function goToBookingPage(value) {
+  const total = Math.max(1, Math.ceil(currentBookingCount / PAGE_SIZE));
+  const parsed = Number.parseInt(value, 10);
+  currentBookingPage = Math.min(total, Math.max(1, Number.isFinite(parsed) ? parsed : 1));
+  if (bookingsPageInput) bookingsPageInput.value = String(currentBookingPage);
+  rerenderCustomerBookings?.();
+}
+bookingsPagination?.addEventListener('click', (event) => {
+  const button = event.target.closest('[data-page-step]');
+  if (button && !button.disabled) goToBookingPage(currentBookingPage + Number(button.dataset.pageStep));
+});
+bookingsPageInput?.addEventListener('change', () => goToBookingPage(bookingsPageInput.value));
+bookingsPageInput?.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter') { event.preventDefault(); goToBookingPage(bookingsPageInput.value); }
+});
 
 const rescheduleDialog = document.getElementById('rescheduleModal');
 const rescheduleForm = document.getElementById('rescheduleForm');
@@ -527,6 +582,7 @@ if (form) {
     try {
       const data = new FormData(form);
       const result = await createBooking({ customerId: access.user.uid, branchId: data.get('branchId'), serviceId: data.get('serviceType'), date: data.get('appointmentDate'), timeSlot: data.get('timeSlot'), vehicle: { plateNumber: data.get('plateNumber'), make: data.get('vehicleMake'), model: data.get('vehicleModel'), year: data.get('vehicleYear') } });
+      latestSubmittedBookingId = result.bookingId;
       let invoice;
       try { invoice = await createWebInvoice(result.bookingId, access.user); }
       catch (error) { alert(`Booking ${result.bookingId} was saved, but invoice creation failed: ${error.message}`); return; }
@@ -539,6 +595,8 @@ if (form) {
       } catch (notificationError) {
         console.error('Booking notification dispatch failed:', notificationError);
       }
+      currentBookingPage = 1;
+      rerenderCustomerBookings?.();
       await loadInvoices(access.user);
       alert(`Booking submitted. Reference ID ${invoice.referenceNumber || invoice.invoiceId} is in your running bills. You can add services there and pay when the bill is ready.`);
       closeBookingForm();
