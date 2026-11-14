@@ -77,7 +77,6 @@ function gmailHttpRequest(string $url, array $payload, array $headers, bool $for
     $response = curl_exec($curl);
     $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
     $curlError = curl_error($curl);
-    curl_close($curl);
     if ($response === false) {
         $host = (string) parse_url($url, PHP_URL_HOST);
         error_log(sprintf('%s cURL request failed: HTTP %d; raw body: <none>; cURL error: %s', $host, $status, $curlError));

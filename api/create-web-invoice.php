@@ -43,14 +43,20 @@ try {
     if ($existing) {
         $referenceNumber = (string)($existing['referenceNumber'] ?? $existing['invoiceNumber'] ?? $booking['referenceNumber'] ?? $booking['invoiceNumber'] ?? '');
         $appointmentDate = (string)($booking['date'] ?? $booking['appointmentDate'] ?? '');
+        $branchId = normalizeBranchId((string) ($booking['branchId'] ?? $booking['branch'] ?? ''));
+        if ($branchId === '') jsonResponse(['ok' => false, 'message' => 'Booking branch is invalid.'], 422);
+        $branchLabel = normalizeBranchLabel((string) ($booking['branch'] ?? $booking['branchName'] ?? $branchId));
         if (!preg_match('/^PMO-[A-Z]{3}-' . preg_quote(str_replace('-', '', $appointmentDate), '/') . '-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/', $referenceNumber)) {
-            $referenceNumber = cooltimeReferenceNumber('PMO', (string)($booking['branchId'] ?? ''), $appointmentDate);
-            firestorePatchDocument($account, 'invoices', $invoiceId, [
-                'referenceNumber' => ['stringValue' => $referenceNumber], 'invoiceNumber' => ['stringValue' => $referenceNumber],
-            ]);
+            $referenceNumber = cooltimeReferenceNumber('PMO', $branchLabel, $appointmentDate);
         }
-        if (($booking['referenceNumber'] ?? '') !== $referenceNumber || ($booking['invoiceNumber'] ?? '') !== $referenceNumber) firestorePatchDocument($account, 'bookings', $bookingId, [
+        firestorePatchDocument($account, 'invoices', $invoiceId, [
             'referenceNumber' => ['stringValue' => $referenceNumber], 'invoiceNumber' => ['stringValue' => $referenceNumber],
+            'branchId' => ['stringValue' => $branchId], 'branch' => ['stringValue' => $branchLabel],
+        ]);
+        if (($booking['referenceNumber'] ?? '') !== $referenceNumber || ($booking['invoiceNumber'] ?? '') !== $referenceNumber
+            || ($booking['branch'] ?? '') !== $branchLabel || ($booking['branchId'] ?? '') !== $branchId) firestorePatchDocument($account, 'bookings', $bookingId, [
+            'referenceNumber' => ['stringValue' => $referenceNumber], 'invoiceNumber' => ['stringValue' => $referenceNumber],
+            'branchId' => ['stringValue' => $branchId], 'branch' => ['stringValue' => $branchLabel],
         ]);
         jsonResponse(['ok' => true, 'invoiceId' => $invoiceId, 'referenceNumber' => $referenceNumber]);
     }
@@ -61,20 +67,16 @@ try {
     if (!$service || !isset($service['price']) || (float) $service['price'] <= 0) {
         jsonResponse(['ok' => false, 'message' => 'Service pricing is not configured.'], 503);
     }
-    $branch = strtolower((string) ($booking['branchId'] ?? ''));
-    $branchId = match ($branch) {
-        'cabuyao', 'cabuyao_main', 'cabuyao main' => 'cabuyao',
-        'santarosa', 'santa_rosa', 'santa-rosa' => 'santa_rosa',
-        default => '',
-    };
+    $branchId = normalizeBranchId((string) ($booking['branchId'] ?? $booking['branch'] ?? ''));
     if ($branchId === '') jsonResponse(['ok' => false, 'message' => 'Booking branch is invalid.'], 422);
+    $branchLabel = normalizeBranchLabel((string) ($booking['branch'] ?? $booking['branchName'] ?? $branchId));
     $price = (float) $service['price'];
     $serviceName = (string) ($service['name'] ?? $serviceId);
     $now = gmdate('Y-m-d\TH:i:s\Z');
     $referenceNumber = (string)($booking['referenceNumber'] ?? $booking['invoiceNumber'] ?? '');
     $appointmentDate = (string)($booking['date'] ?? $booking['appointmentDate'] ?? '');
     if (!preg_match('/^PMO-[A-Z]{3}-' . preg_quote(str_replace('-', '', $appointmentDate), '/') . '-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/', $referenceNumber)) {
-        $referenceNumber = cooltimeReferenceNumber('PMO', (string)($booking['branchId'] ?? $branchId), $appointmentDate);
+        $referenceNumber = cooltimeReferenceNumber('PMO', $branchLabel, $appointmentDate);
     }
     firestorePatchDocument($account, 'invoices', $invoiceId, [
         'invoiceId' => ['stringValue' => $invoiceId],
@@ -83,6 +85,7 @@ try {
         'bookingId' => ['stringValue' => $bookingId],
         'customerId' => ['stringValue' => $user['uid']],
         'branchId' => ['stringValue' => $branchId],
+        'branch' => ['stringValue' => $branchLabel],
         'source' => ['stringValue' => 'web'],
         'servicesAdded' => ['arrayValue' => ['values' => [['stringValue' => $serviceId]]]],
         'serviceDetails' => ['arrayValue' => ['values' => [['mapValue' => ['fields' => [
@@ -100,6 +103,7 @@ try {
     ]);
     firestorePatchDocument($account, 'bookings', $bookingId, [
         'referenceNumber' => ['stringValue' => $referenceNumber], 'invoiceNumber' => ['stringValue' => $referenceNumber],
+        'branchId' => ['stringValue' => $branchId], 'branch' => ['stringValue' => $branchLabel],
     ]);
     jsonResponse(['ok' => true, 'invoiceId' => $invoiceId, 'referenceNumber' => $referenceNumber]);
 } catch (Throwable $error) {

@@ -72,7 +72,6 @@
     <section id="bookings" class="customer-view form-page customer-booking-section" aria-labelledby="bookingTitle" hidden>
       <section class="form-card customer-bookings-card" aria-labelledby="bookingTitle">
         <div class="booking-card-heading"><div><h2 id="bookingTitle">Bookings</h2><p>Book or cancel an appointment.</p></div><button class="btn booking-add-button" id="showBookingForm" type="button">Add new booking</button></div>
-        <p id="paymentReturnNotice" role="status" aria-live="polite" hidden></p>
         <div id="customerBookings" class="customer-bookings-list" aria-live="polite">Loading bookings…</div>
         <div id="customerBookingsPagination" class="customer-bookings-pagination" role="group" aria-label="Bookings pages"></div>
         <form class="booking-create-form" id="bookingForm" hidden>
@@ -80,11 +79,12 @@
           <div class="booking-form-fields">
             <div class="booking-form-column">
               <label for="serviceType">Name of service</label><select id="serviceType" name="serviceType" required><option value="">Select a Service</option></select>
-              <label for="branchId">Branch</label><select id="branchId" name="branchId" required><option value="">Select branch</option><option value="cabuyao">Cabuyao Branch</option><option value="santarosa">Santa Rosa Branch</option></select>
+              <label for="branchId">Branch</label><select id="branchId" name="branchId" required><option value="">Select branch</option><option value="Cabuyao">Cabuyao</option><option value="Santa Rosa">Santa Rosa</option></select>
               <label for="appointmentDate">Preferred date</label><input id="appointmentDate" name="appointmentDate" type="date" required>
               <label for="timeSlot">Available slot</label><select id="timeSlot" name="timeSlot" required disabled><option value="">Select branch and date first</option></select>
             </div>
             <div class="booking-form-column">
+              <label for="savedVehicleProfile">Saved vehicle (optional)</label><select id="savedVehicleProfile" name="savedVehicleProfile"><option value="">Enter vehicle details</option></select>
               <label for="plateNumber">Vehicle Plate Number</label><input id="plateNumber" name="plateNumber" type="text" maxlength="20" required>
               <label for="vehicleMake">Vehicle Make</label><input id="vehicleMake" name="vehicleMake" type="text" required>
               <label for="vehicleModel">Vehicle Model</label><input id="vehicleModel" name="vehicleModel" type="text" required>

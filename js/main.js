@@ -1,6 +1,7 @@
 import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { auth, authReady, db } from './firebase-config.js';
 import { updateAvailableSlots } from './slot-availability.js';
+import { normalizeBranchLabel } from './branch-utils.js';
 
 const bookingModalElement = document.getElementById('guest-booking-modal');
 const paymentModalElement = document.getElementById('guest-payment-modal');
@@ -161,7 +162,7 @@ if (bookingModalElement && paymentModalElement && bookingForm) {
           }
           const form = new FormData(bookingForm);
           const bookingPayload = {
-            name: form.get('name'), email: form.get('email'), service: form.get('service'), branch: form.get('branch'),
+            name: form.get('name'), email: form.get('email'), service: form.get('service'), branch: normalizeBranchLabel(form.get('branch'), ''),
             date: form.get('date'), timeSlot: slotSelect.value, plateNumber: form.get('plateNumber'),
             vehicleMake: form.get('vehicleMake'), vehicleModel: form.get('vehicleModel'), vehicleYear: form.get('vehicleYear'),
             paymentMethod: isCash ? 'cash_otc' : 'e_wallet',
@@ -191,10 +192,21 @@ if (bookingModalElement && paymentModalElement && bookingForm) {
           notice.textContent = 'Opening secure PayMongo checkout…';
           const checkoutResponse = await fetch('api/create-checkout-session.php', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ invoiceId: booking.invoiceId }),
+            body: JSON.stringify({
+              invoiceId: booking.invoiceId,
+              billId: booking.invoiceId,
+              bookingId: booking.bookingId,
+              referenceId: booking.referenceNumber,
+              forceRefresh: true
+            }),
           });
           const checkout = await checkoutResponse.json();
-          if (!checkoutResponse.ok || !checkout.ok || !checkout.checkoutUrl) throw new Error(checkout.message || 'Payment checkout could not be started.');
+          if (!checkoutResponse.ok || !checkout.ok || (!checkout.checkoutUrl && !checkout.alreadyPaid)) throw new Error(checkout.message || 'Payment checkout could not be started.');
+          if (checkout.alreadyPaid) {
+            notice.textContent = 'This invoice is already paid.';
+            paymentModal.hide();
+            return;
+          }
           window.location.href = checkout.checkoutUrl;
         } catch (error) {
           notice.textContent = error instanceof Error ? error.message : 'Payment could not be started. Please try again.';

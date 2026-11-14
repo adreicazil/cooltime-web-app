@@ -93,9 +93,14 @@ try {
         'status' => ['stringValue' => 'new'], 'createdAt' => ['timestampValue' => gmdate('Y-m-d\TH:i:s\Z')],
     ];
     if ($service !== '') $fields['servicePerformed'] = ['stringValue' => $service];
-    foreach (['requestedService', 'branchId', 'requestedDate', 'requestedTime'] as $optionalField) {
+    foreach (['requestedService', 'requestedDate', 'requestedTime'] as $optionalField) {
         $optionalValue = cleanSubmissionText($input[$optionalField] ?? '', 160);
         if ($optionalValue !== '') $fields[$optionalField] = ['stringValue' => $optionalValue];
+    }
+    $requestedBranch = normalizeBranchId(cleanSubmissionText($input['branchId'] ?? $input['branch'] ?? '', 160));
+    if ($requestedBranch !== '') {
+        $fields['branchId'] = ['stringValue' => $requestedBranch];
+        $fields['branch'] = ['stringValue' => normalizeBranchLabel($requestedBranch)];
     }
     if ($attachmentName !== '') {
         $fields['attachmentName'] = ['stringValue' => $attachmentName];

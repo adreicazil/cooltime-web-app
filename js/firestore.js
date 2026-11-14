@@ -3,17 +3,18 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { db } from './firebase-config.js';
 import { createReferenceNumber } from './reference-number.js';
+import { normalizeBranchId, normalizeBranchLabel } from './branch-utils.js';
 
 export const BRANCHES = Object.freeze({
   // Seed defaults. Branch admins may customize these fields in Firestore.
   cabuyao: {
-    name: 'Cabuyao Main Branch', address: 'Cabuyao, Laguna', capacity: 4, status: 'active',
+    name: 'Cabuyao', address: 'Cabuyao, Laguna', capacity: 4, status: 'active',
     operatingHours: { open: '08:00', close: '17:00' },
     operatingDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
     holidaysOpen: true, slotDurationMinutes: 90, timezone: 'Asia/Manila'
   },
   santarosa: {
-    name: 'Santa Rosa Branch', address: 'Santa Rosa, Laguna', capacity: 3, status: 'active',
+    name: 'Santa Rosa', address: 'Santa Rosa, Laguna', capacity: 3, status: 'active',
     operatingHours: { open: '08:00', close: '17:00' },
     operatingDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
     holidaysOpen: true, slotDurationMinutes: 90, timezone: 'Asia/Manila'
@@ -75,6 +76,9 @@ export async function getCustomerInvoices(customerId) {
 }
 
 export async function createBooking({ customerId, userId = customerId, email, customerEmail, branchId, serviceId, date, timeSlot, vehicle }) {
+  const normalizedBranchId = normalizeBranchId(branchId);
+  if (!normalizedBranchId) throw new Error('A valid branch is required.');
+  const branchLabel = normalizeBranchLabel(branchId);
   const vehicleRef = doc(collection(db, 'vehicles'));
   const bookingRef = doc(collection(db, 'bookings'));
   const vehicleData = {
@@ -86,14 +90,19 @@ export async function createBooking({ customerId, userId = customerId, email, cu
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
-  const referenceNumber = createReferenceNumber('PMO', branchId, date);
+  const referenceNumber = createReferenceNumber('PMO', normalizedBranchId, date);
   const normalizedEmail = String(email || customerEmail || '').trim().toLowerCase();
   const batch = writeBatch(db);
   batch.set(vehicleRef, vehicleData);
   batch.set(bookingRef, {
     customerId, userId: userId || customerId, email: normalizedEmail, customerEmail: normalizedEmail,
-    branchId: required(branchId, 'Branch'), serviceId: required(serviceId, 'Service'),
+    branchId: normalizedBranchId, branch: branchLabel, serviceId: required(serviceId, 'Service'),
     vehicleId: vehicleRef.id, date: required(date, 'Appointment date'), timeSlot: required(timeSlot, 'Time slot'),
+    plateNumber: vehicleData.plateNumber, vehiclePlate: vehicleData.plateNumber, plate_number: vehicleData.plateNumber,
+    vehicleMake: vehicleData.make, vehicle_make: vehicleData.make,
+    vehicleModel: vehicleData.model, vehicle_model: vehicleData.model,
+    vehicleYear: vehicleData.year, vehicle_year: vehicleData.year,
+    vehicle: { plateNumber: vehicleData.plateNumber, plate: vehicleData.plateNumber, make: vehicleData.make, model: vehicleData.model, year: vehicleData.year },
     referenceNumber, invoiceNumber: referenceNumber,
     status: 'pending', createdAt: serverTimestamp(), updatedAt: serverTimestamp()
   });
@@ -102,7 +111,11 @@ export async function createBooking({ customerId, userId = customerId, email, cu
     bookingId: bookingRef.id, vehicleId: vehicleRef.id,
     booking: {
       id: bookingRef.id, customerId, userId: userId || customerId, email: normalizedEmail, customerEmail: normalizedEmail,
-      branchId, serviceId, date, timeSlot, vehicleId: vehicleRef.id, vehicle,
+      branchId: normalizedBranchId, branch: branchLabel, serviceId, date, timeSlot, vehicleId: vehicleRef.id, vehicle,
+      plateNumber: vehicleData.plateNumber, vehiclePlate: vehicleData.plateNumber, plate_number: vehicleData.plateNumber,
+      vehicleMake: vehicleData.make, vehicle_make: vehicleData.make,
+      vehicleModel: vehicleData.model, vehicle_model: vehicleData.model,
+      vehicleYear: vehicleData.year, vehicle_year: vehicleData.year,
       referenceNumber, invoiceNumber: referenceNumber, status: 'pending', createdAt: null
     }
   };
@@ -123,6 +136,7 @@ export async function seedCoreCatalog() {
     }
     const current = snapshot.data();
     const missingSettings = {};
+    if (normalizeBranchLabel(current.name, value.name) !== value.name) missingSettings.name = value.name;
     if (!Number.isInteger(Number(current.capacity)) || Number(current.capacity) < 1) missingSettings.capacity = value.capacity;
     if (!String(current.status || '').trim()) missingSettings.status = value.status;
     const hours = current.operatingHours;

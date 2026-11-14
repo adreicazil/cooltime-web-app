@@ -31,7 +31,7 @@
   function localAnswer(message) {
     const normalized = message.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim().replace(/\s+/g, ' ');
     if (/^(services offered|what services( do you offer| are offered)?)$/.test(normalized) || /\b(services offered|services do you offer|what services|aircon cleaning|freon charging|leak detection)\b/.test(normalized)) return 'CoolTime offers car aircon cleaning, repair, freon charging, leak detection, and genuine aircon parts.';
-    if (/^(branch locations|where are (your )?branches|where are the branches)$/.test(normalized) || /\b(branch locations|branch address|where is your branch|where are your branches)\b/.test(normalized)) return 'CoolTime has a Cabuyao Main Branch and a Santa Rosa Branch.';
+    if (/^(branch locations|where are (your )?branches|where are the branches)$/.test(normalized) || /\b(branch locations|branch address|where is your branch|where are your branches)\b/.test(normalized)) return 'CoolTime has branches in Cabuyao and Santa Rosa.';
     if (/^(operating hours|hours|business hours|what are your hours|what time do you open)$/.test(normalized) || /\b(operating hours|business hours|opening hours|what time do you open|what time do you close)\b/.test(normalized)) return 'Both CoolTime branches are open from 8 AM to 5 PM, Monday through Sunday.';
     if (/^(how to book|how do i book|how can i book|book an appointment)$/.test(normalized) || /\b(how (do|can) i book|how to book|book an appointment|make a booking)\b/.test(normalized)) return 'Use the Book Now option to request an appointment, or contact CoolTime through the Contact page. Include your preferred branch, date, and time.';
     return '';

@@ -2,6 +2,7 @@ import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/fi
 import { collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { auth, authReady, db } from './firebase-config.js';
 import { hasOtpVerification } from './auth-guard.js';
+import { normalizeBranchLabel, normalizeBranchText } from './branch-utils.js';
 
 const dashboard = document.querySelector('.customer-dashboard');
 const viewLinks = [...document.querySelectorAll('[data-dashboard-view]')];
@@ -120,7 +121,7 @@ function renderNotificationPreview() {
   if (!notificationPreviewList) return;
   const recent = [...customerNotifications].sort((a, b) => notificationTimeMs(b) - notificationTimeMs(a)).slice(0, 5);
   notificationPreviewList.innerHTML = recent.length ? recent.map((item) => {
-    const message = item.message || item.title || 'Notification';
+    const message = normalizeBranchText(item.message || item.title || 'Notification');
     const category = String(item.type || 'notification').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
     const stamp = notificationTimeLabel(item);
     return `<button type="button" class="customer-notification-preview-row" data-notification-id="${escapeHtml(item.id)}"><span class="customer-notification-preview-meta"><span class="customer-notification-category">${escapeHtml(category)}</span><time>${escapeHtml(stamp)}</time></span><span class="customer-notification-preview-message">${escapeHtml(message)}</span></button>`;
@@ -133,7 +134,7 @@ function renderCustomerNotifications() {
     ? customerNotifications.map((item, index) => {
       const stamp = notificationTimeLabel(item);
       const category = String(item.type || 'notification').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-      return `<button type="button" class="customer-notification-row" data-notification-index="${index}"><span class="customer-notification-full-message"><span class="customer-notification-full-meta"><span class="customer-notification-category">${escapeHtml(category)}</span><time>${escapeHtml(stamp)}</time></span><span class="customer-notification-full-text">${escapeHtml(item.message || item.title || 'Notification')}</span></span></button>`;
+      return `<button type="button" class="customer-notification-row" data-notification-index="${index}"><span class="customer-notification-full-message"><span class="customer-notification-full-meta"><span class="customer-notification-category">${escapeHtml(category)}</span><time>${escapeHtml(stamp)}</time></span><span class="customer-notification-full-text">${escapeHtml(normalizeBranchText(item.message || item.title || 'Notification'))}</span></span></button>`;
     }).join('')
     : '<p class="customer-notification-empty">No notifications yet.</p>';
   renderNotificationPreview();
@@ -144,9 +145,10 @@ function showCustomerNotification(item) {
   if (!notificationDialog || !item) return;
   const title = notificationDialog.querySelector('#notificationDetailTitle');
   const content = notificationDialog.querySelector('.notification-detail-content');
-  if (title) title.textContent = item.message || item.title || 'Notification details';
+  if (title) title.textContent = normalizeBranchText(item.message || item.title || 'Notification details');
   const values = notificationFields.map(([label, key]) => {
-    const value = ['serviceCost', 'paymentBalance'].includes(key) ? formatNotificationAmount(item[key]) : item[key];
+    const value = ['serviceCost', 'paymentBalance'].includes(key) ? formatNotificationAmount(item[key])
+      : key === 'branchName' ? normalizeBranchLabel(item[key] || item.branch) : item[key];
     return value === undefined || value === null || value === '' ? '' : `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`;
   }).filter(Boolean).join('');
   if (content) content.innerHTML = `<dl>${values || '<dd>No booking details are attached to this notification.</dd>'}</dl>`;
@@ -275,8 +277,18 @@ function invoiceInfo(invoice) {
   const paid = status.toLowerCase() === 'paid' || balance <= 0 || cancelled;
   const due = invoice.dueAt?.toDate?.() || (invoice.dueDate ? new Date(invoice.dueDate) : null);
   const overdue = !paid && (status.toLowerCase() === 'overdue' || (due && !Number.isNaN(due.getTime()) && due.getTime() < Date.now()));
-  const created = invoice.createdAt?.toDate?.() || (invoice.createdAt ? new Date(invoice.createdAt) : null);
-  return { total, balance, paid, overdue, status: cancelled ? 'Cancelled' : paid ? 'Paid' : overdue ? 'Overdue' : status, date: created && !Number.isNaN(created.getTime()) ? created.toLocaleDateString() : invoice.date || 'Date unavailable' };
+  const rawCreated = invoice.createdAt ?? invoice.created_at;
+  const created = rawCreated?.toDate ? rawCreated.toDate()
+    : typeof rawCreated === 'number' ? new Date(Math.abs(rawCreated) < 1e12 ? rawCreated * 1000 : rawCreated)
+      : typeof rawCreated === 'string' && rawCreated.trim()
+        ? new Date(Number.isFinite(Number(rawCreated)) ? (Math.abs(Number(rawCreated)) < 1e12 ? Number(rawCreated) * 1000 : Number(rawCreated)) : rawCreated)
+        : null;
+  const dateParts = created && !Number.isNaN(created.getTime())
+    ? new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(created)
+    : [];
+  const dateValues = Object.fromEntries(dateParts.map(({ type, value }) => [type, value]));
+  const creationDate = dateParts.length ? `${dateValues.year}-${dateValues.month}-${dateValues.day}` : invoice.date || 'Date unavailable';
+  return { total, balance, paid, overdue, status: cancelled ? 'Cancelled' : paid ? 'Paid' : overdue ? 'Overdue' : status, date: creationDate };
 }
 
 function renderInvoiceSummary() {
@@ -292,7 +304,7 @@ function renderInvoiceSummary() {
     const info = invoiceInfo(invoice);
     const statusKey = String(info.status || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
     const referenceNumber = invoice.referenceNumber || invoice.invoiceNumber || invoice.id;
-    return `<article class="customer-summary-row customer-invoice-summary-row"><span class="invoice-summary-index">${index + 1}</span><div class="invoice-meta-col"><span class="invoice-id-text">${escapeHtml(referenceNumber)}</span><span class="invoice-date-text">${escapeHtml(info.date)}</span></div><button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${escapeHtml(referenceNumber)}">Copy</button><span class="invoice-summary-total">${money(info.total)}</span><span class="summary-status ${escapeHtml(statusKey)}">${escapeHtml(info.status)}</span></article>`;
+    return `<article class="customer-summary-row customer-invoice-summary-row"><span class="invoice-summary-index">${index + 1}</span><div class="invoice-meta-col"><span class="invoice-id-text">${escapeHtml(referenceNumber)}</span><span class="invoice-date-text">${escapeHtml(info.date)}</span></div><span class="invoice-summary-total">${money(info.total)}</span><span class="summary-status ${escapeHtml(statusKey)}">${escapeHtml(info.status)}</span></article>`;
   }).join('') : '<p class="customer-summary-empty">No pending bills.</p>';
   summaryInvoices.querySelectorAll('.customer-invoice-summary-row .summary-status').forEach((element) => {
     const status = element.textContent.toLowerCase();

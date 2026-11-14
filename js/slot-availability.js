@@ -1,4 +1,5 @@
 import { auth, authReady } from './firebase-config.js';
+import { normalizeBranchId as canonicalBranchId } from './branch-utils.js';
 
 const STANDARD_SLOTS = [
   '09:00 AM - 11:00 AM',
@@ -11,10 +12,7 @@ const refreshBySelect = new WeakMap();
 const boundSelects = new WeakSet();
 
 function normalizeBranch(value) {
-  const branch = String(value || '').toLowerCase().replace(/[^a-z]/g, '');
-  if (branch.includes('santarosa')) return 'santarosa';
-  if (branch.includes('cabuyao')) return 'cabuyao';
-  return '';
+  return canonicalBranchId(value);
 }
 
 function manilaDateTime() {
@@ -69,6 +67,16 @@ export async function updateAvailableSlots(dateInput, branchInput, slotSelectEle
   syncSubmitButton(slotSelectElement);
 
   const refresh = async () => {
+    // The initial call and every polling tick must require a complete
+    // selection. Keep the placeholder instead of sending an invalid request.
+    const currentDate = String(dateInput.value || '').trim();
+    const currentBranchId = normalizeBranch(branchInput.value);
+    if (!currentDate || !currentBranchId) {
+      slotSelectElement.replaceChildren(new Option('Select branch and date first', ''));
+      slotSelectElement.disabled = true;
+      syncSubmitButton(slotSelectElement);
+      return;
+    }
     try {
       const headers = { 'Content-Type': 'application/json' };
       if (requireAuthentication) {
@@ -78,7 +86,7 @@ export async function updateAvailableSlots(dateInput, branchInput, slotSelectEle
       }
       const response = await fetch('/api/slot-availability.php', {
         method: 'POST', headers,
-        body: JSON.stringify({ branchId, date }),
+        body: JSON.stringify({ branchId: currentBranchId, date: currentDate }),
       });
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.message || 'Availability could not be loaded.');
@@ -87,12 +95,12 @@ export async function updateAvailableSlots(dateInput, branchInput, slotSelectEle
       const { date: today, minutes: nowMinutes } = manilaDateTime();
       const occupied = new Set(result.occupiedSlots || []);
       const hasAvailable = STANDARD_SLOTS.some((slot) => {
-        const expired = date < today || (date === today && nowMinutes >= slotEndMinutes(slot));
+        const expired = currentDate < today || (currentDate === today && nowMinutes >= slotEndMinutes(slot));
         return !expired && !occupied.has(slot);
       });
       const options = [new Option('Select a time', '')];
       STANDARD_SLOTS.forEach((slot) => {
-        const expired = date < today || (date === today && nowMinutes >= slotEndMinutes(slot));
+        const expired = currentDate < today || (currentDate === today && nowMinutes >= slotEndMinutes(slot));
         const unavailable = expired || occupied.has(slot);
         const option = new Option(`${slot}${unavailable ? ' (Unavailable)' : ''}`, slot);
         option.disabled = unavailable;
@@ -126,6 +134,8 @@ export async function updateAvailableSlots(dateInput, branchInput, slotSelectEle
 
   await refresh();
   if (runBySelect.get(slotSelectElement) === run) {
-    refreshBySelect.set(slotSelectElement, setInterval(refresh, 15000));
+    // Keep already-open booking forms in sync shortly after an administrator
+    // moves a confirmed appointment to another branch/date/time.
+    refreshBySelect.set(slotSelectElement, setInterval(refresh, 5000));
   }
 }

@@ -55,7 +55,9 @@ try {
     if ($name === '' || strlen($name)>120) $invalid[]='name';
     if (!filter_var($email,FILTER_VALIDATE_EMAIL)) $invalid[]='email';
     if ($serviceKey === '') $invalid[]='service';
-    if (!in_array(strtolower($branch),['cabuyao branch','santa rosa branch','cabuyao','santarosa','santa_rosa'],true)) $invalid[]='branch';
+    $branchId = normalizeBranchId($branch);
+    $branchLabel = normalizeBranchLabel($branch);
+    if ($branchId === '') $invalid[]='branch';
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)) $invalid[]='date';
     if (!preg_match('/^\d{1,2}:\d{2}\s?(AM|PM)\s*-\s*\d{1,2}:\d{2}\s?(AM|PM)$/i',$time)) $invalid[]='timeSlot';
     if ($plate === '') $invalid[]='plateNumber';
@@ -104,20 +106,21 @@ try {
     if ($price<=0) $price=4000.00;
     if (!is_finite($price) || $price<=0) jsonResponse(['ok'=>false,'message'=>'Invalid field: service price is not configured.'],422);
 
-    $branchId = in_array(strtolower($branch),['santa rosa branch','santarosa','santa_rosa'],true)?'santa_rosa':'cabuyao';
+    $branch = $branchLabel;
     $methodName=$method==='cash_otc'?'cash_otc':'paymongo_checkout';
     $paymentStatus=$method==='cash_otc'?'unpaid':'pending';
     $bookingId='walkin_'.bin2hex(random_bytes(12)); $invoiceId='walkin_inv_'.bin2hex(random_bytes(12));
     $now=gmdate('Y-m-d\\TH:i:s\\Z');
-    $reference=cooltimeReferenceNumber($method==='cash_otc'?'OTC':'PMO',$branch,$date);
+    $reference=cooltimeReferenceNumber($method==='cash_otc'?'OTC':'PMO',$branchLabel,$date);
     $bookingFields=[
       'bookingId'=>['stringValue'=>$bookingId],'customerId'=>['stringValue'=>''],'customerName'=>['stringValue'=>$name],'customerEmail'=>['stringValue'=>$email],
-      'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'branchId'=>['stringValue'=>$branchId],'branch'=>['stringValue'=>$branch],
+      'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'branchId'=>['stringValue'=>$branchId],'branch'=>['stringValue'=>$branchLabel],
       'date'=>['stringValue'=>$date],'timeSlot'=>['stringValue'=>$time],'plateNumber'=>['stringValue'=>$plate],
+      'vehiclePlate'=>['stringValue'=>$plate],'vehicle_plate'=>['stringValue'=>$plate],
       'vehicleMake'=>['stringValue'=>$make],'vehicleModel'=>['stringValue'=>$model],'vehicleYear'=>['integerValue'=>$year],
       'plate_number'=>['stringValue'=>$plate],'vehicle_make'=>['stringValue'=>$make],'vehicle_model'=>['stringValue'=>$model],'vehicle_year'=>['integerValue'=>$year],
       'vehicle'=>['mapValue'=>['fields'=>[
-        'plateNumber'=>['stringValue'=>$plate],'make'=>['stringValue'=>$make],
+        'plateNumber'=>['stringValue'=>$plate],'plate'=>['stringValue'=>$plate],'make'=>['stringValue'=>$make],
         'model'=>['stringValue'=>$model],'year'=>['integerValue'=>$year],
       ]]],
       'source'=>['stringValue'=>'walk_in_pos'],'is_guest'=>['booleanValue'=>true],'status'=>['stringValue'=>'pending'],
@@ -130,7 +133,7 @@ try {
     firestorePatchDocument($account,'bookings',$bookingId,$bookingFields);
     firestorePatchDocument($account,'invoices',$invoiceId,[
       'invoiceId'=>['stringValue'=>$invoiceId],'bookingId'=>['stringValue'=>$bookingId],'customerId'=>['stringValue'=>''],
-      'customerName'=>['stringValue'=>$name],'customerEmail'=>['stringValue'=>$email],'branchId'=>['stringValue'=>$branchId],
+      'customerName'=>['stringValue'=>$name],'customerEmail'=>['stringValue'=>$email],'branchId'=>['stringValue'=>$branchId],'branch'=>['stringValue'=>$branchLabel],
       'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'source'=>['stringValue'=>'walk_in_pos'],'is_guest'=>['booleanValue'=>true],
       'paymentMethod'=>['stringValue'=>$methodName],'paymentStatus'=>['stringValue'=>$paymentStatus],
       'payment_method'=>['stringValue'=>$methodName],'payment_status'=>['stringValue'=>$paymentStatus],
@@ -140,7 +143,7 @@ try {
       'downpaymentAmount'=>['doubleValue'=>0],'serviceStatus'=>['stringValue'=>'pending'],'status'=>['stringValue'=>$paymentStatus],
       'createdAt'=>['timestampValue'=>$now],'updatedAt'=>['timestampValue'=>$now],
     ]);
-    jsonResponse(['ok'=>true,'bookingId'=>$bookingId,'invoiceId'=>$invoiceId,'amount'=>$price,'referenceNumber'=>$reference,'customerName'=>$name,'branch'=>$branch,'serviceName'=>$serviceName]);
+    jsonResponse(['ok'=>true,'bookingId'=>$bookingId,'invoiceId'=>$invoiceId,'amount'=>$price,'referenceNumber'=>$reference,'customerName'=>$name,'branch'=>$branchLabel,'serviceName'=>$serviceName]);
 } catch(Throwable $error) {
     error_log('Walk-in booking creation failed: '.$error->getMessage());
     jsonResponse(['ok'=>false,'message'=>'Unable to save this booking. Please retry shortly.'],500);

@@ -185,7 +185,8 @@ try {
         $failureReason = (string) ($resourceAttributes['failure_code'] ?? $resourceAttributes['failure_message'] ?? $resourceAttributes['reason'] ?? $eventType);
         $failureFields = [
             'invoiceId' => ['stringValue' => $reference], 'customerId' => ['stringValue' => (string) ($invoice['customerId'] ?? '')],
-            'branchId' => ['stringValue' => (string) ($invoice['branchId'] ?? '')],
+            'branchId' => ['stringValue' => normalizeBranchId((string) ($invoice['branchId'] ?? $invoice['branch'] ?? ''))],
+            'branch' => ['stringValue' => normalizeBranchLabel((string) ($invoice['branch'] ?? $invoice['branchId'] ?? ''), 'Branch')],
             'amount' => ['integerValue' => (string) ($paymentRecord['amount'] ?? 0)], 'amountUnit' => ['stringValue' => 'centavos'],
             'method' => ['stringValue' => 'paymongo_checkout'], 'status' => ['stringValue' => 'failed'],
             'failureReason' => ['stringValue' => substr($failureReason, 0, 500)], 'eventType' => ['stringValue' => $eventType],
@@ -269,7 +270,8 @@ try {
     $paymentFields = [
         'invoiceId' => ['stringValue' => $reference],
         'customerId' => ['stringValue' => (string) ($invoice['customerId'] ?? '')],
-        'branchId' => ['stringValue' => (string) ($invoice['branchId'] ?? '')],
+        'branchId' => ['stringValue' => normalizeBranchId((string) ($invoice['branchId'] ?? $invoice['branch'] ?? ''))],
+        'branch' => ['stringValue' => normalizeBranchLabel((string) ($invoice['branch'] ?? $invoice['branchId'] ?? ''), 'Branch')],
         // Sales analytics uses the invoice amount in centavos; keep any fee-inclusive
         // processor amount separately so service revenue is not overstated.
         'amount' => ['integerValue' => (string) $expectedCentavos],
@@ -299,9 +301,12 @@ try {
             'updatedAt' => ['timestampValue' => gmdate('Y-m-d\\TH:i:s\\Z')],
         ];
     }
-    webhookFirestoreCommit($account, [
+    $bookingId = (string) ($invoice['bookingId'] ?? '');
+    $paidUpdates = [
         'invoices' => [$reference => [
             'status' => ['stringValue' => 'paid'],
+            'paymentStatus' => ['stringValue' => 'paid'], 'balanceDue' => ['doubleValue' => 0], 'balance_due' => ['doubleValue' => 0],
+            'latestPaymentSessionId' => ['nullValue' => null],
             'paymentId' => ['stringValue' => $paymentDocId],
             'paymentReference' => ['stringValue' => $paymongoPaymentId],
             'paymentMethod' => ['stringValue' => $paymentMethod],
@@ -309,9 +314,12 @@ try {
             'updatedAt' => ['timestampValue' => gmdate('Y-m-d\TH:i:s\Z')],
         ]],
         'payments' => $paymentUpdates,
-    ]);
+    ];
+    if ($bookingId !== '' && preg_match('/^[A-Za-z0-9_-]{1,150}$/', $bookingId)) {
+        $paidUpdates['bookings'] = [$bookingId => ['paymentStatus' => ['stringValue' => 'paid'], 'updatedAt' => ['timestampValue' => gmdate('Y-m-d\TH:i:s\Z')]]];
+    }
+    webhookFirestoreCommit($account, $paidUpdates);
 
-    $bookingId = (string) ($invoice['bookingId'] ?? '');
     $customerId = (string) ($invoice['customerId'] ?? '');
     $customer = $customerId !== '' ? webhookReadDocument($account, 'users', $customerId) : null;
     $booking = $bookingId !== '' ? webhookReadDocument($account, 'bookings', $bookingId) : null;

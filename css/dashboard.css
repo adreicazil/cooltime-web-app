@@ -3704,6 +3704,78 @@ body.super-dashboard-body #notifications-view .notifications-card-container {
   transition: transform .25s ease, box-shadow .25s ease !important;
 }
 
+/* Unified POS transaction monitor and Super Admin audit trail controls. */
+body.admin-dashboard-body #posMonitoring .btn-pos-request-void,
+body.super-dashboard-body #posMonitoring .btn-pos-request-void,
+body.admin-dashboard-body #posMonitoring .btn-pos-approve-void,
+body.super-dashboard-body #posMonitoring .btn-pos-approve-void,
+body.admin-dashboard-body #posMonitoring .btn-pos-reject-void,
+body.super-dashboard-body #posMonitoring .btn-pos-reject-void,
+body.admin-dashboard-body #posMonitoring .pos-audit-actions-menu button,
+body.super-dashboard-body #posMonitoring .pos-audit-actions-menu button,
+body.admin-dashboard-body .btn-reject-reschedule,
+body.super-dashboard-body .btn-reject-reschedule {
+  border: 1px solid rgba(125, 211, 252, .32);
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: #e8f4ff;
+  background: rgba(13, 34, 63, .82);
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+body.admin-dashboard-body #posMonitoring .btn-pos-approve-void,
+body.super-dashboard-body #posMonitoring .btn-pos-approve-void { border-color: rgba(52, 199, 89, .42); }
+body.admin-dashboard-body #posMonitoring .btn-pos-reject-void,
+body.super-dashboard-body #posMonitoring .btn-pos-reject-void { border-color: rgba(255, 105, 97, .42); }
+body.admin-dashboard-body #posMonitoring button:disabled,
+body.super-dashboard-body #posMonitoring button:disabled { opacity: .48; cursor: not-allowed; }
+body.admin-dashboard-body #posMonitoring .pos-status-text.void-requested,
+body.super-dashboard-body #posMonitoring .pos-status-text.void-requested { color: #ffb547; }
+body.admin-dashboard-body #posMonitoring .pos-status-text.flagged,
+body.super-dashboard-body #posMonitoring .pos-status-text.flagged { color: #ff8a65; }
+body.admin-dashboard-body #posMonitoring .pos-status-text.voided,
+body.super-dashboard-body #posMonitoring .pos-status-text.voided { color: #ff6961; }
+body.admin-dashboard-body #posMonitoring .pos-audit-actions,
+body.super-dashboard-body #posMonitoring .pos-audit-actions { position: relative; display: inline-block; }
+body.admin-dashboard-body #posMonitoring .pos-audit-actions > summary,
+body.super-dashboard-body #posMonitoring .pos-audit-actions > summary { list-style: none; cursor: pointer; }
+body.admin-dashboard-body #posMonitoring .pos-audit-actions > summary::-webkit-details-marker,
+body.super-dashboard-body #posMonitoring .pos-audit-actions > summary::-webkit-details-marker { display: none; }
+body.admin-dashboard-body #posMonitoring .pos-audit-actions-menu,
+body.super-dashboard-body #posMonitoring .pos-audit-actions-menu {
+  position: absolute; z-index: 5; right: 0; top: calc(100% + 6px); display: grid; gap: 6px;
+  min-width: 180px; padding: 8px; border: 1px solid rgba(125, 211, 252, .2); border-radius: 12px;
+  background: rgba(5, 18, 38, .97); box-shadow: 0 14px 32px rgba(0, 0, 0, .32);
+}
+body.admin-dashboard-body #posMonitoring .pos-void-request-details,
+body.super-dashboard-body #posMonitoring .pos-void-request-details {
+  margin: 10px 0; padding: 12px 14px; border-left: 3px solid #ffb547; border-radius: 8px;
+  background: rgba(255, 181, 71, .08); color: #e8f4ff;
+}
+body.admin-dashboard-body #posMonitoring .pos-void-request-details p,
+body.super-dashboard-body #posMonitoring .pos-void-request-details p { margin: 5px 0 0; color: #b8c9dc; }
+.pos-audit-trail-card { margin-top: 22px; padding: 18px; border: 1px solid rgba(125, 211, 252, .14); border-radius: 16px; }
+.pos-audit-trail-card h3 { margin: 0 0 6px; color: #eaf6ff; }
+.pos-audit-trail-card > p { color: #9fb4cc; }
+.pos-audit-trail-filters { display: flex; justify-content: flex-end; margin: 12px 0; }
+.pos-audit-trail-filters input { width: min(360px, 100%); }
+.pos-audit-trail-table { width: 100%; border-collapse: collapse; color: #dceaff; }
+.pos-audit-trail-table th, .pos-audit-trail-table td { padding: 11px 12px; border-bottom: 1px solid rgba(255, 255, 255, .08); text-align: left; vertical-align: top; }
+.pos-audit-trail-table th { color: #8fd5ff; font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; }
+.pos-audit-trail-table td small { display: block; color: #91a8c1; }
+.request-decision-state { color: #9fb4cc; }
+@media (max-width: 768px) {
+  .pos-audit-trail-card { padding: 12px; margin-top: 16px; }
+  .pos-audit-trail-filters { justify-content: stretch; }
+  .pos-audit-trail-filters input { width: 100%; }
+  .pos-audit-trail-table { min-width: 760px; }
+  body.admin-dashboard-body #posMonitoring .pos-audit-actions-menu,
+  body.super-dashboard-body #posMonitoring .pos-audit-actions-menu { right: 0; }
+}
+
 body.admin-dashboard-body #serviceManagement:hover,
 body.super-dashboard-body #serviceManagement:hover,
 body.admin-dashboard-body #bookingManagement:hover,

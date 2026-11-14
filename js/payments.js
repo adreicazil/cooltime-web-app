@@ -13,8 +13,11 @@ export async function createWebInvoiceAndCheckout(bookingId, user) {
   const token = await user.getIdToken();
   const invoice = await postJson('api/create-web-invoice.php', token, { bookingId });
   try {
-    const checkout = await postJson('api/create-checkout-session.php', token, { invoiceId: invoice.invoiceId });
-    return { invoiceId: invoice.invoiceId, referenceNumber: invoice.referenceNumber, checkoutUrl: checkout.checkoutUrl, checkoutError: '' };
+    const checkout = await postJson('api/create-checkout-session.php', token, {
+      invoiceId: invoice.invoiceId, billId: invoice.invoiceId, bookingId,
+      referenceId: invoice.referenceNumber, forceRefresh: true
+    });
+    return { invoiceId: invoice.invoiceId, referenceNumber: invoice.referenceNumber, checkoutUrl: checkout.checkoutUrl || '', alreadyPaid: checkout.alreadyPaid === true, checkoutError: '' };
   } catch (error) {
     return { invoiceId: invoice.invoiceId, referenceNumber: invoice.referenceNumber, checkoutUrl: '', checkoutError: error.message };
   }

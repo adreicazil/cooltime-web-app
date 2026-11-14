@@ -22,19 +22,15 @@ function notificationCreate(array $account, string $id, array $data): ?bool
     }
     $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id'])
         . '/databases/(default)/documents/notifications?documentId=' . rawurlencode($id);
-    $context = stream_context_create(['http' => [
-        'method' => 'POST',
-        'header' => "Authorization: Bearer " . firebaseAdminAccessToken() . "\r\nContent-Type: application/json",
-        'content' => json_encode(['fields' => $fields], JSON_THROW_ON_ERROR),
-        'timeout' => 15,
-        'ignore_errors' => true,
-    ]]);
-    $response = @file_get_contents($url, false, $context);
-    $statusLine = $http_response_header[0] ?? '';
-    if (preg_match('/\s2\d\d\s/', $statusLine)) return true;
+    $response = secureHttpRequest($url, 'POST', [
+        'Authorization: Bearer ' . firebaseAdminAccessToken(), 'Content-Type: application/json',
+    ], json_encode(['fields' => $fields], JSON_THROW_ON_ERROR), 15);
+    if ($response['status'] >= 200 && $response['status'] < 300) return true;
     // Deterministic IDs make event retries idempotent and prevent duplicate email dispatch.
-    if (str_contains($statusLine, ' 409 ')) return false;
-    error_log('CoolTime notification write failed (' . $statusLine . '): ' . substr((string) $response, 0, 500));
+    if ($response['status'] === 409) return false;
+    error_log(sprintf('CoolTime notification write failed (HTTP=%d, cURL=%s, response=%s).',
+        $response['status'], $response['error'] ?: 'none',
+        substr(preg_replace('/\s+/', ' ', $response['body']) ?? '', 0, 500) ?: '[empty]'));
     return null;
 }
 
@@ -43,13 +39,22 @@ function notificationReadDocument(array $account, string $collection, string $id
     if ($id === '' || !preg_match('/^[A-Za-z0-9][A-Za-z0-9_-]{0,149}$/', $id)) return null;
     $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id'])
         . '/databases/(default)/documents/' . rawurlencode($collection) . '/' . rawurlencode($id);
-    $context = stream_context_create(['http' => ['method' => 'GET', 'header' => 'Authorization: Bearer ' . firebaseAdminAccessToken(), 'timeout' => 15, 'ignore_errors' => true]]);
-    $response = @file_get_contents($url, false, $context);
-    $statusLine = $http_response_header[0] ?? '';
-    if (str_contains($statusLine, ' 404 ')) return null;
-    if (!is_string($response) || !preg_match('/\s2\d\d\s/', $statusLine)) throw new RuntimeException('Unable to read notification event details.');
-    $document = json_decode($response, true);
-    if (!is_array($document['fields'] ?? null)) return null;
+    $response = secureHttpRequest($url, 'GET', ['Authorization: Bearer ' . firebaseAdminAccessToken()], null, 15);
+    if ($response['status'] === 404) return null;
+    if ($response['status'] < 200 || $response['status'] >= 300) {
+        error_log(sprintf('Notification detail read failed (collection=%s, id=%s, HTTP=%d, cURL=%s, response=%s).',
+            $collection, $id, $response['status'], $response['error'] ?: 'none',
+            substr(preg_replace('/\s+/', ' ', $response['body']) ?? '', 0, 500) ?: '[empty]'));
+        return null;
+    }
+    $document = json_decode($response['body'], true);
+    if (!is_array($document)) {
+        error_log(sprintf('Notification detail response was invalid (collection=%s, id=%s, HTTP=%d, response=%s).',
+            $collection, $id, $response['status'], substr(preg_replace('/\s+/', ' ', $response['body']) ?? '', 0, 500) ?: '[empty]'));
+        return null;
+    }
+    // A valid empty Firestore document has a name but no fields.
+    if (!isset($document['fields'])) return [];
     $decode = static function (array $value) use (&$decode): mixed {
         foreach (['stringValue', 'integerValue', 'doubleValue', 'booleanValue', 'timestampValue'] as $type) {
             if (!array_key_exists($type, $value)) continue;
@@ -73,8 +78,8 @@ function notificationBookingDetails(array $account, array $booking): array
     $customer = notificationReadDocument($account, 'users', (string) ($booking['customerId'] ?? '')) ?? [];
     $branchId = (string) ($booking['branchId'] ?? '');
     $branchAliases = match (strtolower($branchId)) {
-        'santarosa', 'santa rosa', 'santa-rosa' => ['santarosa', 'santa_rosa'],
-        'cabuyao_main', 'cabuyao main' => ['cabuyao_main', 'cabuyao'],
+        'santarosa', 'santa_rosa', 'santa rosa', 'santa-rosa', 'santa rosa branch' => ['santarosa', 'santa_rosa'],
+        'cabuyao_main', 'cabuyao main', 'cabuyao branch', 'cabuyao main branch' => ['cabuyao_main', 'cabuyao'],
         default => [$branchId],
     };
     $branch = [];
@@ -96,7 +101,7 @@ function notificationBookingDetails(array $account, array $booking): array
         'customerEmail' => (string) ($customer['email'] ?? $booking['customerEmail'] ?? ''),
         'serviceName' => (string) ($service['name'] ?? $booking['serviceName'] ?? $booking['serviceId'] ?? 'Service'),
         'serviceCost' => (float) ($service['price'] ?? $invoice['runningTotal'] ?? $invoice['totalAmount'] ?? 0),
-        'branchName' => (string) ($branch['name'] ?? $branchId ?? 'Branch'),
+        'branchName' => normalizeBranchLabel((string) ($branch['name'] ?? $booking['branch'] ?? $branchId ?? ''), 'Branch'),
         'scheduledDate' => (string) ($booking['date'] ?? ''),
         'scheduledTime' => (string) ($booking['timeSlot'] ?? $booking['time'] ?? ''),
         'vehicleYear' => (string) ($vehicle['year'] ?? ''),
@@ -150,8 +155,20 @@ function notifyCustomerRecipient(array $account, string $eventId, string $custom
         'type' => $type, 'message' => $message, 'recipientRole' => 'customer',
         'userId' => $customerId, 'createdAt' => gmdate('Y-m-d\TH:i:s\Z'),
     ]);
-    if (notificationCreate($account, 'customer_' . $customerId . '_' . $eventId, $record) === false) return false;
-    return notificationEmail($email, $subject, $record);
+    try {
+        $persisted = notificationCreate($account, 'customer_' . $customerId . '_' . $eventId, $record);
+        if ($persisted === false) return false;
+    } catch (Throwable $error) {
+        // The approval and audit commit is authoritative; notification storage
+        // trouble must not prevent attempting the customer confirmation email.
+        error_log('CoolTime customer notification persistence failed: ' . $error->getMessage());
+    }
+    try {
+        return notificationEmail($email, $subject, $record);
+    } catch (Throwable $error) {
+        error_log('CoolTime customer notification email failed: ' . $error->getMessage());
+        return false;
+    }
 }
 
 function notifyNewBooking(array $account, array $details): void
@@ -187,7 +204,7 @@ function notifyRescheduleRequest(array $account, array $details): void
 function notifyRescheduleSuccess(array $account, string $customerId, string $customerEmail, array $details): bool
 {
     $message = 'Reschedule successful: your service appointment is successfully rescheduled!';
-    $slotKey = preg_replace('/[^A-Za-z0-9_-]/', '_', (string) ($details['scheduledDate'] ?? '') . '_' . (string) ($details['scheduledTime'] ?? '')) ?: bin2hex(random_bytes(4));
+    $slotKey = preg_replace('/[^A-Za-z0-9_-]/', '_', (string) ($details['branchName'] ?? '') . '_' . (string) ($details['scheduledDate'] ?? '') . '_' . (string) ($details['scheduledTime'] ?? '')) ?: bin2hex(random_bytes(4));
     return notifyCustomerRecipient($account, 'reschedule_success_' . (string) ($details['bookingId'] ?? '') . '_' . $slotKey, $customerId, $customerEmail, 'reschedule_success', $message, $details, 'CoolTime appointment rescheduled');
 }
 

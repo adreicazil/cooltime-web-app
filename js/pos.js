@@ -6,6 +6,7 @@ import { createReferenceNumber } from './reference-number.js';
 import { getUserProfile } from './firestore.js';
 import { logoutUser } from './auth.js';
 import { hasOtpVerification } from './auth-guard.js';
+import { normalizeBranchId, normalizeBranchLabel } from './branch-utils.js';
 
 const layout = document.querySelector('.pos-layout');
 const catalog = document.getElementById('serviceCatalog');
@@ -64,14 +65,15 @@ async function checkout() {
   statusRoot.textContent = 'Saving invoice…';
   const lines = [...cart.values()].map((service) => ({ id: service.id, name: service.name || service.id, price: Number(service.price), quantity: service.quantity, lineTotal: Number(service.price) * service.quantity }));
   const total = totalAmount();
-  const branchId = document.getElementById('branchSelect').value;
+  const branchId = normalizeBranchId(document.getElementById('branchSelect').value);
+  const branch = normalizeBranchLabel(branchId);
   const invoiceRef = doc(collection(db, 'invoices'));
   const paymentMethod = document.getElementById('paymentMethod').value;
   const customerName = document.getElementById('walkInName').value.trim() || 'Walk-in customer';
   const referenceNumber = createReferenceNumber(paymentMethod === 'cash' ? 'OTC' : 'PMO', branchId);
   const paymentRef = paymentMethod === 'cash' ? doc(collection(db, 'payments')) : null;
   const invoice = {
-    invoiceId: invoiceRef.id, invoiceNumber: referenceNumber, referenceNumber, customerId: 'walk-in', customerName, branchId,
+    invoiceId: invoiceRef.id, invoiceNumber: referenceNumber, referenceNumber, customerId: 'walk-in', customerName, branchId, branch,
     source: 'pos', bookingId: null, servicesAdded: lines.map((line) => line.id), serviceDetails: lines,
     runningTotal: total, finalAmount: total, totalAmount: total,
     status: paymentMethod === 'cash' ? 'paid' : 'pending',
@@ -83,12 +85,20 @@ async function checkout() {
     batch.set(invoiceRef, invoice);
     if (paymentMethod === 'cash') {
       batch.set(paymentRef, {
-        invoiceId: invoiceRef.id, customerId: 'walk-in', branchId, amount: total, currency: 'PHP',
+        invoiceId: invoiceRef.id, customerId: 'walk-in', branchId, branch, amount: total, currency: 'PHP',
         amountUnit: 'pesos', method: 'cash', status: 'paid', referenceNumber,
         createdAt: serverTimestamp(), paidAt: serverTimestamp()
       });
     }
     await batch.commit();
+    try {
+      const auditResponse = await fetch('api/admin-workflow.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await currentUser.getIdToken()}` },
+        body: JSON.stringify({ action: 'record_pos_transaction', transactionId: invoiceRef.id, transactionCollection: 'invoices' })
+      });
+      if (!auditResponse.ok) console.error('POS transaction saved, but its audit record could not be written.');
+    } catch (auditError) { console.error('POS transaction saved, but its audit record could not be written:', auditError); }
     renderReceipt(invoiceRef.id, invoice);
     if (paymentMethod === 'paymongo') {
       const response = await fetch('api/create-checkout-session.php', {
@@ -115,7 +125,7 @@ async function checkout() {
 function renderReceipt(id, invoice) {
   const preview = document.getElementById('receiptPreview');
   document.getElementById('receiptPayLink').hidden = true;
-  document.getElementById('receiptBody').innerHTML = `<p><strong>CoolTime Auto Aircon</strong><br>Branch: ${escapeHtml(invoice.branchId === 'cabuyao' ? 'Cabuyao Main' : 'Santa Rosa')}</p><p>Reference ID: <strong>${escapeHtml(invoice.referenceNumber || invoice.invoiceNumber || id)}</strong> <button type="button" class="btn btn-dark" data-copy-reference="${escapeHtml(invoice.referenceNumber || invoice.invoiceNumber || id)}">Copy</button><br>Invoice ID: ${escapeHtml(id)}<br>Customer: ${escapeHtml(invoice.customerName)}<br>Status: ${escapeHtml(invoice.status)}</p><table><thead><tr><th>Service</th><th>Qty</th><th>Amount</th></tr></thead><tbody>${invoice.serviceDetails.map((line) => `<tr><td>${escapeHtml(line.name)}</td><td>${line.quantity}</td><td>${money(line.lineTotal)}</td></tr>`).join('')}</tbody><tfoot><tr><th colspan="2">Total</th><th>${money(invoice.totalAmount)}</th></tr></tfoot></table><p>Thank you for choosing CoolTime.</p>`;
+  document.getElementById('receiptBody').innerHTML = `<p><strong>CoolTime Auto Aircon</strong><br>Branch: ${escapeHtml(normalizeBranchLabel(invoice.branch || invoice.branchId))}</p><p>Reference ID: <strong>${escapeHtml(invoice.referenceNumber || invoice.invoiceNumber || id)}</strong> <button type="button" class="btn btn-dark" data-copy-reference="${escapeHtml(invoice.referenceNumber || invoice.invoiceNumber || id)}">Copy</button><br>Invoice ID: ${escapeHtml(id)}<br>Customer: ${escapeHtml(invoice.customerName)}<br>Status: ${escapeHtml(invoice.status)}</p><table><thead><tr><th>Service</th><th>Qty</th><th>Amount</th></tr></thead><tbody>${invoice.serviceDetails.map((line) => `<tr><td>${escapeHtml(line.name)}</td><td>${line.quantity}</td><td>${money(line.lineTotal)}</td></tr>`).join('')}</tbody><tfoot><tr><th colspan="2">Total</th><th>${money(invoice.totalAmount)}</th></tr></tfoot></table><p>Thank you for choosing CoolTime.</p>`;
   preview.hidden = false;
   preview.scrollIntoView({ behavior: 'smooth' });
 }

@@ -57,6 +57,11 @@ if (bookingForm) {
         alert(`Booking ${result.bookingId} was saved, but invoice creation failed: ${error.message}`);
         return;
       }
+      if (invoice.alreadyPaid) {
+        alert(`Booking submitted. Reference ID: ${invoice.referenceNumber || invoice.invoiceId}. Payment is already confirmed.`);
+        bookingForm.reset();
+        return;
+      }
       if (invoice.checkoutUrl) {
         window.location.assign(invoice.checkoutUrl);
         return;

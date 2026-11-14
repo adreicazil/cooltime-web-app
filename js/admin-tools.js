@@ -1,10 +1,12 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { auth, authReady, db } from './firebase-config.js';
-import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { collection, limit, onSnapshot, orderBy, query } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { getAuthenticatedUser, hasOtpVerification, normalizeRole } from './auth-guard.js';
 import { logoutUser } from './auth.js';
+import { normalizeBranchId, normalizeBranchLabel, normalizeBranchText } from './branch-utils.js';
 
 const $ = (selector) => document.querySelector(selector);
+const setHTML = (element, html) => { if (element) element.innerHTML = html; };
 // Admin tools also runs inside admin-dashboard.html, which intentionally omits
 // the standalone tools page's back link and several Super Admin controls.
 const on = (selector, event, handler) => $(selector)?.addEventListener(event, handler);
@@ -13,7 +15,7 @@ const isAdminDashboard = document.body.dataset.adminDashboard === 'true';
 const isDashboardPage = isSuperAdminDashboard || isAdminDashboard;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
 const money = (value) => `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-let actor, role, bookings = [], accounts = [], services = [], invoices = [], payments = [], submissions = [], customers = [], vehicles = [], branches = [];
+let actor, role, bookings = [], accounts = [], services = [], invoices = [], payments = [], submissions = [], customers = [], vehicles = [], branches = [], legacyPosTransactions = [], auditLogs = [];
 let usersById = {}, servicesById = {}, paymentsByInvoice = {}, vehiclesById = {}, branchesById = {};
 let adminRows = {};
 let reportHistoryData = [];
@@ -46,11 +48,19 @@ function bookingVehicleDetails(booking, vehicleRecord = {}) {
   const nested = booking.vehicle && typeof booking.vehicle === 'object' ? booking.vehicle : {};
   const value = (...items) => items.find((item) => item !== undefined && item !== null && String(item).trim() !== '');
   return {
-    plateNumber: value(nested.plateNumber, nested.plate_number, booking.plateNumber, booking.plate_number, vehicleRecord.plateNumber, vehicleRecord.plate_number),
+    plateNumber: value(nested.plateNumber, nested.plate_number, nested.vehiclePlate, nested.vehicle_plate, nested.plate, booking.vehiclePlate, booking.vehicle_plate, booking.plateNumber, booking.plate_number, booking.plate, vehicleRecord.vehiclePlate, vehicleRecord.vehicle_plate, vehicleRecord.plateNumber, vehicleRecord.plate_number, vehicleRecord.plate),
     make: value(nested.make, nested.vehicleMake, nested.vehicle_make, booking.vehicleMake, booking.vehicle_make, booking.make, vehicleRecord.make, vehicleRecord.vehicleMake, vehicleRecord.vehicle_make),
     model: value(nested.model, nested.vehicleModel, nested.vehicle_model, booking.vehicleModel, booking.vehicle_model, booking.model, vehicleRecord.model, vehicleRecord.vehicleModel, vehicleRecord.vehicle_model),
     year: value(nested.year, nested.vehicleYear, nested.vehicle_year, booking.vehicleYear, booking.vehicle_year, booking.year, vehicleRecord.year, vehicleRecord.vehicleYear, vehicleRecord.vehicle_year),
   };
+}
+
+function branchAddressFor(branchValue, storedAddress = '') {
+  if (storedAddress) return storedAddress;
+  const branchId = normalizeBranchId(branchValue);
+  if (branchId === 'cabuyao') return 'Cabuyao, Laguna';
+  if (branchId === 'santa_rosa') return 'Santa Rosa, Laguna';
+  return 'Address unavailable';
 }
 
 function setupModulePagination(config) {
@@ -59,17 +69,19 @@ function setupModulePagination(config) {
   const footer = card?.querySelector('.table-pagination-footer');
   if (!container || !footer) return { setItems() {} };
   let currentPage = 1;
-  let itemsData = [];
+  let itemsData = null;
   const renderRow = config.renderRowFn || ((item) => item);
 
   function updateView() {
+    // Keep the HTML loading placeholder until the first data source settles.
+    if (itemsData === null) return;
     const totalPages = Math.ceil(itemsData.length / moduleRowsPerPage) || 1;
     currentPage = Math.min(Math.max(1, currentPage), totalPages);
     const startIndex = (currentPage - 1) * moduleRowsPerPage;
     const visibleItems = itemsData.slice(startIndex, startIndex + moduleRowsPerPage);
-    container.innerHTML = visibleItems.length
+    setHTML(container, visibleItems.length
       ? visibleItems.map((item, index) => renderRow(item, startIndex + index)).join('')
-      : config.emptyHtml;
+      : config.emptyHtml);
     const current = footer.querySelector('.current-page-num');
     const total = footer.querySelector('.total-pages-num');
     const previous = footer.querySelector('.btn-prev-page');
@@ -137,9 +149,7 @@ function createHorizontalBookingRowHTML(booking) {
   const status = normalizeBookingFilterStatus(booking.status || 'pending');
   const statusColor = status === 'confirmed' ? '#38bdf8' : '#f97316';
   const branchKey = String(booking.branchId || '').toLowerCase().replace(/[\s-]+/g, '_');
-  const branch = branchesById[booking.branchId]?.name
-    || ({ cabuyao_main: 'Cabuyao Branch', cabuyao: 'Cabuyao Branch', santa_rosa: 'Santa Rosa Branch', santarosa: 'Santa Rosa Branch' }[branchKey])
-    || booking.branchId || 'Branch';
+  const branch = normalizeBranchLabel(branchesById[booking.branchId]?.name || booking.branchName || booking.branch || branchKey || booking.branchId, 'Branch');
   const dateTime = [booking.date, booking.timeSlot || booking.time].filter(Boolean).join(' - ');
   return `<div class="overview-booking-row" role="row">
     <div class="overview-booking-customer" role="cell" title="${esc(user.name || user.username || booking.customerName || 'Customer')}">${esc(user.name || user.username || booking.customerName || 'Customer')}</div>
@@ -151,12 +161,13 @@ function createHorizontalBookingRowHTML(booking) {
 }
 
 function renderOverviewBookings(target) {
+  if (!target) return;
   const recentBookings = bookings
     .filter((item) => ['pending', 'confirmed'].includes(normalizeBookingFilterStatus(item.status || 'pending')))
     .sort((a, b) => `${b.date || ''} ${b.timeSlot || ''}`.localeCompare(`${a.date || ''} ${a.timeSlot || ''}`))
     .slice(0, 30);
-  target.innerHTML = recentBookings.map(createHorizontalBookingRowHTML).join('')
-    || '<p class="overview-empty">No pending or confirmed bookings.</p>';
+  setHTML(target, recentBookings.map(createHorizontalBookingRowHTML).join('')
+    || '<p class="overview-empty">No pending or confirmed bookings.</p>');
 }
 
 function createOverviewServiceRowHTML(service) {
@@ -186,16 +197,16 @@ function renderDashboardOverview() {
 
   if (serviceTarget) {
     const activeServices = services.filter((item) => !['inactive', 'disabled', 'archived'].includes(String(item.status || '').toLowerCase()));
-    serviceTarget.innerHTML = activeServices.map(createOverviewServiceRowHTML).join('') || '<p class="overview-empty">No active services in the catalog.</p>';
+    setHTML(serviceTarget, activeServices.map(createOverviewServiceRowHTML).join('') || '<p class="overview-empty">No active services in the catalog.</p>');
   }
 
   if (inquiriesTarget) {
     const recentSubmissions = [...submissions].sort((a, b) => String(b.createdAt || b.requestedDate || b.id || '').localeCompare(String(a.createdAt || a.requestedDate || a.id || ''))).slice(0, 20);
-    inquiriesTarget.innerHTML = recentSubmissions.map((item) => `<div class="overview-list-item overview-inquiry-item"><div class="overview-item-main"><span class="overview-item-title">${esc(item.name || item.email || 'Customer request')} · ${esc(item.type || (item.collection === 'feedback' ? 'Feedback' : 'Inquiry'))}</span><span class="overview-item-meta">${esc(item.message || item.requestedService || 'No message provided.')}</span></div><span class="overview-item-value inquiry-date-text">${esc(overviewDate(item.createdAt || item.requestedDate))}</span></div>`).join('') || '<p class="overview-empty">No inquiries or feedback yet.</p>';
+    setHTML(inquiriesTarget, recentSubmissions.map((item) => `<div class="overview-list-item overview-inquiry-item"><div class="overview-item-main"><span class="overview-item-title">${esc(item.name || item.email || 'Customer request')} · ${esc(item.type || (item.collection === 'feedback' ? 'Feedback' : 'Inquiry'))}</span><span class="overview-item-meta">${esc(item.message || item.requestedService || 'No message provided.')}</span></div><span class="overview-item-value inquiry-date-text">${esc(overviewDate(item.createdAt || item.requestedDate))}</span></div>`).join('') || '<p class="overview-empty">No inquiries or feedback yet.</p>');
   }
 
   if (reportsTarget) {
-    reportsTarget.innerHTML = reportHistoryData.slice(0, 4).map((item) => `<div class="overview-report-row">${esc(item.type || 'Report')} · ${esc(item.period || '—')} · ${Number(item.rowCount || 0)} rows · ${esc(overviewDate(item.createdAt))}</div>`).join('') || '<p class="overview-empty">No reports generated yet.</p>';
+    setHTML(reportsTarget, reportHistoryData.slice(0, 4).map((item) => `<div class="overview-report-row">${esc(item.type || 'Report')} · ${esc(item.period || '—')} · ${Number(item.rowCount || 0)} rows · ${esc(overviewDate(item.createdAt))}</div>`).join('') || '<p class="overview-empty">No reports generated yet.</p>');
   }
 
   if (notificationsTarget) {
@@ -204,7 +215,7 @@ function renderDashboardOverview() {
       .filter((item) => !item.recipientRole || item.recipientRole === 'admin')
       .sort((a, b) => String(b.createdAt || b.timestamp || b.updatedAt || '').localeCompare(String(a.createdAt || a.timestamp || a.updatedAt || '')))
       .slice(0, 20);
-    notificationsTarget.innerHTML = recentNotifications.map((item) => `<div class="overview-list-item overview-notification-row" role="button" tabindex="0" data-notification-id="${esc(item.id)}"><div class="overview-item-main"><span class="overview-item-title">${esc(formatNotificationMessage(item) || item.title || 'Activity')}</span><span class="overview-item-meta">${esc(overviewDate(item.timestamp || item.createdAt || item.updatedAt))}</span></div></div>`).join('') || '<p class="overview-empty">No operational notifications found.</p>';
+    setHTML(notificationsTarget, recentNotifications.map((item) => `<div class="overview-list-item overview-notification-row" role="button" tabindex="0" data-notification-id="${esc(item.id)}"><div class="overview-item-main"><span class="overview-item-title">${esc(formatNotificationMessage(item) || item.title || 'Activity')}</span><span class="overview-item-meta">${esc(overviewDate(item.timestamp || item.createdAt || item.updatedAt))}</span></div></div>`).join('') || '<p class="overview-empty">No operational notifications found.</p>');
   }
 
   const canvas = $('#overviewMiniChart');
@@ -278,6 +289,50 @@ function readableError(error) {
   return error?.message || 'The action could not be completed.';
 }
 
+function ensureAuditTrailUI() {
+  const monitor = $('#posMonitoring');
+  if (!monitor || $('#posAuditTrail')) return;
+  const section = document.createElement('section');
+  section.className = 'panel pos-audit-trail-card super-only';
+  section.id = 'posAuditTrail';
+  setHTML(section, `<h3>Audit Trail</h3><p>Recorded administrator actions across bookings, customer requests, and POS transactions.</p><div class="pos-audit-trail-filters"><input type="search" id="posAuditSearch" class="form-control" placeholder="Search Reference ID or Admin name" aria-label="Search audit trail by reference or administrator"></div><div class="table-scroll"><table class="pos-audit-trail-table"><thead><tr><th>Date &amp; time</th><th>Action</th><th>Reference ID</th><th>Administrator</th><th>Role</th><th>Details</th></tr></thead><tbody id="posAuditResults"><tr><td colspan="6">Loading audit trail…</td></tr></tbody></table></div><div class="table-pagination-footer"><button type="button" class="btn-pagination-chevron btn-prev-page" title="Previous Page" aria-label="Previous page">&lt;</button><span class="pagination-page-display">Page <span class="current-page-num" title="Click to jump to page">1</span> of <span class="total-pages-num">1</span></span><button type="button" class="btn-pagination-chevron btn-next-page" title="Next Page" aria-label="Next page">&gt;</button></div>`);
+  monitor.append(section);
+  on('#posAuditSearch', 'input', renderAuditTrail);
+}
+
+function configurePosFilters() {
+  const methodSelect = $('#pos-method-filter');
+  const statusSelect = $('#pos-status-filter');
+  const addMissingOptions = (select, options) => {
+    if (!select) return;
+    const existing = new Set([...select.options].map((option) => option.value));
+    options.forEach(([value, label]) => {
+      if (existing.has(value)) return;
+      const option = document.createElement('option'); option.value = value; option.textContent = label; select.append(option);
+    });
+  };
+  addMissingOptions(methodSelect, [['paymaya', 'PayMaya'], ['e-wallet', 'E-wallet'], ['grabpay', 'GrabPay'], ['qrph', 'QR Ph']]);
+  addMissingOptions(statusSelect, [['pending', 'Pending'], ['void_requested', 'Void Requested'], ['flagged', 'Flagged']]);
+}
+
+function auditTimeMs(item) {
+  const value = item?.createdAt ?? item?.timestamp;
+  const date = value?.toDate?.() || (typeof value === 'number' ? new Date(value) : value ? new Date(value) : null);
+  return date && !Number.isNaN(date.getTime()) ? date.getTime() : 0;
+}
+
+function renderAuditTrail() {
+  if (!modulePaginators.posAudit) return;
+  const term = ($('#posAuditSearch')?.value || '').trim().toLowerCase();
+  const rows = [...auditLogs].sort((a, b) => auditTimeMs(b) - auditTimeMs(a)).filter((item) =>
+    !term || `${item.referenceId || ''} ${item.actorName || ''} ${item.actorEmail || ''}`.toLowerCase().includes(term));
+  modulePaginators.posAudit.setItems(rows.map((item) => {
+    const date = item.createdAt?.toDate?.() || (item.createdAt ? new Date(item.createdAt) : null);
+    const stamp = date && !Number.isNaN(date.getTime()) ? date.toLocaleString('en-PH') : 'Timestamp unavailable';
+    return `<tr><td>${esc(stamp)}</td><td><strong>${esc(item.action || 'Action')}</strong></td><td>${esc(item.referenceId || '—')}</td><td>${esc(item.actorName || item.actorEmail || 'Unknown admin')}<small>${esc(item.actorEmail || '')}</small></td><td>${esc(String(item.actorRole || 'admin').replaceAll('_', ' '))}</td><td>${esc(item.details || '')}</td></tr>`;
+  }));
+}
+
 async function initialize() {
   actor = await getAuthenticatedUser();
   if (!actor) { redirectToLoginWhenSignedOut(); return; }
@@ -294,6 +349,7 @@ async function initialize() {
     alert('Your account does not have super administrator access.');
     return;
   }
+  configurePosFilters();
   if (isDashboardPage) {
     modulePaginators.bookings = setupModulePagination({
       cardContainerId: 'bookingManagement', listContainerId: 'bookingResults',
@@ -311,6 +367,13 @@ async function initialize() {
       cardContainerId: 'posMonitoring', listContainerId: 'posResults',
       emptyHtml: '<tr><td colspan="7" class="pos-empty-state">No POS transactions match these filters.</td></tr>'
     });
+    if (role === 'super_admin') {
+      ensureAuditTrailUI();
+      modulePaginators.posAudit = setupModulePagination({
+        cardContainerId: 'posAuditTrail', listContainerId: 'posAuditResults',
+        emptyHtml: '<tr><td colspan="6" class="pos-empty-state">No audit actions found.</td></tr>'
+      });
+    }
   }
   if (!isSuperAdminDashboard) {
     const dashboardBackLink = $('#dashboardBackLink');
@@ -321,9 +384,18 @@ async function initialize() {
     if (adminIdentity) adminIdentity.textContent = `${access.profile?.name || actor.email} · ${role.replace('_', ' ')}`;
   }
   if (role === 'super_admin') document.querySelectorAll('.super-only').forEach((node) => { node.hidden = false; });
-  await loadCoreData();
-  watchDashboardNotifications();
-  watchServiceCatalog();
+  if (isDashboardPage) {
+    // Start independent live reads together so overview, bookings, and POS do
+    // not wait for the admin API's sequential collection export.
+    watchDashboardNotifications();
+    if (role === 'super_admin' && isSuperAdminDashboard) {
+      renderAccounts();
+      loadSettings().catch((error) => console.error('Dashboard settings could not be loaded:', error));
+    }
+  } else {
+    await loadCoreData();
+    watchServiceCatalog();
+  }
   $('#toolsLogout')?.addEventListener('click', () => logoutUser('login.html'));
   on('#closeDialog', 'click', () => $('#detailDialog')?.close());
   on('#booking-search-input', 'input', renderBookings);
@@ -362,12 +434,18 @@ async function initialize() {
     const superAction = event.target.closest('[data-super-pos-action]');
     if (superAction) {
       event.stopPropagation();
-      const { superPosAction, invoiceId } = superAction.dataset;
-      if (superPosAction === 'flag') handleSuperAdminFlag(invoiceId);
-      else if (superPosAction === 'void') handleSuperAdminVoid(invoiceId);
-      else if (superPosAction === 'export') exportSingleTransactionAudit(invoiceId);
+      const { superPosAction, transactionId, transactionCollection } = superAction.dataset;
+      if (superPosAction === 'flag') handleSuperAdminFlag(transactionId, transactionCollection);
+      else if (superPosAction === 'void') handleSuperAdminVoid(transactionId, transactionCollection);
+      else if (superPosAction === 'export') exportSingleTransactionAudit(transactionId, transactionCollection);
       return;
     }
+    const requestVoid = event.target.closest('.btn-pos-request-void');
+    if (requestVoid) { event.stopPropagation(); voidAdminPosTransaction(requestVoid.dataset.transactionId, requestVoid.dataset.transactionCollection); return; }
+    const approveVoid = event.target.closest('.btn-pos-approve-void');
+    if (approveVoid) { event.stopPropagation(); decidePosVoid(approveVoid.dataset.transactionId, approveVoid.dataset.transactionCollection, true); return; }
+    const rejectVoid = event.target.closest('.btn-pos-reject-void');
+    if (rejectVoid) { event.stopPropagation(); decidePosVoid(rejectVoid.dataset.transactionId, rejectVoid.dataset.transactionCollection, false); return; }
     const superDropdownToggle = event.target.closest('.btn-super-pos-actions');
     if (superDropdownToggle) {
       event.stopPropagation();
@@ -379,7 +457,7 @@ async function initialize() {
     const voidButton = event.target.closest('.btn-pos-void-action');
     if (voidButton) {
       event.stopPropagation();
-      voidAdminPosTransaction(voidButton.dataset.invoiceId);
+      voidAdminPosTransaction(voidButton.dataset.transactionId || voidButton.dataset.invoiceId, voidButton.dataset.transactionCollection || 'invoices');
       return;
     }
     const row = event.target.closest('tr.pos-main-row');
@@ -486,6 +564,14 @@ window.addEventListener('pageshow', (event) => {
   }
 });
 async function loadCoreData() {
+  // Dashboard pages are backed by independent listeners installed during
+  // initialization. Their snapshots update state immediately and avoid a
+  // repeated, sequential full-collection export after each admin action.
+  if (isDashboardPage) {
+    renderBookings(); renderSubmissions(); renderServices(); renderPos(); renderCustomers();
+    renderNotifications(); renderAccounts(); renderDashboardOverview();
+    return;
+  }
   const response = await api('api/admin-workflow.php', { action: 'load_data' });
   adminRows = response.data || {};
   const [bookingRows, accountRows, serviceRows, invoiceRows, paymentRows, feedbackRows, inquiryRows, vehicleRows, branchRows] = [
@@ -496,33 +582,99 @@ async function loadCoreData() {
   usersById = Object.fromEntries(accountRows.map((item) => [item.id, item]));
   servicesById = Object.fromEntries(services.map((item) => [item.id, item]));
   vehicles = vehicleRows; branches = branchRows;
+  legacyPosTransactions = adminRows.pos_transactions || [];
   vehiclesById = Object.fromEntries(vehicles.map((item) => [item.id, item])); branchesById = Object.fromEntries(branches.map((item) => [item.id, item]));
   paymentsByInvoice = Object.fromEntries(payments.map((item) => [item.invoiceId, item]));
   renderBookings(); renderSubmissions(); renderServices(); renderPos(); renderCustomers();
   if (document.body.dataset.adminDashboard !== 'true') renderContinuousSystemLogs();
   renderNotifications();
   await loadReportHistory();
-  if (role === 'super_admin' && isSuperAdminDashboard) { renderAccounts(); await loadSettings(); }
   renderDashboardOverview();
 }
 
 function watchDashboardNotifications() {
   if (!isDashboardPage) return;
-  onSnapshot(collection(db, 'notifications'), (snapshot) => {
-    adminRows.notifications = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-    renderNotifications();
-  }, (error) => console.error('Dashboard notifications could not be refreshed:', error));
-  onSnapshot(collection(db, 'reports'), (snapshot) => {
-    reportHistoryData = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))
-      .sort((a, b) => String(b.createdAt || b.id).localeCompare(String(a.createdAt || a.id)));
+  const listen = (name, apply, constraints = []) => onSnapshot(query(collection(db, name), ...constraints), (snapshot) => {
+    const rows = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+    adminRows[name] = rows;
+    apply(rows);
+  }, (error) => console.error(`${name} could not be refreshed:`, error));
+
+  listen('bookings', (rows) => {
+    bookings = rows;
+    renderBookings();
     renderDashboardOverview();
-  }, (error) => console.error('Dashboard report history could not be refreshed:', error));
-  onSnapshot(collection(db, 'invoices'), (snapshot) => {
+  });
+  listen('users', (rows) => {
+    usersById = Object.fromEntries(rows.map((item) => [item.id, item]));
+    accounts = rows.filter((item) => ['customer', 'staff', 'admin'].includes(String(item.role || '').toLowerCase()));
+    customers = rows.filter((item) => String(item.role || '').toLowerCase() === 'customer');
+    renderCustomers();
+    renderBookings();
+    if (role === 'super_admin' && isSuperAdminDashboard) renderAccounts();
+    renderDashboardOverview();
+  });
+  listen('branches', (rows) => {
+    branches = rows;
+    branchesById = Object.fromEntries(rows.map((item) => [item.id, item]));
+    renderPos();
+  });
+  listen('vehicles', (rows) => {
+    vehicles = rows;
+    vehiclesById = Object.fromEntries(rows.map((item) => [item.id, item]));
+    renderBookings();
+  });
+  listen('feedback', (rows) => {
+    submissions = [...rows.map((item) => ({ ...item, collection: 'feedback' })), ...(adminRows.inquiries || []).map((item) => ({ ...item, collection: 'inquiries' }))];
+    renderSubmissions();
+    renderDashboardOverview();
+  });
+  listen('inquiries', (rows) => {
+    submissions = [...(adminRows.feedback || []).map((item) => ({ ...item, collection: 'feedback' })), ...rows.map((item) => ({ ...item, collection: 'inquiries' }))];
+    renderSubmissions();
+    renderDashboardOverview();
+  });
+  listen('services', (rows) => {
+    services = rows;
+    servicesById = Object.fromEntries(rows.map((item) => [item.id, item]));
+    renderServices();
+    renderBookings();
+    renderDashboardOverview();
+  });
+  listen('notifications', (rows) => {
+    adminRows.notifications = rows;
+    renderNotifications();
+    renderDashboardOverview();
+  }, [orderBy('createdAt', 'desc'), limit(150)]);
+  listen('reports', (rows) => {
+    reportHistoryData = rows;
+    renderContinuousReportHistory();
+    renderDashboardOverview();
+  }, [orderBy('createdAt', 'desc'), limit(150)]);
+  listen('invoices', (rows) => {
     const previousById = Object.fromEntries(invoices.map((item) => [item.id, item]));
-    invoices = snapshot.docs.map((document) => ({ ...previousById[document.id], ...document.data(), id: document.id }));
+    invoices = rows.map((item) => ({ ...previousById[item.id], ...item }));
     renderPos();
     renderDashboardOverview();
-  }, (error) => console.error('Dashboard sales analytics could not be refreshed:', error));
+  });
+  listen('payments', (rows) => {
+    payments = rows;
+    paymentsByInvoice = Object.fromEntries(payments.map((item) => [item.invoiceId, item]));
+    renderPos();
+  });
+  listen('pos_transactions', (rows) => {
+    legacyPosTransactions = rows.map((item) => ({ ...item, _collection: 'pos_transactions' }));
+    renderPos();
+  });
+  if (role === 'super_admin') {
+    listen('audit_logs', (rows) => {
+      auditLogs = rows.map((item) => ({ ...item, details: normalizeBranchText(item.details || '') }));
+      renderAuditTrail();
+    }, [orderBy('createdAt', 'desc'), limit(150)]);
+    listen('activity_logs', (rows) => {
+      renderContinuousSystemLogs(rows);
+    }, [orderBy('createdAt', 'desc'), limit(150)]);
+  }
 }
 
 function watchServiceCatalog() {
@@ -544,34 +696,95 @@ function normalizeBookingFilterStatus(value) {
   return status;
 }
 
+function bookingAppointmentDateKey(booking) {
+  const rawDate = String(booking.date || booking.appointmentDate || '').trim();
+  const normalizedDate = rawDate.match(/^\d{4}-\d{2}-\d{2}/)?.[0];
+  if (normalizedDate) return normalizedDate;
+  const invoice = invoiceForBooking(booking);
+  const references = [booking.referenceNumber, booking.referenceId, booking.invoiceNumber,
+    invoice?.referenceNumber, invoice?.referenceId, invoice?.invoiceNumber].filter(Boolean);
+  for (const reference of references) {
+    const dateSegment = String(reference).match(/(?:^|-)(\d{8})(?:-|$)/)?.[1];
+    if (dateSegment) return `${dateSegment.slice(0, 4)}-${dateSegment.slice(4, 6)}-${dateSegment.slice(6, 8)}`;
+  }
+  return '';
+}
+
+function bookingAppointmentStartMinutes(booking) {
+  const slot = String(booking.timeSlot || booking.preferredTimeSlot || booking.time || '').trim();
+  const twelveHour = slot.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (twelveHour) {
+    let hour = Number(twelveHour[1]) % 12;
+    if (twelveHour[3].toUpperCase() === 'PM') hour += 12;
+    return hour * 60 + Number(twelveHour[2]);
+  }
+  const twentyFourHour = slot.match(/(?:^|\D)(\d{1,2}):(\d{2})/);
+  return twentyFourHour ? Number(twentyFourHour[1]) * 60 + Number(twentyFourHour[2]) : -1;
+}
+
+function showAdminConfirm(message, { confirmText = 'OK', cancelText = 'Cancel' } = {}) {
+  let dialog = document.getElementById('adminActionConfirmDialog');
+  if (!dialog) {
+    dialog = document.createElement('dialog');
+    dialog.id = 'adminActionConfirmDialog';
+    dialog.className = 'admin-action-confirm-dialog';
+    document.body.append(dialog);
+  }
+  if (!dialog.querySelector('[data-admin-confirm-message]') || !dialog.querySelector('[data-admin-confirm-ok]') || !dialog.querySelector('[data-admin-confirm-cancel]')) {
+    setHTML(dialog, '<p data-admin-confirm-message></p><div class="admin-action-confirm-actions"><button type="button" data-admin-confirm-cancel>Cancel</button><button type="button" data-admin-confirm-ok>OK</button></div>');
+  }
+  const messageElement = dialog.querySelector('[data-admin-confirm-message]');
+  const confirmButton = dialog.querySelector('[data-admin-confirm-ok]');
+  const cancelButton = dialog.querySelector('[data-admin-confirm-cancel]');
+  if (!messageElement || !confirmButton || !cancelButton) return Promise.resolve(false);
+  messageElement.textContent = message;
+  confirmButton.textContent = confirmText;
+  cancelButton.textContent = cancelText;
+  return new Promise((resolve) => {
+    const finish = (accepted) => {
+      dialog.removeEventListener('close', onClose);
+      if (dialog.open) dialog.close(accepted ? 'confirm' : 'cancel');
+      resolve(accepted);
+    };
+    const onClose = () => resolve(dialog.returnValue === 'confirm');
+    confirmButton.onclick = () => finish(true);
+    cancelButton.onclick = () => finish(false);
+    dialog.addEventListener('close', onClose, { once: true });
+    dialog.showModal();
+    confirmButton.focus();
+  });
+}
+
 function renderBookings() {
-  const search = $('#booking-search-input').value.trim().toLowerCase();
-  const startDate = $('#booking-start-date').value;
-  const endDate = $('#booking-end-date').value;
-  const statusFilter = normalizeBookingFilterStatus($('#booking-status-filter').value);
+  const search = ($('#booking-search-input')?.value || '').trim().toLowerCase();
+  const startDate = $('#booking-start-date')?.value || '';
+  const endDate = $('#booking-end-date')?.value || '';
+  const statusFilter = normalizeBookingFilterStatus($('#booking-status-filter')?.value || '');
   const rows = bookings.filter((booking) => {
     const user = usersById[booking.customerId] || { name: booking.customerName, email: booking.customerEmail, phone: booking.contactNumber };
     const invoice = invoiceForBooking(booking);
-    const reference = booking.referenceNumber || booking.invoiceNumber || invoice?.referenceNumber || invoice?.invoiceNumber || '';
+    const reference = booking.referenceNumber || booking.referenceId || booking.invoiceNumber || invoice?.referenceNumber || invoice?.referenceId || invoice?.invoiceNumber || booking.id || '';
     const status = normalizeBookingFilterStatus(booking.status || 'pending');
     const matchesStatus = !statusFilter || status === statusFilter;
-    const bookingDate = String(booking.date || '').slice(0, 10);
+    const bookingDate = bookingAppointmentDateKey(booking);
     const matchesDateRange = (!startDate || (bookingDate && bookingDate >= startDate))
       && (!endDate || (bookingDate && bookingDate <= endDate));
     return matchesStatus && matchesDateRange && (!search || `${user.name || user.username || ''} ${user.email || ''} ${reference}`.toLowerCase().includes(search));
   });
+  rows.sort((a, b) => bookingAppointmentDateKey(b).localeCompare(bookingAppointmentDateKey(a))
+    || bookingAppointmentStartMinutes(b) - bookingAppointmentStartMinutes(a));
   const renderedRows = rows.map((booking) => {
     const user = usersById[booking.customerId] || { name: booking.customerName, email: booking.customerEmail, phone: booking.contactNumber };
     const service = bookingServiceName(booking);
     const invoice = invoiceForBooking(booking);
-    const reference = booking.referenceNumber || booking.invoiceNumber || invoice?.referenceNumber || invoice?.invoiceNumber || booking.id;
+    const reference = booking.referenceNumber || booking.referenceId || booking.invoiceNumber || invoice?.referenceNumber || invoice?.referenceId || invoice?.invoiceNumber || booking.id;
     const sessionId = String(invoice?.latestPaymentSessionId || '');
     const checkout = payments.find((item) => item.id === `paymongo_${sessionId}` || item.checkoutSessionId === sessionId);
     const activeCheckout = Boolean(sessionId && String(checkout?.status || '').toLowerCase() === 'pending');
     const invoicePaid = String(invoice?.status || '').toLowerCase() === 'paid';
     const isClosed = ['cancelled', 'completed', 'paid'].includes(String(booking.status).toLowerCase()) || invoicePaid;
     const canApprove = String(booking.status).toLowerCase() === 'pending';
-    const canComplete = ['confirmed', 'in_progress'].includes(String(booking.status).toLowerCase());
+    const canComplete = String(booking.status).toLowerCase() === 'confirmed';
     const normalizedStatus = normalizeBookingFilterStatus(booking.status || 'pending');
     const isCancelled = normalizedStatus === 'cancelled';
     const invoiceStatus = String(invoice?.status || '').toLowerCase();
@@ -586,17 +799,18 @@ function renderBookings() {
       const branch = branchesById[booking.branchId] || {};
       const serviceRecord = servicesById[bookingServiceId(booking)] || {};
       const branchKey = String(booking.branchId || '').toLowerCase().replace(/[\s-]+/g, '_');
-      const branchName = branch.name || ({ cabuyao_main: 'Cabuyao', cabuyao: 'Cabuyao', santa_rosa: 'Santa Rosa', santarosa: 'Santa Rosa' }[branchKey] || booking.branchId);
+      const branchName = normalizeBranchLabel(branch.name || booking.branchName || booking.branch || branchKey || booking.branchId);
       const customerName = user.name || user.username || booking.customerName || booking.customerId;
       const customerEmail = user.email || booking.customerEmail;
+      const appointmentDate = booking.date || booking.appointmentDate || '—';
+      const timeSlot = booking.timeSlot || booking.preferredTimeSlot || booking.time || '—';
       const expandedId = `booking-details-${esc(booking.id)}`;
       const field = (label, value) => `<div class="booking-detail-field"><span>${label}</span><strong>${esc(value || '—')}</strong></div>`;
       const reasonField = (label, value) => String(value || '').trim()
         ? `<div class="booking-detail-reason"><span>${label}</span><p>${esc(value)}</p></div>` : '';
       const menuItems = [
-        !isClosed && ['pending', 'confirmed'].includes(bookingStatus) ? `<button type="button" class="reschedule-booking" data-id="${esc(booking.id)}">Update appointment slot</button>` : '',
+        bookingStatus === 'confirmed' ? `<button type="button" class="reschedule-booking" data-id="${esc(booking.id)}">Update appointment slot</button>` : '',
         !isClosed && bookingStatus !== 'confirmed' ? `<button type="button" class="cancel-booking" data-id="${esc(booking.id)}">Expire checkout &amp; release slot</button>` : '',
-        !isClosed ? `<button type="button" class="reject-cancellation" data-id="${esc(booking.id)}">Reject request</button>` : '',
         canComplete ? `<button type="button" class="complete-booking" data-id="${esc(booking.id)}">Complete service</button>` : '',
         canApprove ? `<button type="button" class="approve-booking" data-id="${esc(booking.id)}">Approve booking</button>` : ''
       ].filter(Boolean).join('');
@@ -607,7 +821,7 @@ function renderBookings() {
         <div class="booking-row-summary">
           <div class="booking-row-customer"><strong>${esc(customerName)}</strong></div>
           <div class="booking-row-email">${esc(customerEmail || '—')}</div>
-          <div class="booking-service-info"><span class="service-title">${esc(service)}</span><span class="service-datetime">${esc(booking.date)} - ${esc(booking.timeSlot)} ? ${esc(reference)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button></span></div>
+          <div class="booking-service-info"><span class="service-title">${esc(service)}</span><span class="service-datetime">${esc(appointmentDate)} - ${esc(timeSlot)}</span></div>
           <div class="booking-row-branch">${esc(branchName || '—')}</div>
           <span class="booking-status-pill status ${esc(bookingStatusKey)}">${esc(bookingStatus.replaceAll('_', ' '))}</span>
           ${actionColumnHtml}
@@ -616,8 +830,10 @@ function renderBookings() {
           ${field('Customer name', user.name || user.username || booking.customerName || booking.customerId)}
           ${field('Customer email', user.email || booking.customerEmail)}
           <div class="booking-detail-field"><span>Reference ID</span><strong>${esc(reference)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button></strong></div>
-          ${field('Branch', branch.name || booking.branchId)}
-          ${field('Branch address', branch.address)}
+          ${field('Appointment date', appointmentDate)}
+          ${field('Preferred time slot', timeSlot)}
+          ${field('Branch', normalizeBranchLabel(branch.name || booking.branchName || booking.branch || booking.branchId))}
+          ${field('Branch address', branchAddressFor(branch.name || booking.branch || booking.branchName || booking.branchId, booking.branchAddress || branch.address))}
           ${field('Service price', money(serviceRecord.price))}
           ${field('Vehicle plate number', vehicleDetails.plateNumber)}
           ${field('Vehicle make', vehicleDetails.make)}
@@ -629,14 +845,14 @@ function renderBookings() {
       </article>`;
     }
 
-    return `<tr><td>${esc(user.name || user.username || booking.customerId)}</td><td>${esc(user.email)}</td><td>${esc(booking.date)} ${esc(booking.timeSlot)}</td><td>${esc(service)}</td><td>${esc(booking.branchId)}</td><td>${state}</td><td><button class="action-btn booking-details" data-id="${esc(booking.id)}">View</button>${canApprove ? ` <button class="action-btn approve-booking" data-id="${esc(booking.id)}">Approve booking</button>` : ''}${!isClosed ? `${bookingStatus !== 'confirmed' ? ` <button class="action-btn cancel-booking" data-id="${esc(booking.id)}">${activeCheckout ? 'Expire checkout & release slot' : 'Cancel booking / release slot'}</button>` : ''} <button class="action-btn reject-cancellation" data-id="${esc(booking.id)}">Reject request</button>` : ''}${canComplete ? ` <button class="action-btn complete-booking" data-id="${esc(booking.id)}">Complete service</button>` : ''}</td></tr>`;
+    return `<tr><td>${esc(user.name || user.username || booking.customerId)}</td><td>${esc(user.email)}</td><td>${esc(booking.date)} ${esc(booking.timeSlot)}</td><td>${esc(service)}</td><td>${esc(normalizeBranchLabel(branchesById[booking.branchId]?.name || booking.branchName || booking.branch || booking.branchId))}</td><td>${state}</td><td><button class="action-btn booking-details" data-id="${esc(booking.id)}">View</button>${canApprove ? ` <button class="action-btn approve-booking" data-id="${esc(booking.id)}">Approve booking</button>` : ''}${!isClosed ? `${bookingStatus !== 'confirmed' ? ` <button class="action-btn cancel-booking" data-id="${esc(booking.id)}">${activeCheckout ? 'Expire checkout & release slot' : 'Cancel booking / release slot'}</button>` : ''}` : ''}${bookingStatus === 'confirmed' ? ` <button class="action-btn reschedule-booking" data-id="${esc(booking.id)}">Update appointment slot</button>` : ''}${canComplete ? ` <button class="action-btn complete-booking" data-id="${esc(booking.id)}">Complete service</button>` : ''}</td></tr>`;
   });
   if (isDashboardPage && modulePaginators.bookings) {
     modulePaginators.bookings.setItems(renderedRows);
   } else {
-    $('#bookingResults').innerHTML = renderedRows.length
+    setHTML($('#bookingResults'), renderedRows.length
       ? renderedRows.join('')
-      : '<tr><td colspan="7">No matching bookings found.</td></tr>';
+      : '<tr><td colspan="7">No matching bookings found.</td></tr>');
   }
 }
 
@@ -650,13 +866,22 @@ async function bookingAction(event) {
   const button = event.target.closest('button'); if (!button) return;
   const booking = bookings.find((item) => item.id === button.dataset.id); if (!booking) return;
   if (button.classList.contains('reschedule-booking')) {
-    const date = await prompt('New appointment date (YYYY-MM-DD):', booking.date || '');
+    if (String(booking.status).toLowerCase() !== 'confirmed') return;
+    const branchValue = String(booking.branchId || booking.branch || '').toLowerCase().replace(/[\s-]+/g, '_');
+    const defaultBranch = branchValue.includes('santa') ? 'Santa Rosa' : 'Cabuyao';
+    const branch = await prompt('New appointment branch:', defaultBranch, { choices: ['Cabuyao', 'Santa Rosa'] });
+    const branchId = normalizeBranchId(String(branch || ''));
+    if (!branchId) return;
+    const date = await prompt('New appointment date (YYYY-MM-DD):', booking.date || booking.appointmentDate || '');
     if (!date) return;
-    const time = await prompt('New appointment time (for example, 09:30 AM):', booking.timeSlot || '');
+    const currentTime = booking.timeSlot || booking.preferredTimeSlot || '';
+    const standardTimes = ['09:00 AM - 11:00 AM', '11:00 AM - 01:00 PM', '01:00 PM - 03:00 PM', '03:00 PM - 05:00 PM'];
+    const timeChoices = standardTimes.includes(currentTime) ? standardTimes : [currentTime, ...standardTimes].filter(Boolean);
+    const time = await prompt('New appointment time slot:', currentTime, { choices: timeChoices });
     if (!time) return;
     button.disabled = true;
     try {
-      const result = await api('api/admin-workflow.php', { action: 'reschedule_booking', bookingId: booking.id, date, timeSlot: time });
+      const result = await api('api/admin-workflow.php', { action: 'reschedule_booking', bookingId: booking.id, branchId, branch: normalizeBranchLabel(branchId), date, timeSlot: time });
       alert(result.message);
       await loadCoreData();
     } catch (error) { alert(readableError(error)); button.disabled = false; }
@@ -669,13 +894,56 @@ async function bookingAction(event) {
     return;
   }
   if (button.classList.contains('complete-booking')) {
+    if (String(booking.status).toLowerCase() !== 'confirmed') return;
+    const appointmentDate = booking.date || booking.appointmentDate || '';
+    const appointmentSlot = booking.timeSlot || booking.preferredTimeSlot || '';
+    const endTime = appointmentSlot.split(' - ').pop()?.trim() || appointmentSlot;
+    const scheduledAt = new Date(`${appointmentDate}T${(() => {
+      const match = endTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      if (!match) return '00:00:00';
+      let hour = Number(match[1]) % 12;
+      if (match[3].toUpperCase() === 'PM') hour += 12;
+      return `${String(hour).padStart(2, '0')}:${match[2]}:00`;
+    })()}+08:00`);
+    const earlyCompletionConfirmed = Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date()
+      ? false
+      : await showAdminConfirm('This appointment schedule has not passed yet. Confirm early service completion?');
+    if (scheduledAt > new Date() && !earlyCompletionConfirmed) return;
+    let checkoutStatus = 'none';
+    try {
+      const verification = await api('api/admin-workflow.php', { action: 'verify_booking_checkout', bookingId: booking.id });
+      checkoutStatus = verification.checkoutStatus || 'none';
+    } catch (error) {
+      alert(readableError(error));
+      return;
+    }
+    if (checkoutStatus === 'unpaid' && !(await showAdminConfirm(
+      'The PayMongo checkout is still unpaid. Record the remaining balance as a counter/cash settlement and complete service?',
+      { confirmText: 'Record Counter/Cash Settlement & Complete Service', cancelText: 'Cancel' }
+    ))) return;
+    if (checkoutStatus === 'paid') {
+      button.disabled = true;
+      try {
+        await api('api/admin-workflow.php', { action: 'complete_booking', bookingId: booking.id, downpaymentAmount: 0, paymentMethod: '', earlyCompletionConfirmed, checkoutPaymentVerified: true });
+        await loadCoreData();
+      } catch (error) { alert(readableError(error)); button.disabled = false; }
+      return;
+    }
+    if (checkoutStatus === 'unpaid') {
+      button.disabled = true;
+      try {
+        await api('api/admin-workflow.php', { action: 'complete_booking', bookingId: booking.id, downpaymentAmount: 0, paymentMethod: 'cash', earlyCompletionConfirmed, cashSettlePendingCheckout: true });
+        await loadCoreData();
+      } catch (error) { alert(readableError(error)); button.disabled = false; }
+      return;
+    }
     const rawAmount = await prompt('Downpayment already collected (PHP). Enter 0 if none:', '0', { inputType: 'number' });
     if (rawAmount === null || !Number.isFinite(Number(rawAmount)) || Number(rawAmount) < 0) return alert('Enter a valid downpayment amount.');
     const amount = Number(rawAmount);
     const method = amount > 0 ? await prompt('How was the downpayment paid?', 'cash', { choices: ['cash', 'card', 'e-wallet'] }) : '';
     if (amount > 0 && !['cash', 'card', 'e-wallet'].includes(String(method).toLowerCase())) return alert('Choose cash, card, or e-wallet.');
     button.disabled = true;
-    try { await api('api/admin-workflow.php', { action:'complete_booking', bookingId:booking.id, downpaymentAmount:amount, paymentMethod:String(method || '') }); await loadCoreData(); }
+    try { await api('api/admin-workflow.php', { action:'complete_booking', bookingId:booking.id, downpaymentAmount:amount, paymentMethod:String(method || ''), earlyCompletionConfirmed }); await loadCoreData(); }
     catch (error) { alert(readableError(error)); button.disabled = false; }
     return;
   }
@@ -685,16 +953,8 @@ async function bookingAction(event) {
     const vehicleDetails = bookingVehicleDetails(booking, vehicle);
     const branch = branchesById[booking.branchId] || {};
     const serviceRecord = servicesById[bookingServiceId(booking)] || {};
-    $('#detailContent').innerHTML = `<h2>Booking ${esc(booking.id)}</h2><dl>${[['Customer', user.name || user.username || booking.customerName], ['Email', user.email || booking.customerEmail], ['Contact', user.contactNumber || user.phone || user.contact || booking.phone], ['Date', booking.date], ['Time', booking.timeSlot], ['Service', bookingServiceName(booking)], ['Service price', money(serviceRecord.price)], ['Branch', branch.name || booking.branch || booking.branchId], ['Branch address', branch.address], ['Status', booking.status], ['Vehicle plate number', vehicleDetails.plateNumber], ['Vehicle make', vehicleDetails.make], ['Vehicle model', vehicleDetails.model], ['Vehicle year', vehicleDetails.year], ['Cancellation request reason', booking.cancellationRequestReason], ['Admin cancellation reason', booking.cancellationReason]].map(([key, val]) => `<dt>${esc(key)}</dt><dd>${esc(val || '—')}</dd>`).join('')}</dl>`;
-    $('#detailDialog').showModal(); return;
-  }
-  if (button.classList.contains('reject-cancellation')) {
-    const reason = await prompt('Enter the verification or rejection reply to email the customer:');
-    if (!reason?.trim()) return;
-    button.disabled = true;
-    try { const result = await api('api/admin-workflow.php', { action: 'reject_cancellation', bookingId: booking.id, reason }); alert(result.message); }
-    catch (error) { alert(readableError(error)); button.disabled = false; }
-    return;
+    setHTML($('#detailContent'), `<h2>Booking ${esc(booking.id)}</h2><dl>${[['Customer', user.name || user.username || booking.customerName], ['Email', user.email || booking.customerEmail], ['Contact', user.contactNumber || user.phone || user.contact || booking.phone], ['Date', booking.date], ['Time', booking.timeSlot], ['Service', bookingServiceName(booking)], ['Service price', money(serviceRecord.price)], ['Branch', normalizeBranchLabel(branch.name || booking.branch || booking.branchName || booking.branchId)], ['Branch address', branchAddressFor(branch.name || booking.branch || booking.branchName || booking.branchId, booking.branchAddress || branch.address)], ['Status', booking.status], ['Vehicle plate number', vehicleDetails.plateNumber], ['Vehicle make', vehicleDetails.make], ['Vehicle model', vehicleDetails.model], ['Vehicle year', vehicleDetails.year], ['Cancellation request reason', booking.cancellationRequestReason], ['Admin cancellation reason', booking.cancellationReason]].map(([key, val]) => `<dt>${esc(key)}</dt><dd>${esc(val || '—')}</dd>`).join('')}</dl>`);
+    $('#detailDialog')?.showModal(); return;
   }
   if (!button.classList.contains('cancel-booking')) return;
   const reason = await prompt('Enter the cancellation reason. Any active PayMongo checkout will be expired and the slot released:');
@@ -711,17 +971,19 @@ async function sendVerificationReply(event) {
 }
 
 function renderSubmissions() {
-  $('#inquiryResults').innerHTML = submissions.length ? submissions.map((item, index) => {
+  const target = $('#inquiryResults');
+  if (!target) return;
+  setHTML(target, submissions.length ? submissions.map((item, index) => {
     const detailsId = `inquiry-message-${index}`;
     const ticket = item.ticketNumber || item.id;
     const type = item.type || (item.collection === 'feedback' ? 'Feedback' : item.collection === 'manualRequests' ? 'Manual Request' : 'Inquiry');
-    const branch = branchesById[item.branchId]?.name || item.branchId;
+    const branch = normalizeBranchLabel(branchesById[item.branchId]?.name || item.branchName || item.branch || item.branchId);
     const branchAndTime = [branch, item.requestedDate && `${item.requestedDate}${item.requestedTime ? ` · ${item.requestedTime}` : ''}`].filter(Boolean);
     return `<tr class="inquiry-ticket-row" data-inquiry-row tabindex="0" aria-expanded="false" aria-controls="${detailsId}"><td>${esc(ticket)}</td><td>${esc(type)}</td><td>${esc(item.name)}<br>${esc(item.email)}<br>${esc(item.contactNumber)}</td><td>${branchAndTime.map(esc).join('<br>') || '—'}</td></tr><tr class="inquiry-message-row"><td colspan="4"><div class="inquiry-message-accordion" id="${detailsId}"><div class="inquiry-accordion-details"><div class="inquiry-message-body"><strong>Message</strong><p>${esc(item.message || 'No message provided.')}</p>${item.requestedService ? `<p><strong>Requested service:</strong> ${esc(item.requestedService)}</p>` : ''}${item.attachmentName ? `<button class="view-attachment" data-ticket="${esc(ticket)}" type="button">View ${esc(item.attachmentName)}</button>` : ''}</div><div class="inquiry-accordion-actions"><button class="submission-decision btn-approve-inquiry" data-id="${esc(item.id)}" data-collection="${esc(item.collection)}" data-decision="approved">Approve</button><button class="submission-decision btn-reject-inquiry" data-id="${esc(item.id)}" data-collection="${esc(item.collection)}" data-decision="rejected">Reject</button></div></div></div></td></tr>`;
-  }).join('') : '<tr><td colspan="4">No inquiries or feedback yet.</td></tr>';
+  }).join('') : '<tr><td colspan="4">No inquiries or feedback yet.</td></tr>');
   if (isDashboardPage && modulePaginators.inquiries) {
     const renderedItems = [];
-    const children = $('#inquiryResults').children;
+    const children = target.children;
     if (submissions.length) for (let index = 0; index < children.length; index += 2) {
       renderedItems.push(children[index].outerHTML + (children[index + 1]?.outerHTML || ''));
     }
@@ -761,7 +1023,7 @@ async function submissionAction(event) {
 }
 
 function renderServices() {
-  $('#serviceResults').innerHTML = services.map(renderServiceCard).join('') || 'No services configured.';
+  setHTML($('#serviceResults'), services.map(renderServiceCard).join('') || 'No services configured.');
 }
 
 function renderServiceCard(item) {
@@ -817,13 +1079,16 @@ function enterServiceInlineEdit(serviceId) {
   card.dataset.original = JSON.stringify(originalData);
   card.dataset.editing = 'true';
   card.classList.add('is-editing');
-  card.querySelector('.service-content-body').innerHTML = `
+  const content = card.querySelector('.service-content-body');
+  const actions = card.querySelector('.service-card-actions');
+  if (!content || !actions) return;
+  setHTML(content, `
     <input type="text" class="form-control form-control-sm mb-2 service-edit-field service-input-name" value="${esc(originalData.name)}" placeholder="Service Name" aria-label="Service name">
     <input type="text" inputmode="decimal" class="form-control form-control-sm mb-2 service-edit-field service-input-price" value="${esc(originalData.price)}" placeholder="Price (₱)" aria-label="Price" oninput="this.value = this.value.replace(/[^0-9.]/g, '')">
     <textarea class="form-control form-control-sm mb-2 service-edit-field service-input-desc" rows="2" placeholder="Description" aria-label="Description">${esc(originalData.desc)}</textarea>
     <input type="text" inputmode="numeric" class="form-control form-control-sm mb-2 service-edit-field service-input-duration" value="${esc(originalData.duration)}" placeholder="Duration in hours" aria-label="Duration in hours" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-  `;
-  card.querySelector('.service-card-actions').innerHTML = `<button type="button" class="btn-service-action btn-cancel-state" data-id="${esc(serviceId)}" data-state="cancel">Cancel</button><button type="button" class="btn-service-remove" data-id="${esc(serviceId)}">Remove</button>`;
+  `);
+  setHTML(actions, `<button type="button" class="btn-service-action btn-cancel-state" data-id="${esc(serviceId)}" data-state="cancel">Cancel</button><button type="button" class="btn-service-remove" data-id="${esc(serviceId)}">Remove</button>`);
   card.querySelectorAll('.service-edit-field').forEach((input) => {
     input.addEventListener('keydown', (event) => {
       if (event.key === 'Backspace') event.stopPropagation();
@@ -883,124 +1148,175 @@ async function exitServiceInlineEdit(serviceId, shouldSave) {
   }
 }
 
-function invoiceDate(item) { const value = item.createdAt?.toDate?.() || (item.createdAt ? new Date(item.createdAt) : null); return value && !Number.isNaN(value.getTime()) ? value : null; }
-function formatAuditTimestamp(value) {
-  const date = value?.toDate?.() || (value ? new Date(value) : null);
-  return date && !Number.isNaN(date.getTime()) ? date.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }).replace(',', ' -').toLowerCase() : 'No audit timestamp';
+// Unified POS view. Invoice/payment documents are the canonical data when
+// present; legacy pos_transactions remain visible and are deduplicated by ref.
+function invoiceDate(item) {
+  const value = item?.createdAt ?? item?.created_at ?? item?.paidAt ?? item?.paid_at ?? item?.timestamp ?? item?.date ?? item?.updatedAt;
+  const date = value?.toDate?.() || (typeof value === 'number' ? new Date(value) : value ? new Date(value) : null);
+  return date && !Number.isNaN(date.getTime()) ? date : null;
 }
+
 function transactionMethod(invoice, payment) {
-  const raw = String(payment?.method || invoice.paymentMethod || '').toLowerCase();
+  const raw = String(payment?.method || invoice.paymentMethod || invoice.payment_method || '').toLowerCase();
   if (raw.includes('cash')) return 'cash';
   if (raw.includes('card')) return 'card';
   if (raw.includes('gcash')) return 'gcash';
-  if (raw.includes('maya') || raw.includes('grab') || raw.includes('qr') || raw.includes('wallet')) return 'e-wallet';
-  return raw.includes('paymongo') ? 'e-wallet' : (raw || 'unknown');
+  if (raw.includes('maya')) return 'paymaya';
+  if (raw.includes('grab')) return 'grabpay';
+  if (raw.includes('qrph') || raw.includes('qr')) return 'qrph';
+  if (raw.includes('wallet') || raw.includes('paymongo')) return 'e-wallet';
+  return raw || 'unknown';
+}
+
+function normalizedPosStatus(transaction) {
+  const raw = String(transaction.status || 'pending').toLowerCase().replaceAll('-', '_').replaceAll(' ', '_');
+  if (raw === 'void_requested' || raw === 'void_request') return 'Void Requested';
+  if (raw === 'voided' || raw === 'void') return 'Voided';
+  if (transaction.isFlagged) return 'Flagged';
+  if (raw === 'paid' || raw === 'completed') return 'Paid';
+  if (raw === 'pending' || raw === 'unpaid' || raw === 'payment_overdue') return 'Pending';
+  return raw.replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function buildPosTransactions() {
+  const rows = [];
+  const invoiceIds = new Set();
+  const references = new Set();
+  for (const invoice of invoices) {
+    const payment = paymentsByInvoice[invoice.id] || payments.find((item) => item.invoiceId === invoice.id) || null;
+    const source = String(invoice.source || '').toLowerCase();
+    const reference = String(invoice.referenceNumber || invoice.invoiceNumber || invoice.referenceId || invoice.id);
+    const status = String(invoice.status || '').toLowerCase();
+    if (!['pos', 'walk_in_pos'].includes(source) && !payment && !['paid', 'voided', 'void_requested'].includes(status) && !/^(OTC|PMO)-/i.test(reference)) continue;
+    invoiceIds.add(invoice.id);
+    references.add(reference.toLowerCase());
+    rows.push({ ...invoice, _collection: 'invoices', _payment: payment, _reference: reference });
+  }
+  for (const payment of payments) {
+    if (invoiceIds.has(payment.invoiceId)) continue;
+    const reference = String(payment.referenceNumber || payment.invoiceNumber || payment.referenceId || payment.id);
+    if (references.has(reference.toLowerCase())) continue;
+    references.add(reference.toLowerCase());
+    rows.push({ ...payment, id: payment.id, invoiceId: payment.invoiceId || payment.id, source: 'payment_record',
+      totalAmount: Number(payment.amountUnit === 'centavos' ? payment.amount / 100 : payment.amount || 0),
+      createdAt: payment.createdAt || payment.paidAt || payment.timestamp, status: payment.status || 'pending',
+      paymentMethod: payment.method, _collection: 'payments', _payment: payment, _reference: reference, _synthetic: true });
+  }
+  for (const transaction of legacyPosTransactions) {
+    const reference = String(transaction.referenceNumber || transaction.invoiceNumber || transaction.referenceId || transaction.id);
+    if (references.has(reference.toLowerCase())) continue;
+    references.add(reference.toLowerCase());
+    rows.push({ ...transaction, source: transaction.source || 'legacy_pos', _collection: 'pos_transactions', _reference: reference });
+  }
+  return rows.sort((a, b) => (invoiceDate(b)?.getTime() || 0) - (invoiceDate(a)?.getTime() || 0));
+}
+
+function posCashier(transaction) {
+  const id = transaction.cashierId || transaction.createdBy || transaction.adminId || transaction.userId || '';
+  return transaction.cashierName || transaction.createdByName || transaction.cashier || usersById[id]?.name || usersById[id]?.username || usersById[id]?.email || id || '—';
+}
+
+function posActionData(transaction) {
+  return `data-transaction-id="${esc(transaction.id)}" data-transaction-collection="${esc(transaction._collection || 'invoices')}"`;
 }
 
 function renderPos() {
-  const from = $('#pos-start-date').value, to = $('#pos-end-date').value, method = $('#pos-method-filter').value, cashierSearch = $('#pos-cashier-search').value.trim().toLowerCase(), referenceSearch = ($('#pos-reference-search')?.value || '').trim().toLowerCase(), status = $('#pos-status-filter').value.toLowerCase();
-  const rows = invoices.filter((invoice) => invoice.source === 'pos').filter((invoice) => {
-    const date = invoiceDate(invoice); const payment = paymentsByInvoice[invoice.id];
-    const cashier = usersById[invoice.createdBy]?.name || usersById[invoice.createdBy]?.email || invoice.createdBy || '';
-    return (!from || (date && date >= new Date(`${from}T00:00:00`))) && (!to || (date && date <= new Date(`${to}T23:59:59`)))
-      && (!method || transactionMethod(invoice, payment) === method) && (!cashierSearch || String(cashier).toLowerCase().includes(cashierSearch))
-      && (!referenceSearch || `${invoice.referenceNumber || ''} ${invoice.invoiceNumber || ''}`.toLowerCase().includes(referenceSearch))
-      && (!status || String(invoice.status || '').toLowerCase() === status);
+  const from = $('#pos-start-date')?.value || '', to = $('#pos-end-date')?.value || '';
+  const method = $('#pos-method-filter')?.value || '';
+  const cashierSearch = ($('#pos-cashier-search')?.value || '').trim().toLowerCase();
+  const referenceSearch = ($('#pos-reference-search')?.value || '').trim().toLowerCase();
+  const status = ($('#pos-status-filter')?.value || '').toLowerCase();
+  const rows = buildPosTransactions().filter((transaction) => {
+    const date = invoiceDate(transaction);
+    const payment = transaction._payment || paymentsByInvoice[transaction.invoiceId || transaction.id];
+    const displayStatus = normalizedPosStatus(transaction).toLowerCase().replaceAll(' ', '_');
+    return (!from || (date && date >= new Date(`${from}T00:00:00`)))
+      && (!to || (date && date <= new Date(`${to}T23:59:59`)))
+      && (!method || transactionMethod(transaction, payment) === method)
+      && (!cashierSearch || posCashier(transaction).toLowerCase().includes(cashierSearch))
+      && (!referenceSearch || String(transaction._reference || '').toLowerCase().includes(referenceSearch))
+      && (!status || displayStatus === status || String(transaction.status || '').toLowerCase().replaceAll(' ', '_') === status);
   });
-  $('#posResults').innerHTML = rows.map((invoice) => {
-    const payment = paymentsByInvoice[invoice.id]; const date = invoiceDate(invoice); const cashier = usersById[invoice.createdBy]?.name || usersById[invoice.createdBy]?.email || invoice.createdBy || '—';
-    const statusKey = String(invoice.status || '').toLowerCase().replace(/[^a-z0-9-]/g, '-');
-    const total = invoice.totalAmount ?? invoice.finalAmount ?? 0;
-    const serviceRows = (invoice.serviceDetails || []).map((line) => {
+  const renderedItems = rows.map((transaction) => {
+    const payment = transaction._payment || paymentsByInvoice[transaction.invoiceId || transaction.id];
+    const date = invoiceDate(transaction);
+    const reference = transaction._reference || transaction.referenceNumber || transaction.invoiceNumber || transaction.referenceId || transaction.id;
+    const displayStatus = normalizedPosStatus(transaction);
+    const statusKey = displayStatus.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+    const cashier = posCashier(transaction);
+    const total = Number(transaction.totalAmount ?? transaction.finalAmount ?? transaction.runningTotal
+      ?? (payment?.amountUnit === 'centavos' ? Number(payment.amount || 0) / 100 : payment?.amount) ?? 0);
+    const lines = transaction.serviceDetails || transaction.items || transaction.lineItems || [];
+    const serviceRows = lines.map((line) => {
       const quantity = Number(line.quantity || 1);
-      const unitPrice = Number(line.price || 0);
-      const serviceName = line.name || servicesById[line.serviceId || line.service_id]?.name || line.serviceId || line.service_id || 'Service';
-      return `<tr><td>${esc(serviceName)}</td><td>${quantity}</td><td>${money(unitPrice)}</td><td>${money(line.lineTotal ?? unitPrice * quantity)}</td></tr>`;
+      const price = Number(line.price ?? line.unitPrice ?? 0);
+      const name = line.name || line.serviceName || servicesById[line.serviceId || line.service_id]?.name || line.serviceId || 'Service';
+      return `<tr><td>${esc(name)}</td><td>${quantity}</td><td>${money(price)}</td><td>${money(line.lineTotal ?? line.amount ?? price * quantity)}</td></tr>`;
     }).join('') || '<tr><td colspan="4">No itemized services recorded.</td></tr>';
-    const customer = invoice.customerName || (invoice.customerId ? usersById[invoice.customerId]?.name || usersById[invoice.customerId]?.username || invoice.customerId : 'Walk-in customer');
-    const dateText = date ? `${date.toLocaleDateString('en-GB')} · ${date.toLocaleTimeString('en-US').toLowerCase()}` : '—';
-    const isPaid = String(invoice.status || '').toLowerCase() === 'paid';
-    const rowAction = isAdminDashboard
-      ? (isPaid ? `<button type="button" class="btn-pos-void-action" data-invoice-id="${esc(invoice.id)}">Void</button>` : '—')
-      : isSuperAdminDashboard
-        ? ''
-        : '<button type="button" class="pos-actions-button" aria-expanded="false">Actions ▾</button>';
-    const responsibleId = invoice.lastAuditBy || invoice.voidedBy || invoice.flaggedBy || invoice.createdBy;
-    const responsibleName = invoice.lastAuditByName || usersById[responsibleId]?.name || usersById[responsibleId]?.username || usersById[responsibleId]?.email || responsibleId || 'Unknown admin';
-    const auditAt = invoice.lastAuditAt || invoice.voidedAt || invoice.flaggedAt || invoice.updatedAt || invoice.createdAt;
-    const auditFooter = isSuperAdminDashboard ? `<div class="pos-audit-expanded-footer"><div class="audit-trail-info"><div><strong>Audit Trail:</strong> Processed by Admin (${esc(responsibleName)})</div><div><strong>Last Audit Timestamp:</strong> ${esc(formatAuditTimestamp(auditAt))}</div><div><strong>Flag Status:</strong> ${invoice.isFlagged ? '🚩 Flagged' : 'Normal'}${invoice.flagReason ? ` · ${esc(invoice.flagReason)}` : ''}</div></div><details class="pos-audit-actions"><summary class="btn-super-pos-actions">Actions ▾</summary><div class="pos-audit-actions-menu"><button type="button" class="audit-action-flag" data-super-pos-action="flag" data-invoice-id="${esc(invoice.id)}">⚑ ${invoice.isFlagged ? 'Remove Flag' : 'Toggle Flag'}</button><button type="button" class="audit-action-void" data-super-pos-action="void" data-invoice-id="${esc(invoice.id)}"${isPaid ? '' : ' disabled'}>Void Transaction</button><button type="button" data-super-pos-action="export" data-invoice-id="${esc(invoice.id)}">Export Audit Summary</button></div></details></div>` : '';
-    const reference = invoice.referenceNumber || invoice.invoiceNumber || invoice.id;
-    return `<tr class="pos-main-row" tabindex="0"><td><strong class="pos-invoice-id">${esc(reference)}</strong><button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button><span class="pos-invoice-time">ID ${esc(invoice.id)} · ${esc(dateText)}</span></td><td>${esc(branchesById[invoice.branchId]?.name || invoice.branchId || '—')}</td><td>${esc(cashier)}</td><td>${esc(transactionMethod(invoice, payment))}</td><td><span class="pos-status-text ${esc(statusKey)}">${esc(invoice.status || 'unknown')}</span></td><td class="pos-amount">${money(total)}</td><td>${rowAction}</td></tr><tr class="pos-detail-row"><td colspan="7"><div class="pos-accordion-panel"><p class="pos-accordion-summary">Reference ID: ${esc(reference)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button></p><p>Customer: ${esc(customer)} · Cashier: ${esc(cashier)}</p><div class="pos-detail-table-scroll"><table class="pos-detail-table"><thead><tr><th>Service</th><th>Qty</th><th>Unit</th><th>Line total</th></tr></thead><tbody>${serviceRows}</tbody></table></div><strong class="pos-total-summary">Total ${money(total)}</strong>${payment?.referenceNumber || invoice.paymentReference ? `<p class="pos-payment-reference">Payment reference: ${esc(payment?.referenceNumber || invoice.paymentReference)}</p>` : ''}${auditFooter}</div></td></tr>`;
-  }).join('') || '<tr><td class="pos-empty-state" colspan="7">No POS transactions match these filters.</td></tr>';
-  if (isDashboardPage && modulePaginators.pos) {
-    const renderedItems = [];
-    const children = $('#posResults').children;
-    if (rows.length) for (let index = 0; index < children.length; index += 2) {
-      renderedItems.push(children[index].outerHTML + (children[index + 1]?.outerHTML || ''));
-    }
-    modulePaginators.pos.setItems(renderedItems);
-  }
+    const isPaid = String(transaction.status || '').toLowerCase() === 'paid';
+    const isVoidRequested = ['void_requested', 'void requested'].includes(String(transaction.status || '').toLowerCase());
+    const attrs = posActionData(transaction);
+    let rowAction = '—';
+    if (role === 'admin') rowAction = isVoidRequested ? '<button type="button" disabled>Void Pending</button>'
+      : isPaid ? `<button type="button" class="btn-pos-request-void" ${attrs}>Request Void</button>` : '—';
+    if (role === 'super_admin') rowAction = `${isVoidRequested ? `<button type="button" class="btn-pos-approve-void" ${attrs}>Approve Void</button><button type="button" class="btn-pos-reject-void" ${attrs}>Reject Void</button>` : ''}<details class="pos-audit-actions"><summary class="btn-super-pos-actions">Actions ▾</summary><div class="pos-audit-actions-menu"><button type="button" data-super-pos-action="flag" ${attrs}>${transaction.isFlagged ? 'Remove Flag' : 'Flag'} transaction</button><button type="button" data-super-pos-action="void" ${attrs}${isPaid ? '' : ' disabled'}>Void transaction</button><button type="button" data-super-pos-action="export" ${attrs}>Export audit summary</button></div></details>`;
+    const requester = transaction.voidRequestedByName || usersById[transaction.voidRequestedBy]?.name || transaction.voidRequestedByEmail || 'Unknown admin';
+    const requestDetails = isVoidRequested ? `<div class="pos-void-request-details"><strong>Void requested by ${esc(requester)}</strong><p>${esc(transaction.voidRequestReason || 'No reason provided.')}</p></div>` : '';
+    const branch = normalizeBranchLabel(branchesById[transaction.branchId]?.name || transaction.branchName || transaction.branch || transaction.branchId);
+    const stamp = date ? `${date.toLocaleDateString('en-PH')} ${date.toLocaleTimeString('en-PH')}` : 'Timestamp unavailable';
+    const customer = transaction.customerName || (transaction.customerId ? usersById[transaction.customerId]?.name || transaction.customerId : 'Walk-in customer');
+    return `<tr class="pos-main-row" tabindex="0"><td><strong class="pos-invoice-id">${esc(reference)}</strong><button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button><span class="pos-invoice-time">ID ${esc(transaction.id)} · ${esc(stamp)}</span></td><td>${esc(branch)}</td><td>${esc(cashier)}</td><td>${esc(transactionMethod(transaction, payment))}</td><td><span class="pos-status-text ${esc(statusKey)}">${esc(displayStatus)}</span></td><td class="pos-amount">${money(total)}</td><td>${rowAction}</td></tr><tr class="pos-detail-row"><td colspan="7"><div class="pos-accordion-panel"><p class="pos-accordion-summary">Reference ID: ${esc(reference)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button></p><p>Customer: ${esc(customer)} · Cashier: ${esc(cashier)} · Branch: ${esc(branch)}</p>${requestDetails}<div class="pos-detail-table-scroll"><table class="pos-detail-table"><thead><tr><th>Service</th><th>Qty</th><th>Unit</th><th>Line total</th></tr></thead><tbody>${serviceRows}</tbody></table></div><strong class="pos-total-summary">Total ${money(total)}</strong>${payment?.referenceNumber || transaction.paymentReference ? `<p class="pos-payment-reference">Payment reference: ${esc(payment?.referenceNumber || transaction.paymentReference)}</p>` : ''}</div></td></tr>`;
+  });
+  if (modulePaginators.pos) modulePaginators.pos.setItems(renderedItems);
+  else setHTML($('#posResults'), renderedItems.join('') || '<tr><td class="pos-empty-state" colspan="7">No POS transactions match these filters.</td></tr>');
 }
 
-async function voidAdminPosTransaction(invoiceId) {
-  const invoice = invoices.find((item) => item.id === invoiceId && item.source === 'pos');
-  if (!invoice || String(invoice.status || '').toLowerCase() !== 'paid') return;
-  if (!confirm(`Void paid POS transaction ${invoiceId}?`)) return;
+function findPosTransaction(id, collectionName) {
+  return buildPosTransactions().find((item) => item.id === id && item._collection === collectionName);
+}
+
+async function voidAdminPosTransaction(id, collectionName) {
+  const transaction = findPosTransaction(id, collectionName);
+  if (role !== 'admin' || !transaction || normalizedPosStatus(transaction) !== 'Paid') return;
+  const reason = await prompt(`Required reason to request void for ${transaction._reference}:`);
+  if (!reason?.trim()) return alert('A void reason is required.');
+  try { const result = await api('api/admin-workflow.php', { action: 'request_void_pos_transaction', transactionId: id, transactionCollection: collectionName, reason: reason.trim() }); alert(result.message); }
+  catch (error) { alert(readableError(error)); }
+}
+
+async function handleSuperAdminFlag(id, collectionName) {
+  const transaction = findPosTransaction(id, collectionName);
+  if (role !== 'super_admin' || !transaction) return;
+  const isFlagged = Boolean(transaction.isFlagged);
+  const reason = await prompt(`${isFlagged ? 'Reason for removing the flag from' : 'Reason for flagging'} ${transaction._reference}:`, transaction.flagReason || '');
+  if (!reason?.trim()) return alert('A flag reason is required.');
+  try { await api('api/admin-workflow.php', { action: 'flag_pos_transaction', transactionId: id, transactionCollection: collectionName, isFlagged: !isFlagged, reason: reason.trim() }); }
+  catch (error) { alert(readableError(error)); }
+}
+
+async function handleSuperAdminVoid(id, collectionName) {
+  const transaction = findPosTransaction(id, collectionName);
+  if (role !== 'super_admin' || !transaction || normalizedPosStatus(transaction) !== 'Paid') return;
+  const reason = await prompt(`Required reason to immediately void ${transaction._reference}:`);
+  if (!reason?.trim()) return alert('A void reason is required.');
+  if (!confirm(`Immediately void transaction ${transaction._reference}?`)) return;
+  try { await api('api/admin-workflow.php', { action: 'void_pos_transaction', transactionId: id, transactionCollection: collectionName, reason: reason.trim() }); }
+  catch (error) { alert(readableError(error)); }
+}
+
+async function decidePosVoid(id, collectionName, approve) {
+  if (role !== 'super_admin') return;
   try {
-    await api('api/admin-workflow.php', { action: 'void_pos_transaction', invoiceId });
-    invoice.status = 'voided';
-    invoice.voidedAt = new Date().toISOString();
-    invoice.voidedBy = actor.uid;
-    renderPos();
-  } catch (error) {
-    alert(readableError(error));
-  }
+    const result = await api('api/admin-workflow.php', { action: approve ? 'approve_void_pos_transaction' : 'reject_void_pos_transaction', transactionId: id, transactionCollection: collectionName });
+    alert(result.message);
+  } catch (error) { alert(readableError(error)); }
 }
 
-async function handleSuperAdminFlag(invoiceId) {
-  const invoice = invoices.find((item) => item.id === invoiceId && item.source === 'pos');
-  if (!isSuperAdminDashboard || !invoice) return;
-  const isFlagged = Boolean(invoice.isFlagged);
-  const reason = prompt(`${isFlagged ? 'Reason for removing the flag from' : 'Reason for flagging'} ${invoiceId}:`, invoice.flagReason || '');
-  if (reason === null) return;
-  if (!reason.trim()) return alert('Enter a reason to record this audit action.');
-  try {
-    await api('api/admin-workflow.php', { action: 'flag_pos_transaction', invoiceId, isFlagged: !isFlagged, reason: reason.trim() });
-    invoice.isFlagged = !isFlagged;
-    invoice.flagReason = !isFlagged ? reason.trim() : '';
-    invoice.lastAuditAt = new Date().toISOString();
-    invoice.lastAuditBy = actor.uid;
-    invoice.lastAuditByName = usersById[actor.uid]?.name || usersById[actor.uid]?.username || actor.email;
-    renderPos();
-  } catch (error) {
-    alert(readableError(error));
-  }
-}
-
-async function handleSuperAdminVoid(invoiceId) {
-  const invoice = invoices.find((item) => item.id === invoiceId && item.source === 'pos');
-  if (!isSuperAdminDashboard || !invoice || String(invoice.status || '').toLowerCase() !== 'paid') return;
-  if (!confirm(`Void paid POS transaction ${invoiceId}?`)) return;
-  try {
-    await api('api/admin-workflow.php', { action: 'void_pos_transaction', invoiceId });
-    invoice.status = 'voided';
-    invoice.voidedAt = new Date().toISOString();
-    invoice.voidedBy = actor.uid;
-    invoice.lastAuditAt = invoice.voidedAt;
-    invoice.lastAuditBy = actor.uid;
-    invoice.lastAuditByName = usersById[actor.uid]?.name || usersById[actor.uid]?.username || actor.email;
-    renderPos();
-  } catch (error) {
-    alert(readableError(error));
-  }
-}
-
-function exportSingleTransactionAudit(invoiceId) {
-  const invoice = invoices.find((item) => item.id === invoiceId && item.source === 'pos');
-  if (!invoice || !isSuperAdminDashboard) return;
-  const logs = (adminRows.activity_logs || []).filter((item) => item.invoiceId === invoiceId);
-  const rows = [{ recordType: 'transaction', ...invoice }, ...logs.map((item) => ({ recordType: 'audit_log', ...item }))];
-  downloadText(`pos-audit-${invoiceId}.csv`, csv(rows));
+function exportSingleTransactionAudit(id, collectionName) {
+  const transaction = findPosTransaction(id, collectionName);
+  if (!transaction || role !== 'super_admin') return;
+  const logs = auditLogs.filter((item) => item.referenceId === transaction._reference);
+  downloadText(`pos-audit-${transaction._reference}.csv`, csv([{ recordType: 'transaction', ...transaction }, ...logs.map((item) => ({ recordType: 'audit_log', ...item }))]));
 }
 
 function dateKey(row) {
@@ -1106,9 +1422,9 @@ function reportDisplayRows(rows, type) {
       const payment = paymentsByInvoice[row.id] || {};
       const total = Number(row.totalAmount ?? row.finalAmount ?? 0);
       const amountLabel = `PHP ${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      return [dateKey(row) || '—', row.id || '—', row.customerName || (row.customerId ? user.name || user.username || row.customerId : 'Walk-in customer'), branch.name || row.branchName || row.branchId || '—', transactionMethod(row, payment), row.status || '—', amountLabel];
+      return [dateKey(row) || '—', row.id || '—', row.customerName || (row.customerId ? user.name || user.username || row.customerId : 'Walk-in customer'), normalizeBranchLabel(branch.name || row.branchName || row.branch || row.branchId), transactionMethod(row, payment), row.status || '—', amountLabel];
     }
-    return [dateKey(row) || '—', user.name || user.username || row.customerName || row.customerEmail || row.customerId || '—', service.name || bookingServiceName(row) || '—', branch.name || row.branchName || row.branchId || '—', row.status || row.rating || '—', amount != null ? money(amount) : '—'];
+    return [dateKey(row) || '—', user.name || user.username || row.customerName || row.customerEmail || row.customerId || '—', service.name || bookingServiceName(row) || '—', normalizeBranchLabel(branch.name || row.branchName || row.branch || row.branchId), row.status || row.rating || '—', amount != null ? money(amount) : '—'];
   });
 }
 
@@ -1202,7 +1518,7 @@ async function generateReport(event) {
         buckets[key] = (buckets[key] || 0) + (Number.isFinite(value) ? value : 0);
       });
       const max = Math.max(1, ...Object.values(buckets));
-      output.innerHTML = `<h3>${esc(data.type)} · ${rows.length} records</h3><div class="report-bars">${Object.entries(buckets).sort(([a],[b]) => a.localeCompare(b)).map(([day,count]) => `<div class="report-bar" title="${esc(day)}: ${count}" style="height:${Math.max(18, count / max * 160)}px">${count}<br>${esc(day.slice(5))}</div>`).join('')}</div>`;
+      setHTML(output, `<h3>${esc(data.type)} · ${rows.length} records</h3><div class="report-bars">${Object.entries(buckets).sort(([a],[b]) => a.localeCompare(b)).map(([day,count]) => `<div class="report-bar" title="${esc(day)}: ${count}" style="height:${Math.max(18, count / max * 160)}px">${count}<br>${esc(day.slice(5))}</div>`).join('')}</div>`);
     }
     await loadReportHistory();
   } catch (error) { alert(readableError(error)); }
@@ -1221,7 +1537,7 @@ function renderContinuousReportHistory(historyItems = reportHistoryData) {
   if (!list) {
     // Legacy admin report panels do not include the dual-column history layout.
     const legacyList = $('#reportHistory');
-    if (legacyList) legacyList.innerHTML = historyItems.map((item) => `<p>${esc(item.type)} · ${esc(item.period)} · ${esc(item.start)}—${esc(item.end)} · ${Number(item.rowCount || 0)} rows</p>`).join('') || 'No reports generated.';
+    setHTML(legacyList, historyItems.map((item) => `<p>${esc(item.type)} · ${esc(item.period)} · ${esc(item.start)}—${esc(item.end)} · ${Number(item.rowCount || 0)} rows</p>`).join('') || 'No reports generated.');
     return;
   }
   const midIndex = Math.ceil(historyItems.length / 2);
@@ -1231,21 +1547,23 @@ function renderContinuousReportHistory(historyItems = reportHistoryData) {
     `<div class="report-history-row-item">${esc(item.type || 'bookings')} · ${esc(item.period || 'monthly')} · ${esc(item.start || '—')}—${esc(item.end || '—')} · ${Number(item.rowCount || 0)} rows</div>`;
   const leftContainer = $('#report-history-left-block');
   const rightContainer = $('#report-history-right-block');
-  if (leftContainer) leftContainer.innerHTML = leftItems.map(renderRow).join('') || '<div class="report-history-empty">No reports generated.</div>';
-  if (rightContainer) rightContainer.innerHTML = rightItems.map(renderRow).join('');
+  setHTML(leftContainer, leftItems.map(renderRow).join('') || '<div class="report-history-empty">No reports generated.</div>');
+  setHTML(rightContainer, rightItems.map(renderRow).join(''));
 }
 
 function renderCustomers() {
-  const search = $('#customerSearch').value.trim().toLowerCase();
+  const target = $('#customerResults');
+  if (!target) return;
+  const search = ($('#customerSearch')?.value || '').trim().toLowerCase();
   const rows = customers.filter((item) => `${item.firstName || ''} ${item.lastName || ''} ${item.name || item.username || ''} ${item.email || ''} ${item.contactNumber || item.phone || item.contact || ''}`.toLowerCase().includes(search));
-  $('#customerResults').innerHTML = rows.map((item) => {
+  setHTML(target, rows.map((item) => {
     const legacyNameParts = String(item.name || item.username || '').trim().split(/\s+/).filter(Boolean);
     const firstName = item.firstName || legacyNameParts[0] || '—';
     const lastName = item.lastName || legacyNameParts.slice(1).join(' ') || '—';
     return `<tr class="customer-record-row"><td>${esc(firstName)}</td><td>${esc(lastName)}</td><td>${esc(item.email || '—')}</td><td>${esc(item.contactNumber || item.phone || item.contact || '—')}</td><td>${esc(item.status || 'active')}</td><td><button class="customer-toggle ${item.status === 'disabled' ? 'btn-enable-customer' : 'btn-disable-customer'}" data-id="${esc(item.id)}">${item.status === 'disabled' ? 'Enable' : 'Disable'}</button></td></tr>`;
-  }).join('') || '<tr><td colspan="6">No customer records.</td></tr>';
+  }).join('') || '<tr><td colspan="6">No customer records.</td></tr>');
   if (isDashboardPage && modulePaginators.customers) {
-    const renderedItems = rows.length ? [...$('#customerResults').children].map((row) => row.outerHTML) : [];
+    const renderedItems = rows.length ? [...target.children].map((row) => row.outerHTML) : [];
     modulePaginators.customers.setItems(renderedItems);
   }
 }
@@ -1277,8 +1595,8 @@ function renderContinuousSystemLogs(logsData = null) {
     '<div class="system-log-row-item"><div class="system-log-time">' + esc(log.time || log.timestamp || '—') +
     '</div><div class="system-log-event">' + esc(log.event || '—') +
     '</div><div class="system-log-details">' + esc(log.details || '—') + '</div></div>';
-  leftContainer.innerHTML = leftBatch.map(renderRow).join('') || '<div class="system-log-empty">No system logs found.</div>';
-  rightContainer.innerHTML = rightBatch.map(renderRow).join('');
+  setHTML(leftContainer, leftBatch.map(renderRow).join('') || '<div class="system-log-empty">No system logs found.</div>');
+  setHTML(rightContainer, rightBatch.map(renderRow).join(''));
 }
 
 function notificationTimestamp(item) {
@@ -1340,8 +1658,8 @@ function renderNotifications() {
     .slice(0, 100);
   if (!rows.length) {
     currentNotifPage = 1;
-    target.innerHTML = '<div class="notification-list-empty">No operational notifications found.</div>';
-    if (pagination) pagination.innerHTML = '';
+    setHTML(target, '<div class="notification-list-empty">No operational notifications found.</div>');
+    setHTML(pagination, '');
     renderDashboardOverview();
     return;
   }
@@ -1350,14 +1668,14 @@ function renderNotifications() {
   if (currentNotifPage < 1) currentNotifPage = 1;
   const startIndex = (currentNotifPage - 1) * notifsPerPage;
   const pageItems = rows.slice(startIndex, startIndex + notifsPerPage);
-  target.innerHTML = pageItems.map((item) => {
-    const message = formatNotificationMessage(item);
+  setHTML(target, pageItems.map((item) => {
+    const message = normalizeBranchText(formatNotificationMessage(item));
     const timestamp = notificationTimestamp(item);
     const time = item.date || timestamp?.toLocaleString('en-PH') || '';
     const timeMarkup = time ? '<time class="notification-list-time">' + esc(time) + '</time>' : '';
     return `<div class="notification-list-item overview-notification-row" role="button" tabindex="0" data-notification-id="${esc(item.id)}"><span>${esc(message || 'Notification')}</span>${timeMarkup}</div>`;
-  }).join('') || '<div class="notification-list-empty">No operational notifications found.</div>';
-  if (pagination) pagination.innerHTML = renderNotificationPaginationControls(currentNotifPage, totalPages);
+  }).join('') || '<div class="notification-list-empty">No operational notifications found.</div>');
+  setHTML(pagination, renderNotificationPaginationControls(currentNotifPage, totalPages));
   renderDashboardOverview();
 }
 
@@ -1407,21 +1725,36 @@ function openNotificationDetail(item) {
     dialog.id = 'notificationDetailModal';
     dialog.className = 'notification-detail-modal';
     dialog.setAttribute('aria-labelledby', 'notificationDetailTitle');
-    dialog.innerHTML = '<h2 id="notificationDetailTitle">Notification details</h2><div class="notification-detail-content"></div>';
+    setHTML(dialog, '<h2 id="notificationDetailTitle">Notification details</h2><div class="notification-detail-content"></div>');
     document.body.append(dialog);
   }
   const fields = [
     ['Customer Name', item.customerName], ['Service Performed', item.serviceName],
     ['Service Cost (PHP)', item.serviceCost == null ? '' : Number(item.serviceCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
-    ['Branch Location', item.branchName], ['Scheduled Date', item.scheduledDate], ['Scheduled Time', item.scheduledTime],
+    ['Branch Location', normalizeBranchLabel(item.branchName || item.branch)], ['Scheduled Date', item.scheduledDate], ['Scheduled Time', item.scheduledTime],
     ['Vehicle Year', item.vehicleYear], ['Vehicle Make', item.vehicleMake], ['Vehicle Model', item.vehicleModel],
     ['Plate Number', item.vehiclePlateNumber], ['Status', item.bookingStatus], ['Payment Status', item.paymentStatus],
     ['Payment Balance (PHP)', item.paymentBalance == null ? '' : Number(item.paymentBalance).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })]
   ].filter(([, value]) => value !== undefined && value !== null && value !== '');
   const title = dialog.querySelector('#notificationDetailTitle');
   const content = dialog.querySelector('.notification-detail-content');
-  if (title) title.textContent = item.message || formatNotificationMessage(item) || 'Notification';
-  if (content) content.innerHTML = `<dl>${fields.map(([label, value]) => `<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`).join('') || '<dd>No booking details are attached to this notification.</dd>'}</dl>`;
+  if (title) title.textContent = normalizeBranchText(item.message || formatNotificationMessage(item) || 'Notification');
+  const canRejectReschedule = role === 'admin' || role === 'super_admin';
+  const isRescheduleRequest = String(item.type || '').toLowerCase() === 'reschedule_request' && !item.decision;
+  if (content) {
+    setHTML(content, `<dl>${fields.map(([label, value]) => `<dt>${esc(label)}</dt><dd>${esc(value)}</dd>`).join('') || '<dd>No booking details are attached to this notification.</dd>'}</dl>${isRescheduleRequest && canRejectReschedule ? `<button type="button" class="btn btn-secondary btn-reject-reschedule" data-notification-id="${esc(item.id)}">Reject reschedule request</button>` : item.decision ? `<p class="request-decision-state">Request ${esc(item.decision)}${item.decisionReason ? `: ${esc(item.decisionReason)}` : ''}</p>` : ''}`);
+    content.querySelector('.btn-reject-reschedule')?.addEventListener('click', async (event) => {
+      const button = event.currentTarget;
+      const reason = prompt('Required reason for rejecting this reschedule request:');
+      if (!reason?.trim()) return alert('A rejection reason is required.');
+      button.disabled = true;
+      try {
+        const result = await api('api/admin-workflow.php', { action: 'reject_reschedule_request', notificationId: item.id, reason: reason.trim() });
+        alert(result.message);
+        dialog.close();
+      } catch (error) { button.disabled = false; alert(readableError(error)); }
+    });
+  }
   dialog.showModal();
 }
 
@@ -1578,8 +1911,10 @@ function setAccountsPage(direction) {
 window.setAccountsPage = setAccountsPage;
 
 function renderAccounts() {
+  const target = $('#accountResults');
+  if (!target) return;
   const roleLabels = { customer: 'Customer', staff: 'Staff', admin: 'Admin', super_admin: 'Super Admin' };
-  $('#accountResults').innerHTML = accounts.map((item, index) => {
+  setHTML(target, accounts.map((item, index) => {
     const detailsId = `account-edit-${index}`;
     const name = item.name || item.username || '';
     const role = item.role || 'customer';
@@ -1587,7 +1922,7 @@ function renderAccounts() {
     const roleOptions = [['customer', 'Customer'], ['admin', 'Admin'], ['super_admin', 'Super Admin']];
     if (role === 'staff') roleOptions.splice(1, 0, ['staff', 'Staff']);
     return `<tr class="account-summary-row account-row-item" data-account-row data-role="${esc(role.replaceAll('_', ' '))}" tabindex="0" aria-expanded="false" aria-controls="${detailsId}"><td>${esc(name)}</td><td>${esc(item.email)}</td><td>${esc(roleLabels[role] || role)}</td><td>${esc(status)}</td></tr><tr class="account-edit-row"><td colspan="4"><div class="account-edit-accordion" id="${detailsId}" inert><form class="account-edit-form" data-id="${esc(item.id)}"><div class="account-edit-fields"><input name="name" value="${esc(name)}" placeholder="Username" aria-label="Username" required><input name="email" type="email" value="${esc(item.email)}" placeholder="Email" aria-label="Email" required><input name="password" type="password" placeholder="Password (leave blank to keep current)" aria-label="Password (leave blank to keep current)"><select name="role" aria-label="Role">${roleOptions.map(([value, label]) => `<option value="${value}"${role === value ? ' selected' : ''}>${label}</option>`).join('')}</select><select name="status" aria-label="Status"><option value="active"${status === 'active' ? ' selected' : ''}>Active</option><option value="disabled"${status === 'disabled' ? ' selected' : ''}>Disabled</option></select></div><div class="account-form-actions"><button class="btn-save-account" type="submit">Save changes</button><button class="btn-cancel-account-action btn-cancel-account-edit" type="button">Cancel</button><button class="account-delete btn-delete-account" type="button" data-id="${esc(item.id)}">Delete</button></div><output></output></form></div></td></tr>`;
-  }).join('') || '<tr><td colspan="4">No accounts found.</td></tr>';
+  }).join('') || '<tr><td colspan="4">No accounts found.</td></tr>');
   filterAccountRows();
 }
 
@@ -1610,7 +1945,7 @@ function filterAccountRows() {
     if (row.nextElementSibling?.classList.contains('account-edit-row')) row.nextElementSibling.style.display = visible ? '' : 'none';
   });
   const footer = $('#account-pagination');
-  if (footer) footer.innerHTML = renderInteractivePagination(currentAccountsPage, totalPages, 'setAccountsPage');
+  setHTML(footer, renderInteractivePagination(currentAccountsPage, totalPages, 'setAccountsPage'));
 }
 
 async function saveAccount(event) {
@@ -1682,12 +2017,13 @@ async function loadSettings() {
     const modeRadio = $(`#paymongo${mode === 'live' ? 'Live' : 'Test'}`);
     if (modeRadio) modeRadio.checked = true;
     loadNotificationTemplate();
-    $('#settingsResults').innerHTML = settings.map((item) => {
+    const settingsTarget = $('#settingsResults');
+    if (settingsTarget) setHTML(settingsTarget, settings.map((item) => {
       const key = item.key || item.id || '';
       const value = /secret|password|token|credential/i.test(key) ? '••••••••' : item.value;
       return `<p><strong>${esc(item.category)} / ${esc(key)}:</strong> ${esc(value)}</p>`;
-    }).join('') || '<p>No settings saved.</p>';
-  } catch (error) { $('#settingsResults').textContent = error.message; }
+    }).join('') || '<p>No settings saved.</p>');
+  } catch (error) { const target = $('#settingsResults'); if (target) target.textContent = error.message; }
 }
 
 async function saveStructuredSettings(form, entries, successMessage) {

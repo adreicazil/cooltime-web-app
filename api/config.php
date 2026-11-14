@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
 
+// Keep PHP-generated calendar date strings aligned with the customer-facing
+// appointment and billing dates. Firestore timestamps that use gmdate remain UTC.
+date_default_timezone_set('Asia/Manila');
+
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
 ini_set('display_startup_errors', '0');
@@ -106,7 +110,12 @@ function environment(string $name, bool $required = true): string
         error_log("CoolTime OTP configuration is missing: {$name}");
         jsonResponse(['ok' => false, 'message' => 'Email verification is not configured on this server.'], 503);
     }
-    return $value === false ? '' : trim($value);
+    if ($value === false) return '';
+    $value = trim((string) $value);
+    if (strlen($value) >= 2 && (($value[0] === '"' && $value[-1] === '"') || ($value[0] === "'" && $value[-1] === "'"))) {
+        $value = substr($value, 1, -1);
+    }
+    return $value;
 }
 
 function isConfiguredValue(string $value): bool
@@ -195,6 +204,23 @@ function cooltimeReferenceNumber(string $paymentSource, string $branch, ?string 
     return $source . '-' . $branchCode . '-' . $date . '-' . $code;
 }
 
+function normalizeBranchId(string $value): string
+{
+    $normalized = strtolower(preg_replace('/[^a-z]/i', '', trim($value)) ?? '');
+    if (in_array($normalized, ['cabuyao', 'cabuyaomain', 'cabuyaobranch', 'cabuyaomainbranch'], true)) return 'cabuyao';
+    if (in_array($normalized, ['santarosa', 'santarosabranch'], true)) return 'santa_rosa';
+    return '';
+}
+
+function normalizeBranchLabel(string $value, string $fallback = ''): string
+{
+    return match (normalizeBranchId($value)) {
+        'cabuyao' => 'Cabuyao',
+        'santa_rosa' => 'Santa Rosa',
+        default => trim((string) (preg_replace('/\\s+branch\\s*$/i', '', trim($value)) ?: $fallback)),
+    };
+}
+
 function authorizationToken(): string
 {
     $header = '';
@@ -227,19 +253,13 @@ function firebaseUserFromToken(string $idToken): array
     $url = 'https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=' . rawurlencode($apiKey);
     $payload = json_encode(['idToken' => $idToken]);
 
-    $context = stream_context_create([
-        'http' => [
-            'method' => 'POST',
-            'header' => "Content-Type: application/json\r\n",
-            'content' => $payload,
-            'timeout' => 10,
-            'ignore_errors' => true,
-        ],
-    ]);
-    $response = @file_get_contents($url, false, $context);
-    $decoded = is_string($response) ? json_decode($response, true) : null;
+    $response = secureHttpRequest($url, 'POST', ['Content-Type: application/json'], $payload, 10);
+    $decoded = $response['body'] !== '' ? json_decode($response['body'], true) : null;
 
     if (!is_array($decoded) || empty($decoded['users'][0]['localId']) || empty($decoded['users'][0]['email'])) {
+        error_log(sprintf('Firebase token lookup failed (HTTP=%d, cURL=%s, response=%s).',
+            $response['status'], $response['error'] ?: 'none',
+            substr(preg_replace('/\\s+/', ' ', $response['body']) ?? '', 0, 500) ?: '[empty]'));
         jsonResponse(['ok' => false, 'message' => 'Your sign-in session is invalid or has expired. Please log in again.'], 401);
     }
 
@@ -260,14 +280,8 @@ function requireOtpSession(array $user): void
         $account = firebaseServiceAccount();
         $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id'])
             . '/databases/(default)/documents/mfa_sessions/' . rawurlencode($uid);
-        $context = stream_context_create(['http' => [
-            'method' => 'GET',
-            'header' => 'Authorization: Bearer ' . firebaseAdminAccessToken(),
-            'timeout' => 10,
-            'ignore_errors' => true,
-        ]]);
-        $response = @file_get_contents($url, false, $context);
-        $document = is_string($response) ? json_decode($response, true) : null;
+        $response = secureHttpRequest($url, 'GET', ['Authorization: Bearer ' . firebaseAdminAccessToken()], null, 10);
+        $document = $response['body'] !== '' ? json_decode($response['body'], true) : null;
         $expiry = (string) ($document['fields']['expiresAt']['timestampValue'] ?? '');
         if (is_array($document) && $expiry !== '' && strtotime($expiry) > time()) return;
     } catch (Throwable $error) {
@@ -283,18 +297,10 @@ function revokeOtpSession(string $uid): void
         $account = firebaseServiceAccount();
         $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id'])
             . '/databases/(default)/documents/mfa_sessions/' . rawurlencode($uid);
-        $context = stream_context_create(['http' => [
-            'method' => 'DELETE',
-            'header' => 'Authorization: Bearer ' . firebaseAdminAccessToken(),
-            'timeout' => 10,
-            'ignore_errors' => true,
-        ]]);
-        @file_get_contents($url, false, $context);
-        $statusLine = $http_response_header[0] ?? '';
-        preg_match('/\s(\d{3})\s/', $statusLine, $matches);
-        $status = (int) ($matches[1] ?? 0);
+        $response = secureHttpRequest($url, 'DELETE', ['Authorization: Bearer ' . firebaseAdminAccessToken()], null, 10);
+        $status = $response['status'];
         if (($status < 200 || $status >= 300) && $status !== 404) {
-            error_log('CoolTime Firebase OTP session revoke failed (HTTP ' . $status . '); local PHP session was revoked.');
+            error_log('CoolTime Firebase OTP session revoke failed (HTTP ' . $status . ', cURL=' . ($response['error'] ?: 'none') . '); local PHP session was revoked.');
         }
     } catch (Throwable $error) {
         error_log('CoolTime Firebase OTP session revoke failed; local PHP session was revoked: ' . $error->getMessage());
@@ -431,6 +437,9 @@ function sendResendEmail(string $email, string $subject, string $html, string $t
         CURLOPT_SSL_VERIFYPEER => true,
         CURLOPT_SSL_VERIFYHOST => 2,
     ]);
+    $caBundle = environment('FIREBASE_CA_BUNDLE', false)
+        ?: (string) (getenv('CURL_CA_BUNDLE') ?: ini_get('curl.cainfo') ?: ini_get('openssl.cafile'));
+    if ($caBundle !== '' && is_readable($caBundle)) curl_setopt($curl, CURLOPT_CAINFO, $caBundle);
     $response = curl_exec($curl);
     $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
     $curlError = curl_error($curl);
@@ -445,8 +454,6 @@ function sendResendEmail(string $email, string $subject, string $html, string $t
         $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
         $curlError = curl_error($curl);
     }
-    curl_close($curl);
-
     if ($response === false) {
         throw new RuntimeException('Resend API request failed: ' . $curlError);
     }
@@ -474,7 +481,7 @@ function sendOtpEmail(string $email, string $code, string $purpose = 'login', bo
 function sendConfiguredEmail(string $email, string $subject, string $htmlBody, string $textBody = ''): void
 {
     $plainText = $textBody !== '' ? $textBody : trim(strip_tags(str_replace(['</p>', '<br>', '<br/>'], "\n", $htmlBody)));
-    sendResendEmail($email, $subject, $htmlBody, $plainText);
+    sendResendEmail($email, $subject, $htmlBody, $plainText, isLocalDevelopmentRequest());
 }
 
 // Payment callbacks must finish their database updates even if email delivery fails.
@@ -748,24 +755,66 @@ function firebaseAdminAccessToken(): string
     return $token;
 }
 
+function isLocalDevelopmentRequest(): bool
+{
+    $hostHeader = trim((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    $host = strtolower((string) parse_url('http://' . $hostHeader, PHP_URL_HOST));
+    if (!in_array($host, ['localhost', '127.0.0.1', '::1'], true)) return false;
+    // The built-in PHP server is an explicit local-development signal. For
+    // other SAPIs, require the connection's local address to be loopback too.
+    if (PHP_SAPI === 'cli-server') return true;
+    $serverAddress = trim((string) ($_SERVER['SERVER_ADDR'] ?? ''));
+    return in_array($serverAddress, ['127.0.0.1', '::1'], true);
+}
+
+function secureHttpRequest(string $url, string $method = 'GET', array $headers = [], ?string $content = null, int $timeout = 15): array
+{
+    if (!function_exists('curl_init')) {
+        throw new RuntimeException('The PHP cURL extension is required for Firebase HTTPS requests.');
+    }
+    $curl = curl_init($url);
+    if ($curl === false) throw new RuntimeException('Could not initialize an HTTPS request.');
+    $options = [
+        CURLOPT_CUSTOMREQUEST => strtoupper($method), CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_CONNECTTIMEOUT => min(8, $timeout), CURLOPT_TIMEOUT => $timeout,
+        CURLOPT_HTTPHEADER => $headers, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2,
+    ];
+    if ($content !== null) $options[CURLOPT_POSTFIELDS] = $content;
+    $caBundle = environment('FIREBASE_CA_BUNDLE', false)
+        ?: (string) (getenv('CURL_CA_BUNDLE') ?: ini_get('curl.cainfo') ?: ini_get('openssl.cafile'));
+    if ($caBundle !== '' && is_readable($caBundle)) $options[CURLOPT_CAINFO] = $caBundle;
+    curl_setopt_array($curl, $options);
+
+    $response = curl_exec($curl);
+    $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+    $curlError = curl_error($curl);
+    $curlErrorNumber = curl_errno($curl);
+    $usedLocalTlsFallback = false;
+    if ($response === false && isLocalDevelopmentRequest()
+        && (in_array($curlErrorNumber, [60, 77, 83], true)
+            || stripos($curlError, 'certificate') !== false || stripos($curlError, 'CA cert') !== false)) {
+        // Only local loopback PHP development may retry without verification.
+        // Production requests (including Render) always retain strict TLS.
+        curl_setopt_array($curl, [CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0]);
+        $response = curl_exec($curl);
+        $status = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        $curlError = curl_error($curl);
+        $usedLocalTlsFallback = $response !== false;
+    }
+    if ($usedLocalTlsFallback) error_log('Local Firebase HTTPS request used the loopback-only TLS fallback because the configured CA bundle rejected the certificate.');
+    return ['status' => $status, 'body' => is_string($response) ? $response : '', 'error' => $curlError];
+}
+
 function httpJsonRequest(string $url, array $payload, array $headers = [], bool $formEncoded = false): array
 {
     $content = $formEncoded ? http_build_query($payload) : json_encode($payload, JSON_THROW_ON_ERROR);
-    if (!$formEncoded) {
-        $headers[] = 'Content-Type: application/json';
+    if (!$formEncoded) $headers[] = 'Content-Type: application/json';
+    $response = secureHttpRequest($url, 'POST', $headers, $content);
+    $body = $response['body'] !== '' ? json_decode($response['body'], true) : null;
+    if (!is_array($body) && $response['error'] !== '') {
+        error_log(sprintf('HTTPS JSON request failed (HTTP %d, cURL: %s).', $response['status'], $response['error']));
     }
-    $context = stream_context_create(['http' => [
-        'method' => 'POST',
-        'header' => implode("\r\n", $headers),
-        'content' => $content,
-        'timeout' => 15,
-        'ignore_errors' => true,
-    ]]);
-    $response = @file_get_contents($url, false, $context);
-    $body = is_string($response) ? json_decode($response, true) : null;
-    $statusLine = $http_response_header[0] ?? '';
-    preg_match('/\s(\d{3})\s/', $statusLine, $matches);
-    return ['status' => (int) ($matches[1] ?? 0), 'body' => is_array($body) ? $body : []];
+    return ['status' => $response['status'], 'body' => is_array($body) ? $body : [], 'raw' => $response['body'], 'error' => $response['error']];
 }
 
 function firebaseAdminLookupUserByEmail(string $email): ?array
@@ -844,23 +893,15 @@ function firestorePatchDocument(array $account, string $collection, string $docu
         $fieldMasks = array_map(static fn(string $fieldPath): string => 'updateMask.fieldPaths=' . rawurlencode($fieldPath), array_keys($fields));
         $url .= '?' . implode('&', $fieldMasks);
     }
-        $context = stream_context_create(['http' => [
-            'method' => 'PATCH',
-            'header' => "Authorization: Bearer " . firebaseAdminAccessToken() . "\r\nContent-Type: application/json",
-            'content' => $payload,
-            'timeout' => 15,
-            'ignore_errors' => true,
-        ]]);
-        $response = @file_get_contents($url, false, $context);
-        if (!is_string($response)) {
-            throw new RuntimeException('Firestore document update failed.');
-        }
-        $statusLine = $http_response_header[0] ?? '';
-        preg_match('/\s(\d{3})\s/', $statusLine, $matches);
-        $status = (int) ($matches[1] ?? 0);
-        if ($status < 200 || $status >= 300) {
-            throw new RuntimeException('Firestore document update failed.');
-        }
+    $result = secureHttpRequest($url, 'PATCH', [
+        'Authorization: Bearer ' . firebaseAdminAccessToken(), 'Content-Type: application/json',
+    ], $payload, 15);
+    if ($result['status'] < 200 || $result['status'] >= 300) {
+        error_log(sprintf('Firestore document update failed (collection=%s, id=%s, HTTP=%d, cURL=%s, response=%s).',
+            $collection, $documentId, $result['status'], $result['error'] ?: 'none',
+            substr(preg_replace('/\s+/', ' ', $result['body']) ?? '', 0, 500) ?: '[empty]'));
+        throw new RuntimeException('Firestore document update failed (HTTP ' . $result['status'] . ').');
+    }
 }
 
 function maskedEmail(string $email): string

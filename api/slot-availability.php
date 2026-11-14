@@ -4,48 +4,49 @@ declare(strict_types=1);
 require_once __DIR__ . '/config.php';
 requirePost();
 
-function availabilityFirestoreQuery(array $account, string $branchId): array
+function availabilityFirestoreQuery(array $account, string $fieldName, string $branchValue): array
 {
     $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id'])
         . '/databases/(default)/documents:runQuery';
     $payload = [
         'structuredQuery' => [
             'select' => ['fields' => [
-                ['fieldPath' => 'branchId'], ['fieldPath' => 'date'],
-                ['fieldPath' => 'timeSlot'], ['fieldPath' => 'status'],
+                ['fieldPath' => 'branchId'], ['fieldPath' => 'date'], ['fieldPath' => 'appointmentDate'],
+                ['fieldPath' => 'branch'], ['fieldPath' => 'timeSlot'], ['fieldPath' => 'preferredTimeSlot'], ['fieldPath' => 'status'],
             ]],
             'from' => [['collectionId' => 'bookings']],
             'where' => ['fieldFilter' => [
-                'field' => ['fieldPath' => 'branchId'],
+                'field' => ['fieldPath' => $fieldName],
                 'op' => 'EQUAL',
-                'value' => ['stringValue' => $branchId],
+                'value' => ['stringValue' => $branchValue],
             ]],
         ],
     ];
-    $context = stream_context_create(['http' => [
-        'method' => 'POST',
-        'header' => "Authorization: Bearer " . firebaseAdminAccessToken() . "\r\nContent-Type: application/json",
-        'content' => json_encode($payload, JSON_THROW_ON_ERROR),
-        'timeout' => 15,
-        'ignore_errors' => true,
-    ]]);
-    $response = @file_get_contents($url, false, $context);
-    $statusLine = $http_response_header[0] ?? '';
-    preg_match('/\s(\d{3})\s/', $statusLine, $statusMatches);
-    $status = (int) ($statusMatches[1] ?? 0);
-    if (!is_string($response) || $status < 200 || $status >= 300) {
-        $errorBody = is_string($response) ? json_decode($response, true) : null;
+    $response = secureHttpRequest($url, 'POST', [
+        'Authorization: Bearer ' . firebaseAdminAccessToken(), 'Content-Type: application/json',
+    ], json_encode($payload, JSON_THROW_ON_ERROR), 15);
+    if ($response['status'] < 200 || $response['status'] >= 300) {
+        $errorBody = $response['body'] !== '' ? json_decode($response['body'], true) : null;
         $providerError = is_array($errorBody) ? ($errorBody['error']['status'] ?? $errorBody['error']['message'] ?? '') : '';
         $providerError = substr(preg_replace('/[^A-Za-z0-9_. -]/', '', (string) $providerError) ?? '', 0, 120);
+        error_log(sprintf('Firestore availability query failed (HTTP=%d, cURL=%s, response=%s).',
+            $response['status'], $response['error'] ?: 'none',
+            substr(preg_replace('/\s+/', ' ', $response['body']) ?? '', 0, 500) ?: '[empty]'));
         throw new RuntimeException(sprintf(
             'Firestore availability query failed (HTTP %d, provider_error=%s).',
-            $status,
+            $response['status'],
             $providerError !== '' ? $providerError : 'unspecified'
         ));
     }
-    $rows = json_decode($response, true);
+    $rows = json_decode($response['body'], true);
     if (!is_array($rows)) throw new RuntimeException('Firestore availability response was invalid.');
     return $rows;
+}
+
+function availabilityNormalizeBranch(string $value): string
+{
+    // Accept canonical labels and legacy "... Branch" labels as well as IDs.
+    return normalizeBranchId(trim($value));
 }
 
 function availabilityDateKey(array $value): string
@@ -65,9 +66,9 @@ function availabilityDateKey(array $value): string
 
 try {
     $data = requestData();
-    $branch = strtolower(trim((string) ($data['branchId'] ?? '')));
+    $branch = availabilityNormalizeBranch((string) ($data['branchId'] ?? $data['branch'] ?? ''));
     $date = trim((string) ($data['date'] ?? ''));
-    if (!in_array($branch, ['cabuyao', 'santarosa'], true)
+    if (!in_array($branch, ['cabuyao', 'santa_rosa'], true)
         || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
         jsonResponse(['ok' => false, 'message' => 'A valid branch and appointment date are required.'], 400);
     }
@@ -92,15 +93,21 @@ try {
         requireOtpSession($user);
     }
     $account = firebaseServiceAccount();
-    $aliases = $branch === 'santarosa' ? ['santarosa', 'santa_rosa'] : ['cabuyao', 'cabuyao_main'];
+    $aliases = $branch === 'santa_rosa'
+        ? ['santarosa', 'santa_rosa', 'santa_rosa_branch', 'santarosa_branch', 'Santa Rosa', 'Santa Rosa Branch', 'Santa Rosa branch', 'santa rosa branch']
+        : ['cabuyao', 'cabuyao_main', 'cabuyao_branch', 'cabuyao_main_branch', 'Cabuyao', 'Cabuyao Branch', 'Cabuyao branch', 'Cabuyao Main Branch', 'Cabuyao main branch', 'cabuyao branch'];
+    $branchFieldValues = $branch === 'santa_rosa'
+        ? ['Santa Rosa', 'Santa Rosa Branch', 'Santa Rosa branch', 'santa rosa branch', 'santarosa', 'santa_rosa']
+        : ['Cabuyao', 'Cabuyao Branch', 'Cabuyao branch', 'Cabuyao Main Branch', 'Cabuyao main branch', 'cabuyao branch', 'cabuyao', 'cabuyao_main'];
     $occupied = [];
-    foreach ($aliases as $branchId) {
-        foreach (availabilityFirestoreQuery($account, $branchId) as $row) {
+    foreach ([...array_map(static fn(string $value): array => ['branchId', $value], $aliases),
+        ...array_map(static fn(string $value): array => ['branch', $value], $branchFieldValues)] as [$fieldName, $branchValue]) {
+        foreach (availabilityFirestoreQuery($account, $fieldName, $branchValue) as $row) {
             $fields = $row['document']['fields'] ?? null;
-            if (!is_array($fields) || availabilityDateKey($fields['date'] ?? []) !== $date) continue;
+            if (!is_array($fields) || availabilityDateKey($fields['date'] ?? $fields['appointmentDate'] ?? []) !== $date) continue;
             $status = strtolower(trim((string) ($fields['status']['stringValue'] ?? 'pending')));
             if (in_array($status, ['cancelled', 'canceled', 'archived', 'completed', 'expired', 'payment overdue'], true)) continue;
-            $timeSlot = trim((string) ($fields['timeSlot']['stringValue'] ?? ''));
+            $timeSlot = trim((string) ($fields['timeSlot']['stringValue'] ?? $fields['preferredTimeSlot']['stringValue'] ?? ''));
             if ($timeSlot !== '') $occupied[$timeSlot] = true;
         }
     }

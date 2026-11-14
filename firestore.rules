@@ -16,7 +16,7 @@ service cloud.firestore {
         && getUserData().get('status', 'active') == 'active'
         && (getUserData().get('role', '') == role
           || (role == 'admin' && getUserData().get('role', '') in ['Admin', 'ADMIN'])
-          || (role == 'super_admin' && getUserData().get('role', '') in ['Super_Admin', 'SUPER_ADMIN', 'super-admin', 'Super-Admin', 'super admin', 'Super Admin']));
+          || (role == 'super_admin' && getUserData().get('role', '') in ['Super_Admin', 'SUPER_ADMIN', 'super-admin', 'Super-Admin', 'super admin', 'Super Admin', 'superadmin', 'SuperAdmin', 'SUPERADMIN']));
     }
     function isAdmin() { return hasRole('admin') || hasRole('super_admin'); }
     function isSuperAdmin() { return hasRole('super_admin'); }
@@ -62,6 +62,14 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     match /payments/{paymentId} { allow read, write: if isAdmin(); }
+    match /pos_transactions/{transactionId} {
+      allow read, create, update: if isAdmin();
+      allow delete: if isSuperAdmin();
+    }
+    match /audit_logs/{auditId} {
+      allow read, create, update: if isAdmin();
+      allow delete: if isSuperAdmin();
+    }
     match /service_history/{historyId} {
       allow read: if isSignedIn() && (resource.data.customerId == request.auth.uid || isAdmin());
       allow write: if isAdmin();

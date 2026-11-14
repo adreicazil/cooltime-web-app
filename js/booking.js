@@ -2,6 +2,7 @@ import { collection, doc, getDoc, getDocs, getDocsFromServer, onSnapshot, query,
 import { requireRole } from './auth-guard.js';
 import { db } from './firebase-config.js';
 import { updateAvailableSlots } from './slot-availability.js';
+import { normalizeBranchId, normalizeBranchLabel } from './branch-utils.js';
 import { createBooking } from './firestore.js';
 import { createWebInvoice } from './payments.js';
 
@@ -10,7 +11,9 @@ const branchInput = document.getElementById('branchId');
 const dateInput = document.getElementById('appointmentDate');
 const slotInput = document.getElementById('timeSlot');
 const submitButton = document.getElementById('bookBtn');
+const savedVehicleSelect = document.getElementById('savedVehicleProfile');
 let customerProfile = null;
+let savedVehiclesById = {};
 
 const serviceTypeSelect = document.getElementById('serviceType');
 if (serviceTypeSelect) {
@@ -96,8 +99,8 @@ function configuredSlots(branch, selectedDate) {
 }
 
 async function getBranchSchedule(branchId) {
-  const aliases = branchId === 'santarosa' ? ['santarosa', 'santa_rosa']
-    : branchId === 'cabuyao' ? ['cabuyao'] : [branchId];
+  const aliases = ['santarosa', 'santa_rosa'].includes(branchId) ? ['santarosa', 'santa_rosa']
+    : branchId === 'cabuyao' ? ['cabuyao', 'cabuyao_main'] : [branchId];
   for (const collectionName of ['branches', 'branch']) {
     for (const id of aliases) {
       const snapshot = await getDoc(doc(db, collectionName, id));
@@ -133,11 +136,55 @@ let stopInvoiceListener = null;
 let runningBillsCurrentPage = 1;
 let runningBillsHasInitialSnapshot = false;
 let runningBillsKnownIds = new Set();
+let invoiceVerificationUser = null;
+const checkoutVerificationAttempts = new Set();
 const billMoney = (amount) => `PHP ${Number(amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function formatManilaDate(date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+function invoiceCreatedAtDate(invoice) {
+  const raw = invoice.createdAt ?? invoice.created_at;
+  if (raw?.toDate) return raw.toDate();
+  if (typeof raw === 'number') return new Date(Math.abs(raw) < 1e12 ? raw * 1000 : raw);
+  if (typeof raw === 'string' && raw.trim()) {
+    const numeric = Number(raw);
+    return new Date(Number.isFinite(numeric) ? (Math.abs(numeric) < 1e12 ? numeric * 1000 : numeric) : raw);
+  }
+  return null;
+}
+
+async function refreshPendingCheckoutStatuses(invoiceRecords) {
+  const user = invoiceVerificationUser;
+  if (!user) return;
+  for (const { id, data } of invoiceRecords) {
+    const attemptKey = `${id}:${data.latestPaymentSessionId || ''}`;
+    if (String(data.status || '').toLowerCase() === 'paid' || !data.latestPaymentSessionId || checkoutVerificationAttempts.has(attemptKey)) continue;
+    checkoutVerificationAttempts.add(attemptKey);
+    try {
+      const response = await fetch('api/verify-checkout-session.php', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+        body: JSON.stringify({ invoiceId: id })
+      });
+      const result = await response.json();
+      if (!response.ok || !result.ok) throw new Error(result.message || 'Payment status refresh failed.');
+      if (result.checkoutStatus === 'paid' || result.checkoutStatus === 'expired') {
+        try { await refreshInvoicesFromServer(user); } catch (error) { console.warn('Running bills refresh after checkout reconciliation failed:', error); }
+      }
+    } catch (error) {
+      console.warn(`Pending checkout for invoice ${id} could not be verified:`, error);
+      setTimeout(() => checkoutVerificationAttempts.delete(attemptKey), 30000);
+    }
+  }
+}
 
 function renderInvoices(snapshot) {
   latestInvoiceSnapshot = snapshot;
   const invoiceRecords = snapshot.docs.map((item) => ({ id: item.id, data: item.data() }));
+  void refreshPendingCheckoutStatuses(invoiceRecords);
   const addedIds = invoiceRecords.filter(({ id }) => !runningBillsKnownIds.has(id)).map(({ id }) => id);
   const justAdded = runningBillsHasInitialSnapshot && addedIds.length > 0;
   runningBillsKnownIds = new Set(invoiceRecords.map(({ id }) => id));
@@ -184,10 +231,10 @@ function renderInvoices(snapshot) {
     const referenceNumber = invoice.referenceNumber || invoice.invoiceNumber || id;
     const lineHtml = lines.map((line) => `<li>${escapeHtml(line.name || line.id)} <span>x ${Number(line.quantity || 1)} · ${billMoney(line.lineTotal ?? Number(line.price || 0) * Number(line.quantity || 1))}</span></li>`).join('');
     const addControl = closed ? '' : `<div class="bill-add-service"><label for="add-service-${escapeHtml(id)}">Add a service</label><div class="bill-add-controls" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;"><select id="add-service-${escapeHtml(id)}" class="bill-service-select"><option value="">Choose service</option>${billServices.map((service) => `<option value="${escapeHtml(service.id)}">${escapeHtml(service.name)} - ${billMoney(service.price)}</option>`).join('')}</select><button class="btn btn-secondary bill-add" data-invoice-id="${escapeHtml(id)}" type="button">Add to bill</button></div></div>`;
-    const created = invoice.createdAt?.toDate?.() || (invoice.createdAt ? new Date(invoice.createdAt) : null);
-    const date = created && !Number.isNaN(created.getTime()) ? created.toISOString().slice(0, 10) : (invoice.date || 'Date unavailable');
+    const created = invoiceCreatedAtDate(invoice);
+    const date = created && !Number.isNaN(created.getTime()) ? formatManilaDate(created) : (invoice.date || 'Date unavailable');
     const detailId = `invoice-details-${escapeHtml(id)}`;
-    return `<article class="invoice-row running-bill" data-invoice-id="${escapeHtml(id)}"><div class="bill-summary"><span class="bill-index">${firstIndex + index + 1}</span><button class="bill-invoice-toggle" type="button" aria-expanded="false" aria-controls="${detailId}" aria-label="Show details for invoice ${escapeHtml(referenceNumber)}"><span class="invoice-meta-col"><span class="invoice-id-text">${escapeHtml(referenceNumber)}</span><span class="invoice-date-text">${escapeHtml(date)}</span></span></button><strong class="bill-amount">${billMoney(amount)}</strong><span class="bill-status ${escapeHtml(statusKey)}">${escapeHtml(status)}</span>${!closed ? `<button class="btn btn-primary invoice-pay bill-summary-pay" type="button" data-invoice-id="${escapeHtml(id)}">Pay balance</button>` : '<span class="bill-summary-pay-placeholder" aria-hidden="true"></span>'}</div><div class="bill-breakdown-panel" id="${detailId}" aria-hidden="true" inert><p><strong>Reference ID:</strong> ${escapeHtml(referenceNumber)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${escapeHtml(referenceNumber)}">Copy</button></p><ul class="bill-lines">${lineHtml || '<li>No services added.</li>'}</ul><div class="bill-totals"><span>Running total</span><strong>${billMoney(amount)}</strong>${downpayment > 0 ? `<span>Downpayment credited</span><strong>- ${billMoney(downpayment)}</strong>` : ''}<span>Balance due</span><strong>${billMoney(balance)}</strong></div>${addControl}</div></article>`;
+    return `<article class="invoice-row running-bill" data-invoice-id="${escapeHtml(id)}" data-booking-id="${escapeHtml(invoice.bookingId || '')}" data-reference-id="${escapeHtml(referenceNumber)}"><div class="bill-summary"><span class="bill-index">${firstIndex + index + 1}</span><button class="bill-invoice-toggle" type="button" aria-expanded="false" aria-controls="${detailId}" aria-label="Show details for invoice ${escapeHtml(referenceNumber)}"><span class="invoice-meta-col"><span class="invoice-id-text">${escapeHtml(referenceNumber)}</span><span class="invoice-date-text">${escapeHtml(date)}</span></span></button><strong class="bill-amount">${billMoney(amount)}</strong><span class="bill-status ${escapeHtml(statusKey)}">${escapeHtml(status)}</span>${!closed ? `<button class="btn btn-primary invoice-pay bill-summary-pay" type="button" data-invoice-id="${escapeHtml(id)}">Pay balance</button>` : '<span class="bill-summary-pay-placeholder" aria-hidden="true"></span>'}</div><div class="bill-breakdown-panel" id="${detailId}" aria-hidden="true" inert><p><strong>Reference ID:</strong> ${escapeHtml(referenceNumber)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${escapeHtml(referenceNumber)}">Copy</button></p><ul class="bill-lines">${lineHtml || '<li>No services added.</li>'}</ul><div class="bill-totals"><span>Running total</span><strong>${billMoney(amount)}</strong>${downpayment > 0 ? `<span>Downpayment credited</span><strong>- ${billMoney(downpayment)}</strong>` : ''}<span>Balance due</span><strong>${billMoney(balance)}</strong></div>${addControl}</div></article>`;
   }).join('');
 }
 
@@ -221,12 +268,36 @@ document.getElementById('customerInvoices')?.addEventListener('click', async (ev
       const result = await response.json();
       if (!response.ok || !result.ok) throw new Error(result.message || 'Unable to add service.');
     } else {
-      const response = await fetch('api/create-checkout-session.php', {
+      const verifyResponse = await fetch('api/verify-checkout-session.php', {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await access.user.getIdToken()}` },
         body: JSON.stringify({ invoiceId: payButton.dataset.invoiceId })
       });
+      const verification = await verifyResponse.json();
+      if (!verifyResponse.ok || !verification.ok) throw new Error(verification.message || 'Unable to verify the current checkout.');
+      if (verification.alreadyPaid || verification.checkoutStatus === 'paid') {
+        try { await refreshInvoicesFromServer(access.user); }
+        catch (refreshError) { console.error('Paid invoice refresh failed:', refreshError); }
+        button.disabled = false;
+        return;
+      }
+      const response = await fetch('api/create-checkout-session.php', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await access.user.getIdToken()}` },
+        body: JSON.stringify({
+          invoiceId: payButton.dataset.invoiceId,
+          billId: payButton.dataset.invoiceId,
+          bookingId: payButton.closest('.running-bill')?.dataset.bookingId || '',
+          referenceId: payButton.closest('.running-bill')?.dataset.referenceId || '',
+          forceRefresh: true
+        })
+      });
       const result = await response.json();
-      if (!response.ok || !result.checkoutUrl) throw new Error(result.message || 'Unable to start payment.');
+      if (!response.ok || (!result.checkoutUrl && !result.alreadyPaid)) throw new Error(result.message || 'Unable to start payment.');
+      if (result.alreadyPaid) {
+        try { await refreshInvoicesFromServer(access.user); }
+        catch (refreshError) { console.error('Paid invoice refresh failed:', refreshError); }
+        button.disabled = false;
+        return;
+      }
       window.location.assign(result.checkoutUrl);
     }
   } catch (error) {
@@ -245,6 +316,7 @@ document.getElementById('customerInvoices')?.addEventListener('click', async (ev
 function loadInvoices(user) {
   const target = document.getElementById('customerInvoices');
   if (!target) return;
+  invoiceVerificationUser = user;
   getDocs(collection(db, 'services')).then((snapshot) => {
     billServices = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((service) => Number(service.price) > 0 && String(service.status || 'active').toLowerCase() === 'active');
     if (latestInvoiceSnapshot) renderInvoices(latestInvoiceSnapshot);
@@ -307,18 +379,27 @@ function bookingCreatedDate(booking) {
 }
 
 function renderCustomerBookings(records, serviceCatalog, vehicleData, branchCatalog, user, profile, target) {
+  const branchAddressFor = (branchValue, storedAddress = '') => {
+    if (storedAddress) return storedAddress;
+    const branchId = normalizeBranchId(branchValue);
+    if (branchId === 'cabuyao') return 'Cabuyao, Laguna';
+    if (branchId === 'santa_rosa') return 'Santa Rosa, Laguna';
+    return 'Address unavailable';
+  };
   const bookingData = records.map((record) => {
     const data = record.data;
     const serviceId = data.serviceId || data.service_id || data.serviceID || '';
     const service = serviceCatalog[serviceId] || {};
-    const branchKey = String(data.branchId || data.branch_id || '').toLowerCase().replace(/[- ]/g, '_');
+    const branchValue = data.branchId || data.branch_id || data.branch || data.branchName || '';
+    const normalizedBranchId = normalizeBranchId(branchValue);
+    const branchKey = normalizedBranchId || String(branchValue).toLowerCase().replace(/[- ]/g, '_');
     const branch = branchCatalog[branchKey] || {};
     return {
       ...data, id: record.id, serviceId,
       serviceName: service.name || data.service_name || data.serviceName || readableServiceFallback(serviceId),
       servicePrice: Number(service.price || data.servicePrice || data.service_price || 0),
-      branchName: data.branchName || branch.name || ({ cabuyao: 'Cabuyao Branch', santarosa: 'Santa Rosa Branch', santa_rosa: 'Santa Rosa Branch' }[branchKey]) || data.branchId || 'Branch unavailable',
-      branchAddress: data.branchAddress || branch.address || 'Address unavailable',
+      branchName: normalizeBranchLabel(data.branchName || branch.name || branchValue || branchKey, 'Branch unavailable'),
+      branchAddress: branchAddressFor(branchValue, data.branchAddress || branch.address),
       customerName: profile?.name || profile?.username || 'Customer',
       customerEmail: user.email || profile?.email || 'Email unavailable',
       vehicle: data.vehicle || vehicleData[data.vehicleId || data.vehicle_id] || {}
@@ -339,11 +420,11 @@ function renderCustomerBookings(records, serviceCatalog, vehicleData, branchCata
     const statusKey = rawStatusKey === 'in-progress' ? 'ongoing' : rawStatusKey;
     const status = statusKey === 'ongoing' ? 'Ongoing' : statusKey.charAt(0).toUpperCase() + statusKey.slice(1).replaceAll('-', ' ');
     const branchKey = String(booking.branchId || '').toLowerCase().replace(/[- ]/g, '_');
-    const branch = booking.branchName || ({ santarosa: 'Sta. Rosa', santa_rosa: 'Sta. Rosa', cabuyao: 'Cabuyao' }[branchKey]) || booking.branchId || 'Branch unavailable';
+    const branch = normalizeBranchLabel(booking.branchName || booking.branch || booking.branchId, 'Branch unavailable');
     const nestedVehicle = booking.vehicle && typeof booking.vehicle === 'object' ? booking.vehicle : {};
     const storedVehicle = vehicleData[booking.vehicleId || booking.vehicle_id] || {};
     const vehicle = {
-      plateNumber: nestedVehicle.plateNumber || nestedVehicle.plate_number || booking.plateNumber || booking.plate_number || storedVehicle.plateNumber || storedVehicle.plate_number,
+      plateNumber: nestedVehicle.plateNumber || nestedVehicle.plate_number || nestedVehicle.vehiclePlate || nestedVehicle.plate || booking.vehiclePlate || booking.vehicle_plate || booking.plateNumber || booking.plate_number || booking.plate || storedVehicle.vehiclePlate || storedVehicle.vehicle_plate || storedVehicle.plateNumber || storedVehicle.plate_number || storedVehicle.plate,
       make: nestedVehicle.make || nestedVehicle.vehicleMake || nestedVehicle.vehicle_make || booking.vehicleMake || booking.vehicle_make || booking.make || storedVehicle.make || storedVehicle.vehicleMake || storedVehicle.vehicle_make,
       model: nestedVehicle.model || nestedVehicle.vehicleModel || nestedVehicle.vehicle_model || booking.vehicleModel || booking.vehicle_model || booking.model || storedVehicle.model || storedVehicle.vehicleModel || storedVehicle.vehicle_model,
       year: nestedVehicle.year || nestedVehicle.vehicleYear || nestedVehicle.vehicle_year || booking.vehicleYear || booking.vehicle_year || booking.year || storedVehicle.year || storedVehicle.vehicleYear || storedVehicle.vehicle_year,
@@ -378,6 +459,17 @@ async function loadCustomerBookings(user, profile) {
       getDocs(collection(db, 'branches'))
     ]);
     const vehicleData = Object.fromEntries(vehicles.docs.map((item) => [item.id, item.data()]));
+    savedVehiclesById = vehicleData;
+    if (savedVehicleSelect) {
+      const options = vehicles.docs.map((item) => {
+        const vehicle = item.data();
+        const plate = vehicle.plateNumber || vehicle.plate_number || vehicle.vehiclePlate || vehicle.vehicle_plate || vehicle.plate || '';
+        const label = [plate, vehicle.year, vehicle.make || vehicle.vehicleMake || vehicle.vehicle_make, vehicle.model || vehicle.vehicleModel || vehicle.vehicle_model].filter(Boolean).join(' · ');
+        return new Option(label || `Saved vehicle ${item.id}`, item.id);
+      });
+      savedVehicleSelect.replaceChildren(new Option('Enter vehicle details', ''), ...options);
+      savedVehicleSelect.disabled = options.length === 0;
+    }
     const branchCatalog = Object.fromEntries(branches.docs.map((item) => [item.id.toLowerCase().replace(/[- ]/g, '_'), { id: item.id, ...item.data() }]));
     let records = [];
     let serviceCatalog = {};
@@ -661,6 +753,16 @@ if (form) {
       finishClose();
     }, 450);
   };
+  savedVehicleSelect?.addEventListener('change', () => {
+    const vehicle = savedVehicleSelect.value ? savedVehicleSelect.options[savedVehicleSelect.selectedIndex] : null;
+    if (!vehicle?.value) return;
+    const saved = savedVehiclesById[vehicle.value];
+    if (!saved) return;
+    form.elements.namedItem('plateNumber').value = saved.plateNumber || saved.plate_number || saved.vehiclePlate || saved.vehicle_plate || saved.plate || '';
+    form.elements.namedItem('vehicleMake').value = saved.make || saved.vehicleMake || saved.vehicle_make || '';
+    form.elements.namedItem('vehicleModel').value = saved.model || saved.vehicleModel || saved.vehicle_model || '';
+    form.elements.namedItem('vehicleYear').value = saved.year || saved.vehicleYear || saved.vehicle_year || '';
+  });
   newBookingButton?.addEventListener('click', () => {
     const currentCount = document.querySelectorAll('#customerBookings .customer-booking-row').length;
     document.getElementById('bookingFormIndex').textContent = String(currentCount + 1);
@@ -691,21 +793,6 @@ if (form) {
     document.getElementById('customerName')?.replaceChildren(fullName.value || 'Customer');
     loadInvoices(access.user);
     loadCustomerBookings(access.user, customerProfile);
-    const paymentNotice = document.getElementById('paymentReturnNotice');
-    const returnStatus = new URLSearchParams(window.location.search).get('payment');
-    const returnInvoice = new URLSearchParams(window.location.search).get('invoice');
-    if (paymentNotice && returnStatus) {
-      paymentNotice.hidden = false;
-      paymentNotice.textContent = returnStatus === 'overdue'
-        ? `Payment was not completed for invoice ${returnInvoice || ''}. The invoice remains available so you can retry payment.`
-        : returnStatus === 'success'
-          ? `Payment for invoice ${returnInvoice || ''} was submitted. The invoice will show paid after PayMongo confirms it.`
-          : returnStatus === 'superseded'
-            ? `A newer checkout was started for invoice ${returnInvoice || ''}. Its current payment status is shown below.`
-            : returnStatus === 'cancelled'
-              ? `Invoice ${returnInvoice || ''} was cancelled. Contact the branch if you need help.`
-          : 'We could not confirm the payment return. Check your invoice status or contact support.';
-    }
   }).catch(() => window.location.replace('login.html'));
   form.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -715,7 +802,7 @@ if (form) {
     try {
       const data = new FormData(form);
       const bookingEmail = String(access.user.email || '').trim().toLowerCase();
-      const result = await createBooking({ customerId: access.user.uid, userId: access.user.uid, email: bookingEmail, customerEmail: bookingEmail, branchId: data.get('branchId'), serviceId: data.get('serviceType'), date: data.get('appointmentDate'), timeSlot: data.get('timeSlot'), vehicle: { plateNumber: data.get('plateNumber'), make: data.get('vehicleMake'), model: data.get('vehicleModel'), year: data.get('vehicleYear') } });
+      const result = await createBooking({ customerId: access.user.uid, userId: access.user.uid, email: bookingEmail, customerEmail: bookingEmail, branchId: normalizeBranchId(data.get('branchId')), serviceId: data.get('serviceType'), date: data.get('appointmentDate'), timeSlot: data.get('timeSlot'), vehicle: { plateNumber: data.get('plateNumber'), make: data.get('vehicleMake'), model: data.get('vehicleModel'), year: data.get('vehicleYear') } });
       latestSubmittedBookingId = result.bookingId;
       if (result.booking) optimisticBookingRecords.set(result.bookingId, result.booking);
       rerenderCustomerBookings?.();

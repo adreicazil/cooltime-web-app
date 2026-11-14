@@ -5,6 +5,7 @@ import { getUserProfile } from './firestore.js';
 import { logoutUser } from './auth.js';
 import { setActiveNavigation, toggleSidebar } from './ui.js';
 import { hasOtpVerification, normalizeRole } from './auth-guard.js';
+import { normalizeBranchLabel } from './branch-utils.js';
 
 setActiveNavigation();
 
@@ -135,7 +136,7 @@ async function manageAccountAction(event) {
 
 function renderBranchAnalytics() {
   const branches = {
-    cabuyao: { name: 'Cabuyao Main', bookings: 0, paid: 0, sales: 0 },
+    cabuyao: { name: 'Cabuyao', bookings: 0, paid: 0, sales: 0 },
     santarosa: { name: 'Santa Rosa', bookings: 0, paid: 0, sales: 0 }
   };
   bookingRows.forEach((booking) => {
@@ -162,7 +163,7 @@ function renderBranchAnalytics() {
   });
   calculateDashboardMetrics(bookingRows, userRows, bookingRows, paymentRows, todaySales);
   const body = document.getElementById('branchMetricsBody');
-  if (body) body.innerHTML = Object.values(branches).map((branch) => `<tr><td>${escapeHtml(branch.name)}</td><td>${branch.bookings.toLocaleString()}</td><td>${branch.paid.toLocaleString()}</td><td>PHP ${Number(branch.sales).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`).join('');
+  if (body) body.innerHTML = Object.values(branches).map((branch) => `<tr><td>${escapeHtml(normalizeBranchLabel(branch.name))}</td><td>${branch.bookings.toLocaleString()}</td><td>${branch.paid.toLocaleString()}</td><td>PHP ${Number(branch.sales).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`).join('');
 }
 
 function calculateDashboardMetrics(bookings, users, walkInCustomers, posTransactions, paidSalesToday) {
@@ -224,7 +225,7 @@ function renderPendingBookings(snapshot) {
     const status = String(booking.status || 'pending').toLowerCase();
     const canApprove = status === 'pending';
     const canCancel = !['cancelled', 'completed', 'paid'].includes(status);
-    return `<tr><td>${escapeHtml(item.id)}</td><td>${escapeHtml(booking.customerId)}</td><td>${escapeHtml(booking.serviceId)}</td><td>${escapeHtml(booking.date)} ${escapeHtml(booking.timeSlot)}</td><td>${escapeHtml(booking.branchId)}</td><td><span class="status ${escapeHtml(status)}">${escapeHtml(status.replaceAll('_', ' '))}</span></td><td>${canApprove ? `<button class="action-btn booking-action" data-id="${escapeHtml(item.id)}" data-status="confirmed">Approve</button> ` : ''}${canCancel ? `<button class="action-btn booking-action" data-id="${escapeHtml(item.id)}" data-status="cancelled">Cancel / release slot</button>` : ''}</td></tr>`;
+    return `<tr><td>${escapeHtml(item.id)}</td><td>${escapeHtml(booking.customerId)}</td><td>${escapeHtml(booking.serviceId)}</td><td>${escapeHtml(booking.date)} ${escapeHtml(booking.timeSlot)}</td><td>${escapeHtml(normalizeBranchLabel(booking.branchName || booking.branch || booking.branchId))}</td><td><span class="status ${escapeHtml(status)}">${escapeHtml(status.replaceAll('_', ' '))}</span></td><td>${canApprove ? `<button class="action-btn booking-action" data-id="${escapeHtml(item.id)}" data-status="confirmed">Approve</button> ` : ''}${canCancel ? `<button class="action-btn booking-action" data-id="${escapeHtml(item.id)}" data-status="cancelled">Cancel / release slot</button>` : ''}</td></tr>`;
   }).join('');
 }
 
