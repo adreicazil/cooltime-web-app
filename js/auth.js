@@ -5,7 +5,7 @@ import {
   signOut
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { auth, authReady } from './firebase-config.js';
-import { createUserProfile, getUserProfile } from './firestore.js';
+import { createUserProfile } from './firestore.js';
 
 const loginForm = document.getElementById('loginForm');
 const registerForm = document.getElementById('registerForm');
@@ -125,17 +125,19 @@ if (registerForm) {
       if (error?.code === 'auth/email-already-in-use') {
         try {
           const credential = await signInWithEmailAndPassword(auth, email, password);
-          const existingProfile = await getUserProfile(credential.user.uid);
-          if (!existingProfile) {
-            await createUserProfile(credential.user.uid, { username, name, firstName, lastName, contactNumber, email });
-            await signOut(auth);
-            showMessage('Your customer profile has been completed. Please log in.');
-            window.location.replace('login.html');
-            return;
-          }
+          // A first registration attempt may have created the Auth account but
+          // failed to create its Firestore profile. Try the profile create
+          // directly: reading it here would require an OTP session first.
+          await createUserProfile(credential.user.uid, { username, name, firstName, lastName, contactNumber, email });
           await signOut(auth);
+          showMessage('Your customer profile has been completed. Please log in.');
+          window.location.replace('login.html');
+          return;
         } catch (recoveryError) {
+          if (auth.currentUser) await signOut(auth);
           console.error('CoolTime profile-recovery error:', recoveryError);
+          showMessage('This email already has an account. If your previous signup did not finish, publish the current Firestore rules and try again. Otherwise, log in with this email and password.');
+          return;
         }
       }
       if (auth.currentUser) {
