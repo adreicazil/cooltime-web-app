@@ -1238,7 +1238,12 @@ function renderContinuousReportHistory(historyItems = reportHistoryData) {
 function renderCustomers() {
   const search = $('#customerSearch').value.trim().toLowerCase();
   const rows = customers.filter((item) => `${item.firstName || ''} ${item.lastName || ''} ${item.name || item.username || ''} ${item.email || ''} ${item.contactNumber || item.phone || item.contact || ''}`.toLowerCase().includes(search));
-  $('#customerResults').innerHTML = rows.map((item) => `<tr class="customer-record-row"><td>${esc(item.firstName || '—')}</td><td>${esc(item.lastName || '—')}</td><td>${esc(item.email || '—')}</td><td>${esc(item.contactNumber || item.phone || item.contact || '—')}</td><td>${esc(item.status || 'active')}</td><td><button class="customer-toggle ${item.status === 'disabled' ? 'btn-enable-customer' : 'btn-disable-customer'}" data-id="${esc(item.id)}">${item.status === 'disabled' ? 'Enable' : 'Disable'}</button></td></tr>`).join('') || '<tr><td colspan="6">No customer records.</td></tr>';
+  $('#customerResults').innerHTML = rows.map((item) => {
+    const legacyNameParts = String(item.name || item.username || '').trim().split(/\s+/).filter(Boolean);
+    const firstName = item.firstName || legacyNameParts[0] || '—';
+    const lastName = item.lastName || legacyNameParts.slice(1).join(' ') || '—';
+    return `<tr class="customer-record-row"><td>${esc(firstName)}</td><td>${esc(lastName)}</td><td>${esc(item.email || '—')}</td><td>${esc(item.contactNumber || item.phone || item.contact || '—')}</td><td>${esc(item.status || 'active')}</td><td><button class="customer-toggle ${item.status === 'disabled' ? 'btn-enable-customer' : 'btn-disable-customer'}" data-id="${esc(item.id)}">${item.status === 'disabled' ? 'Enable' : 'Disable'}</button></td></tr>`;
+  }).join('') || '<tr><td colspan="6">No customer records.</td></tr>';
   if (isDashboardPage && modulePaginators.customers) {
     const renderedItems = rows.length ? [...$('#customerResults').children].map((row) => row.outerHTML) : [];
     modulePaginators.customers.setItems(renderedItems);

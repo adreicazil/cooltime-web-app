@@ -2008,9 +2008,17 @@ td {
 .customer-records-card-container table {
   width: 100%;
   min-width: 900px;
+  table-layout: fixed;
   color: #fff;
   font-size: 0.9rem;
 }
+
+.customer-records-card-container .customer-first-name-col,
+.customer-records-card-container .customer-last-name-col { width: 15%; }
+.customer-records-card-container .customer-email-col { width: 25%; }
+.customer-records-card-container .customer-contact-col { width: 20%; }
+.customer-records-card-container .customer-status-col { width: 12%; }
+.customer-records-card-container .customer-action-col { width: 13%; }
 
 .customer-records-card-container thead th {
   padding: 10px 16px;
@@ -2034,6 +2042,7 @@ td {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
   color: rgba(255, 255, 255, 0.92);
   white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .customer-records-card-container .customer-toggle {
