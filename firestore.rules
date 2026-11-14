@@ -35,7 +35,10 @@ service cloud.firestore {
     match /branches/{branchId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     // Read compatibility for projects seeded with the historical singular collection.
     match /branch/{branchId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /services/{serviceId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    match /services/{serviceId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
     match /vehicles/{vehicleId} {
       allow read: if isAdmin() || (isSignedIn() && resource.data.customerId == request.auth.uid);
       allow create: if isSignedIn() && request.resource.data.customerId == request.auth.uid;

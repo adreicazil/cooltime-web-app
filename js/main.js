@@ -23,10 +23,13 @@ const serviceSelects = [
   document.getElementById('guest-service-select'),
   document.getElementById('serviceType'),
 ].filter(Boolean);
+const fallbackBookableServices = [
+  { id: 'svc_cleaning', name: 'General AC Cleaning' },
+  { id: 'svc_freon', name: 'Freon Charging' },
+];
 
-function renderBookableServices(snapshot) {
-  const services = snapshot.docs
-    .map((serviceDoc) => ({ id: serviceDoc.id, ...serviceDoc.data() }))
+function populateBookableServiceSelects(services) {
+  const bookableServices = services
     .filter((service) => ['active', 'available'].includes(String(service.status || '').trim().toLowerCase()))
     .filter((service) => typeof service.name === 'string' && service.name.trim() !== '')
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -34,20 +37,22 @@ function renderBookableServices(snapshot) {
   serviceSelects.forEach((select) => {
     const selectedId = select.value;
     const options = [new Option('Select a Service', '')];
-    services.forEach((service) => options.push(new Option(service.name.trim(), service.id)));
+    bookableServices.forEach((service) => options.push(new Option(service.name.trim(), service.id)));
     select.replaceChildren(...options);
-    select.disabled = services.length === 0;
-    if (services.some((service) => service.id === selectedId)) select.value = selectedId;
+    select.disabled = bookableServices.length === 0;
+    if (bookableServices.some((service) => service.id === selectedId)) select.value = selectedId;
   });
+}
+
+function renderBookableServices(snapshot) {
+  populateBookableServiceSelects(snapshot.docs
+    .map((serviceDoc) => ({ id: serviceDoc.id, ...serviceDoc.data() })));
 }
 
 if (serviceSelects.length) {
   onSnapshot(collection(db, 'services'), renderBookableServices, (error) => {
     console.error('CoolTime service catalog could not be loaded:', error);
-    serviceSelects.forEach((select) => {
-      select.replaceChildren(new Option('Select a Service', ''));
-      select.disabled = true;
-    });
+    populateBookableServiceSelects(fallbackBookableServices.map((service) => ({ ...service, status: 'active' })));
   });
 }
 
