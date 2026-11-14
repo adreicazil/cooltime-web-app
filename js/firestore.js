@@ -31,12 +31,15 @@ const required = (value, label) => {
   return result;
 };
 
-export async function createUserProfile(uid, { email, username, name = username }) {
+export async function createUserProfile(uid, { email, username, name = username, firstName, lastName, contactNumber }) {
   await setDoc(doc(db, 'users', uid), {
     uid,
     email: required(email, 'Email').toLowerCase(),
     name: required(name, 'Name'),
     username: required(username, 'Username'),
+    firstName: required(firstName, 'First name'),
+    lastName: required(lastName, 'Last name'),
+    contactNumber: required(contactNumber, 'Contact number'),
     role: 'customer',
     status: 'active',
     createdAt: serverTimestamp(),

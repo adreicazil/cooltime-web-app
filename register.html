@@ -60,10 +60,14 @@
           Create account
         </h1>
       </div>
-      <label for="username">Username</label>
-      <input id="username" name="username" type="text" autocomplete="username" required>
+      <label for="firstName">First Name</label>
+      <input id="firstName" name="firstName" type="text" autocomplete="given-name" maxlength="80" required>
+      <label for="lastName">Last Name</label>
+      <input id="lastName" name="lastName" type="text" autocomplete="family-name" maxlength="80" required>
       <label for="email">Email</label>
       <input id="email" name="email" type="email" autocomplete="email" required>
+      <label for="contactNumber">Contact Number</label>
+      <input id="contactNumber" name="contactNumber" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" pattern="[+0-9(). -]{7,20}" title="Enter a valid contact number." required>
       <label for="password">Password</label>
       <div class="password-input-wrap"><input id="password" name="password" type="password" autocomplete="new-password" required><button class="toggle-password" type="button" data-password-toggle aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg></button></div>
       <label for="confirmPassword">Confirm Password</label>

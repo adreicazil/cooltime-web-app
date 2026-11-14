@@ -5,7 +5,7 @@ import {
   signOut
 } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { auth, authReady } from './firebase-config.js';
-import { createUserProfile } from './firestore.js';
+import { createUserProfile, getUserProfile } from './firestore.js';
 
 const loginForm = document.getElementById('loginForm');
 const registerForm = document.getElementById('registerForm');
@@ -76,7 +76,11 @@ if (loginForm) {
 if (registerForm) {
   registerForm.addEventListener('submit', async (event) => {
     event.preventDefault();
-    const username = getInputValue(registerForm, '#username');
+    const firstName = getInputValue(registerForm, '#firstName');
+    const lastName = getInputValue(registerForm, '#lastName');
+    const name = `${firstName} ${lastName}`.trim();
+    const username = name;
+    const contactNumber = getInputValue(registerForm, '#contactNumber');
     const email = getInputValue(registerForm, '#email');
     const password = getPasswordValue(registerForm, '#password').trim();
     const confirmPassword = getPasswordValue(registerForm, '#confirm-password').trim();
@@ -99,8 +103,13 @@ if (registerForm) {
       showMessage('Please use a permanent email address to create your account.');
       return;
     }
-    if (security?.containsInappropriateContent(username)) {
-      showMessage('Please choose a username without inappropriate language.');
+    if (security?.containsInappropriateContent(name)) {
+      showMessage('Please enter a name without inappropriate language.');
+      return;
+    }
+    if (security && !security.isValidPHMobileNumber(contactNumber)) {
+      showMessage('Enter a valid Philippine mobile number.');
+      registerForm.querySelector('#contactNumber')?.focus();
       return;
     }
     const registerButton = registerForm.querySelector('[type="submit"]');
@@ -108,7 +117,7 @@ if (registerForm) {
     try {
       await authReady;
       const credential = await createUserWithEmailAndPassword(auth, email, password);
-      await createUserProfile(credential.user.uid, { username, email });
+      await createUserProfile(credential.user.uid, { username, name, firstName, lastName, contactNumber, email });
       await signOut(auth);
       showMessage('Customer account created successfully. Please log in.');
       window.location.replace('login.html');
@@ -118,7 +127,7 @@ if (registerForm) {
           const credential = await signInWithEmailAndPassword(auth, email, password);
           const existingProfile = await getUserProfile(credential.user.uid);
           if (!existingProfile) {
-            await createUserProfile(credential.user.uid, { username, email });
+            await createUserProfile(credential.user.uid, { username, name, firstName, lastName, contactNumber, email });
             await signOut(auth);
             showMessage('Your customer profile has been completed. Please log in.');
             window.location.replace('login.html');
