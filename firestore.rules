@@ -95,6 +95,11 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
     match /activity_logs/{logId} { allow read, write: if isAdmin(); }
+    match /system_logs/{logId} {
+    allow create: if true;
+    allow get, list: if isSuperAdmin();
+    allow update, delete: if false;
+}
     match /system_settings/{settingId} { allow read: if isAdmin(); allow write: if isSuperAdmin(); }
     // The server writes and revokes these short-lived records after OTP checks.
     match /mfa_sessions/{userId} { allow read, write: if false; }

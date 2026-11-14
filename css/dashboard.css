@@ -2851,25 +2851,14 @@ td {
   overflow-x: hidden;
   padding-right: 8px;
 }
-.super-dashboard-body #system-view .system-logs-dual-flow {
-  display: grid !important;
-  grid-template-columns: 1fr 1fr !important;
-  gap: 32px !important;
-  width: 100% !important;
-}
-.super-dashboard-body #system-view .system-log-block { min-width: 0; overflow-x: auto; }
 .super-dashboard-body #system-view .system-log-row-item {
   display: grid !important;
-  grid-template-columns: 150px 180px 1fr !important;
-  align-items: center !important;
+  grid-template-columns: minmax(145px, .75fr) minmax(180px, 1fr) minmax(0, 2fr) !important;
+  align-items: start !important;
   gap: 12px !important;
-  padding: 8px 10px !important;
+  width: 100%;
+  padding: 12px 10px !important;
   border-bottom: 1px solid rgba(255, 255, 255, .08) !important;
-}
-.super-dashboard-body #system-view .system-log-header {
-  color: rgba(255, 255, 255, .68);
-  font-size: .85rem;
-  font-weight: 700;
 }
 .super-dashboard-body #system-view .system-log-time {
   color: rgba(255, 255, 255, .9);
@@ -2893,7 +2882,7 @@ td {
 }
 @media (max-width: 640px) {
   .super-dashboard-body #system-view .system-card-container { padding: 20px 16px !important; }
-  .super-dashboard-body #system-view .system-logs-dual-flow { gap: 16px !important; }
+  .super-dashboard-body #system-view .system-log-row-item { grid-template-columns: minmax(0, 1fr) !important; gap: 5px !important; }
   .super-dashboard-body #system-view #settingsForm select,
   .super-dashboard-body #system-view #settingsForm input,
   .super-dashboard-body #system-view #settingsForm button { flex: 1 1 100%; }
@@ -3759,10 +3748,10 @@ body.super-dashboard-body #posMonitoring .pos-void-request-details p { margin: 5
 .pos-audit-trail-card { margin-top: 22px; padding: 18px; border: 1px solid rgba(125, 211, 252, .14); border-radius: 16px; }
 .pos-audit-trail-card h3 { margin: 0 0 6px; color: #eaf6ff; }
 .pos-audit-trail-card > p { color: #9fb4cc; }
-.pos-audit-trail-filters { display: flex; justify-content: flex-end; margin: 12px 0; }
+.pos-audit-trail-filters { display: flex; justify-content: flex-start; margin: 12px 0; }
 .pos-audit-trail-filters input {
-  box-sizing: border-box; width: min(360px, 100%); min-height: 38px; padding: 8px 15px;
-  border: 1px solid #d1d5db; border-radius: 999px; background: rgba(255, 255, 255, .96); color: #172334;
+  box-sizing: border-box; width: min(360px, 100%); min-height: 38px; padding: 8px 12px;
+  border: 1px solid #d1d5db; border-radius: 8px; background: rgba(255, 255, 255, .96); color: #172334;
 }
 .pos-audit-trail-filters input::placeholder { color: #7b8491; opacity: 1; }
 .pos-audit-trail-scroll { width: 100%; max-width: 100%; overflow-x: hidden; }
@@ -3772,8 +3761,8 @@ body.super-dashboard-body #posMonitoring .pos-void-request-details p { margin: 5
 .pos-audit-trail-table td { min-width: 0; padding: 10px 12px; border: 0; text-align: left; vertical-align: top; white-space: normal; overflow-wrap: anywhere; }
 .pos-audit-trail-table td small { display: block; margin-top: 3px; color: #91a8c1; }
 .pos-audit-trail-table .pos-audit-action > strong,
-.pos-audit-trail-table .pos-audit-action small strong,
-.pos-audit-trail-table .pos-audit-admin small strong { color: #eaf6ff; }
+.pos-audit-trail-table .pos-audit-admin > .pos-audit-role { display: block; color: #eaf6ff; font-weight: 700; }
+.pos-audit-trail-table .pos-audit-action small { font-weight: 400; }
 .pos-audit-trail-table .pos-audit-details { white-space: normal; word-break: break-word; overflow-wrap: anywhere; }
 .pos-audit-trail-table .pos-audit-empty { grid-column: 1 / -1; }
 .request-decision-state { color: #9fb4cc; }

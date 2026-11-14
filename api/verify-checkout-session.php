@@ -40,6 +40,9 @@ try {
         $status = 'expired';
     } elseif ($response['status'] < 200 || $response['status'] >= 300) {
         error_log(sprintf('Customer PayMongo verification failed (session=%s, HTTP=%d, cURL=%s, response=%s).', $sessionId, $response['status'], $response['error'] ?: 'none', substr(preg_replace('/\s+/', ' ', $response['body']) ?? '', 0, 500)));
+        writeSystemLog('API Failure', sprintf('PayMongo checkout verification failed: HTTP %d; %s', $response['status'],
+            $response['error'] ?: substr(preg_replace('/\s+/', ' ', $response['body']) ?? '', 0, 500)),
+            '/api/verify-checkout-session.php', (int) $response['status'], (string) ($user['email'] ?? ''));
         throw new RuntimeException('PayMongo could not verify this checkout.');
     } else {
         $attributes = json_decode($response['body'], true)['data']['attributes'] ?? [];
@@ -78,5 +81,6 @@ try {
     jsonResponse(['ok' => true, 'checkoutStatus' => $status, 'alreadyPaid' => $status === 'paid']);
 } catch (Throwable $error) {
     error_log('Customer PayMongo status verification failed: ' . $error->getMessage());
+    writeSystemLog('API Failure', 'Checkout status verification error: ' . $error->getMessage(), '/api/verify-checkout-session.php', 502);
     jsonResponse(['ok' => false, 'message' => 'Payment status could not be refreshed right now.'], 502);
 }

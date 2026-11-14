@@ -32,6 +32,9 @@ function availabilityFirestoreQuery(array $account, string $fieldName, string $b
         error_log(sprintf('Firestore availability query failed (HTTP=%d, cURL=%s, response=%s).',
             $response['status'], $response['error'] ?: 'none',
             substr(preg_replace('/\s+/', ' ', $response['body']) ?? '', 0, 500) ?: '[empty]'));
+        writeSystemLog('API Failure', sprintf('Firestore availability query failed: HTTP %d; %s', $response['status'],
+            $response['error'] ?: substr(preg_replace('/\s+/', ' ', $response['body']) ?? '', 0, 500)),
+            '/api/slot-availability.php', (int) $response['status']);
         throw new RuntimeException(sprintf(
             'Firestore availability query failed (HTTP %d, provider_error=%s).',
             $response['status'],
@@ -114,5 +117,6 @@ try {
     jsonResponse(['ok' => true, 'branchId' => $branch, 'date' => $date, 'occupiedSlots' => array_keys($occupied)]);
 } catch (Throwable $error) {
     error_log('Slot availability lookup failed: ' . $error->getMessage());
+    writeSystemLog('API Failure', 'Slot availability lookup failed: ' . $error->getMessage(), '/api/slot-availability.php', 503);
     jsonResponse(['ok' => false, 'message' => 'Availability could not be loaded. Please retry shortly.'], 503);
 }

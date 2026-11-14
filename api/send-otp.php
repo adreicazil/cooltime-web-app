@@ -55,9 +55,11 @@ try {
     }
     $lastSentAt = (int) ($record['last_sent_at'] ?? 0);
     if ($now - $lastSentAt < OTP_RESEND_COOLDOWN_SECONDS) {
+        writeSystemLog('OTP Request Failed', $user['email'] . ' - OTP resend cooldown active.', '/api/send-otp.php', 429, $user['email']);
         jsonResponse(['ok' => false, 'message' => 'Please wait before requesting another code.'], 429);
     }
     if ($requestCount >= OTP_MAX_REQUESTS_PER_WINDOW) {
+        writeSystemLog('OTP Request Failed', $user['email'] . ' - OTP request limit reached.', '/api/send-otp.php', 429, $user['email']);
         jsonResponse(['ok' => false, 'message' => 'Too many code requests. Please try again later.'], 429);
     }
 
@@ -68,6 +70,7 @@ try {
     } catch (Throwable $error) {
         error_log('CoolTime OTP email failed: ' . $error->getMessage());
         if (!$isLocalDevelopment) {
+            writeSystemLog('OTP Request Failed', $user['email'] . ' - verification email could not be sent: ' . $error->getMessage(), '/api/send-otp.php', 503, $user['email']);
             jsonResponse(['ok' => false, 'message' => 'We could not send a verification email. Please try again later.'], 503);
         }
         $emailSent = false;
@@ -95,9 +98,14 @@ try {
     ];
     });
 
+    writeSystemLog(!empty($response['ok']) ? 'OTP Sent' : 'OTP Request Failed',
+        $user['email'] . ' - ' . (string) ($response['message'] ?? 'OTP request processed.'),
+        '/api/send-otp.php', !empty($response['ok']) ? 200 : 400, $user['email']);
     jsonResponse($response);
 } catch (Throwable $error) {
     error_log('CoolTime OTP endpoint failed: ' . $error->getMessage());
+    writeSystemLog('OTP Request Failed', (string) ($_SERVER['REQUEST_URI'] ?? '/api/send-otp.php') . ' - ' . $error->getMessage(),
+        '/api/send-otp.php', 503);
     if (!headers_sent()) {
         http_response_code(500);
         header('Content-Type: application/json; charset=utf-8');

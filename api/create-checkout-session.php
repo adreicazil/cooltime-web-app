@@ -209,6 +209,9 @@ try {
         if ($paymongoMessage === '' && $result['status'] >= 200 && $result['status'] < 300) {
             $paymongoMessage = 'PayMongo did not return an active checkout session.';
         }
+        writeSystemLog('API Failure', 'PayMongo checkout creation returned HTTP ' . $result['status'] . ': '
+            . ($paymongoMessage !== '' ? $paymongoMessage : ($result['error'] ?: 'Invalid checkout response.')),
+            '/api/create-checkout-session.php', (int) ($result['status'] ?: 502), (string) ($user['email'] ?? ''));
         jsonResponse(['ok' => false, 'message' => $paymongoMessage !== '' ? substr($paymongoMessage, 0, 1000) : 'Payment checkout is temporarily unavailable.'], 502);
     }
     $paymentId = 'paymongo_' . preg_replace('/[^A-Za-z0-9_-]/', '', $session['id']);
@@ -252,5 +255,6 @@ try {
     jsonResponse(['ok' => true, 'checkoutUrl' => $checkoutUrl, 'sessionId' => (string) $session['id']]);
 } catch (Throwable $error) {
     error_log('Checkout session error: ' . $error->getMessage());
+    writeSystemLog('API Failure', 'Checkout session error: ' . $error->getMessage(), '/api/create-checkout-session.php', 500);
     jsonResponse(['ok' => false, 'message' => 'Unable to start payment checkout.'], 500);
 }

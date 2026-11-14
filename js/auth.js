@@ -40,6 +40,17 @@ function authMessage(error, action) {
   return messages[error?.code] || `We could not ${action}. Please try again.`;
 }
 
+async function logFailedLogin(email, errorCode) {
+  try {
+    await fetch('api/log-system-event.php', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: 'Login Failed', email, errorCode: String(errorCode || '') })
+    });
+  } catch (logError) {
+    console.warn('Failed login attempt could not be recorded.', logError);
+  }
+}
+
 if (loginForm) {
   loginForm.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -70,6 +81,7 @@ if (loginForm) {
       sessionStorage.setItem('cooltimeOtpPendingEmail', result.email || credential.user.email || '');
       window.location.replace('otp.html');
     } catch (error) {
+      if (String(error?.code || '').startsWith('auth/')) await logFailedLogin(email, error.code);
       if (auth.currentUser) await signOut(auth);
       if (String(error?.message || '').toLowerCase().includes('could not send a verification email')) {
         showMessage('Your account and password are okay, but we could not send the sign-in verification code. Please try logging in again later. Email verification is required to protect your account.');

@@ -9,6 +9,7 @@ header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store, private');
 
 ob_start();
+$user = null;
 
 register_shutdown_function(static function (): void {
     $error = error_get_last();
@@ -65,8 +66,20 @@ try {
     }
 } catch (Throwable $error) {
     error_log('CoolTime OTP verification failed: ' . $error->getMessage());
+    writeSystemLog('OTP Verification Failed', 'OTP verification endpoint error: ' . $error->getMessage(), '/api/verify-otp.php', 503,
+        (string) ($user['email'] ?? ''));
     $response = ['ok' => false, 'message' => 'The verification service is temporarily unavailable. Please try again later.'];
     $status = 503;
+}
+
+if (is_array($user)) {
+    $email = (string) ($user['email'] ?? 'unknown email');
+    if (!empty($response['ok'])) {
+        writeSystemLog('Login Success', $email . ' - OTP verified.', '/api/verify-otp.php', 200, $email);
+    } elseif ($status < 500) {
+        writeSystemLog('OTP Verification Failed', $email . ' - ' . (string) ($response['message'] ?? 'OTP was rejected.'),
+            '/api/verify-otp.php', $status, $email);
+    }
 }
 
 http_response_code($status);

@@ -1,6 +1,6 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { auth, authReady, db } from './firebase-config.js';
-import { collection, limit, onSnapshot, orderBy, query } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { addDoc, collection, limit, onSnapshot, orderBy, query, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { getAuthenticatedUser, hasOtpVerification, normalizeRole } from './auth-guard.js';
 import { logoutUser } from './auth.js';
 import { normalizeBranchId, normalizeBranchLabel, normalizeBranchText } from './branch-utils.js';
@@ -268,14 +268,30 @@ function renderDashboardOverview() {
   });
 }
 
+async function recordClientApiFailure(path, payload, status, message) {
+  try {
+    await addDoc(collection(db, 'system_logs'), {
+      createdAt: serverTimestamp(), timestamp: serverTimestamp(), event: 'Frontend API Failure', type: 'Frontend API Failure',
+      details: `${path} (${status}) ${payload?.action || ''}: ${String(message || 'Request failed').slice(0, 900)}`,
+      message: `${path} (${status}) ${payload?.action || ''}: ${String(message || 'Request failed').slice(0, 900)}`,
+      endpoint: path, statusCode: Number(status || 0), uid: actor?.uid || '', email: actor?.email || ''
+    });
+  } catch (logError) { console.warn('Frontend API failure could not be written to system logs.', logError); }
+}
+
 async function api(path, payload) {
   const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await actor.getIdToken(payload.action === 'verify_session')}` }, body: JSON.stringify(payload) });
   let result;
   try { result = await response.json(); }
-  catch { throw new Error(`Admin service returned an invalid response (HTTP ${response.status}).`); }
+  catch {
+    const message = `Admin service returned an invalid response (HTTP ${response.status}).`;
+    await recordClientApiFailure(path, payload, response.status, message);
+    throw new Error(message);
+  }
   if (!response.ok || !result.ok) {
     const error = new Error(result.message || `Request failed (HTTP ${response.status}).`);
     error.status = response.status;
+    await recordClientApiFailure(path, payload, response.status, error.message);
     throw error;
   }
   return result;
@@ -329,7 +345,7 @@ function renderAuditTrail() {
   modulePaginators.posAudit.setItems(rows.map((item) => {
     const date = item.createdAt?.toDate?.() || (item.createdAt ? new Date(item.createdAt) : null);
     const stamp = date && !Number.isNaN(date.getTime()) ? date.toLocaleString('en-PH') : 'Timestamp unavailable';
-    return `<tr class="pos-audit-row"><td class="pos-audit-time">${esc(stamp)}</td><td class="pos-audit-action"><strong>${esc(item.action || 'Action')}</strong><small><strong>${esc(item.referenceId || '—')}</strong></small></td><td class="pos-audit-admin"><span>${esc(item.actorName || item.actorEmail || 'Unknown admin')}</span><small>${esc(item.actorEmail || '')}</small><small><strong>${esc(String(item.actorRole || 'admin').replaceAll('_', ' '))}</strong></small></td><td class="pos-audit-details">${esc(item.details || '')}</td></tr>`;
+    return `<tr class="pos-audit-row"><td class="pos-audit-time">${esc(stamp)}</td><td class="pos-audit-action"><strong>${esc(item.action || 'Action')}</strong><small>${esc(item.referenceId || '—')}</small></td><td class="pos-audit-admin"><strong class="pos-audit-role">${esc(String(item.actorRole || 'admin').replaceAll('_', ' '))}</strong><span>${esc(item.actorName || item.actorEmail || 'Unknown admin')}</span><small>${esc(item.actorEmail || '')}</small></td><td class="pos-audit-details">${esc(item.details || '')}</td></tr>`;
   }));
 }
 
@@ -598,7 +614,10 @@ function watchDashboardNotifications() {
     const rows = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
     adminRows[name] = rows;
     apply(rows);
-  }, (error) => console.error(`${name} could not be refreshed:`, error));
+  }, (error) => {
+    console.error(`${name} could not be refreshed:`, error);
+    if (name !== 'system_logs') recordClientApiFailure(`Firestore/${name}`, { action: 'onSnapshot' }, error?.code || 0, error?.message || 'Listener failed');
+  });
 
   listen('bookings', (rows) => {
     bookings = rows;
@@ -671,9 +690,9 @@ function watchDashboardNotifications() {
       auditLogs = rows.map((item) => ({ ...item, details: normalizeBranchText(item.details || '') }));
       renderAuditTrail();
     }, [orderBy('createdAt', 'desc'), limit(150)]);
-    listen('activity_logs', (rows) => {
+    listen('system_logs', (rows) => {
       renderContinuousSystemLogs(rows);
-    }, [orderBy('createdAt', 'desc'), limit(150)]);
+    }, [orderBy('createdAt', 'desc'), limit(10)]);
   }
 }
 
@@ -1585,34 +1604,27 @@ function renderCustomers() {
 }
 
 function renderContinuousSystemLogs(logsData = null) {
-  const leftContainer = $('#system-logs-left-block');
-  const rightContainer = $('#system-logs-right-block');
-  if (!leftContainer || !rightContainer) return;
+  const list = $('#system-logs-list');
+  if (!list) return;
   if (logsData === null) {
-    allSystemLogs = [
-      ...(adminRows.activity_logs || []).map((row) => ({ ...row, logSource: 'Activity' })),
-      ...(adminRows.notifications || []).map((row) => ({ ...row, logSource: 'Notification' }))
-    ].sort((a, b) => String(b.createdAt || b.timestamp || b.updatedAt || '').localeCompare(String(a.createdAt || a.timestamp || a.updatedAt || '')))
-      .map((row) => {
-        const rawDate = row.createdAt || row.timestamp || row.updatedAt;
-        const date = rawDate?.toDate?.() || (rawDate ? new Date(rawDate) : null);
-        const time = date && !Number.isNaN(date.getTime()) ? date.toLocaleString() : '—';
-        const event = row.action || row.event || row.type || row.status || row.logSource;
-        const details = row.message || row.description || [row.category && row.key ? row.category + ' / ' + row.key : '', row.email || row.userEmail || row.adminId || row.userId || row.uid].filter(Boolean).join(' · ') || row.id || '';
-        return { time, event, details };
-      });
+    allSystemLogs = adminRows.system_logs || [];
     logsData = allSystemLogs;
   }
-
-  const midIndex = Math.ceil(logsData.length / 2);
-  const leftBatch = logsData.slice(0, midIndex);
-  const rightBatch = logsData.slice(midIndex);
-  const renderRow = (log) =>
-    '<div class="system-log-row-item"><div class="system-log-time">' + esc(log.time || log.timestamp || '—') +
-    '</div><div class="system-log-event">' + esc(log.event || '—') +
-    '</div><div class="system-log-details">' + esc(log.details || '—') + '</div></div>';
-  setHTML(leftContainer, leftBatch.map(renderRow).join('') || '<div class="system-log-empty">No system logs found.</div>');
-  setHTML(rightContainer, rightBatch.map(renderRow).join(''));
+  const timestampMs = (log) => {
+    const raw = log.createdAt ?? log.timestamp;
+    const date = raw?.toDate?.() || (typeof raw === 'number' ? new Date(raw) : raw ? new Date(raw) : null);
+    return date && !Number.isNaN(date.getTime()) ? date.getTime() : 0;
+  };
+  const rows = [...logsData].sort((a, b) => timestampMs(b) - timestampMs(a));
+  const renderRow = (log) => {
+    const rawDate = log.createdAt ?? log.timestamp;
+    const date = rawDate?.toDate?.() || (typeof rawDate === 'number' ? new Date(rawDate) : rawDate ? new Date(rawDate) : null);
+    const time = date && !Number.isNaN(date.getTime()) ? date.toLocaleString('en-PH') : 'Timestamp unavailable';
+    const event = log.event || log.type || 'System event';
+    const details = log.details || log.message || '';
+    return `<article class="system-log-row-item"><time class="system-log-time">${esc(time)}</time><strong class="system-log-event">${esc(event)}</strong><div class="system-log-details">${esc(details)}</div></article>`;
+  };
+  setHTML(list, rows.map(renderRow).join('') || '<div class="system-log-empty">No system logs recorded yet.</div>');
 }
 
 function notificationTimestamp(item) {

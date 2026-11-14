@@ -177,7 +177,12 @@ function adminWorkflowExpireCheckout(string $sessionId): void
     }
     if (strtolower((string) ($attributes['status'] ?? '')) === 'expired') return;
     $expired = httpJsonRequest($url . '/expire', ['data' => ['attributes' => (object) []]], $headers);
-    if ($expired['status'] < 200 || $expired['status'] >= 300) throw new RuntimeException('PayMongo could not expire the active checkout session.');
+    if ($expired['status'] < 200 || $expired['status'] >= 300) {
+        writeSystemLog('API Failure', sprintf('PayMongo checkout expiration failed: HTTP %d; %s', $expired['status'],
+            $expired['error'] ?: substr(preg_replace('/\s+/', ' ', $expired['raw'] ?? '') ?? '', 0, 400)),
+            '/api/admin-workflow.php', (int) $expired['status']);
+        throw new RuntimeException('PayMongo could not expire the active checkout session.');
+    }
 }
 
 function adminWorkflowPaymongoStatus(string $sessionId): string
@@ -191,6 +196,9 @@ function adminWorkflowPaymongoStatus(string $sessionId): string
     if ($response['status'] < 200 || $response['status'] >= 300) {
         error_log(sprintf('PayMongo checkout verification failed (session=%s, HTTP=%d, cURL=%s, response=%s).',
             $sessionId, $response['status'], $response['error'] ?: 'none', substr(preg_replace('/\s+/', ' ', $response['body']) ?? '', 0, 500)));
+        writeSystemLog('API Failure', sprintf('PayMongo checkout verification failed: HTTP %d; %s', $response['status'],
+            $response['error'] ?: substr(preg_replace('/\s+/', ' ', $response['body']) ?? '', 0, 400)),
+            '/api/admin-workflow.php', (int) $response['status']);
         throw new RuntimeException('PayMongo could not verify the checkout session.');
     }
     $session = json_decode($response['body'], true)['data']['attributes'] ?? [];
@@ -1015,6 +1023,9 @@ try {
         get_class($error),
         $error->getMessage()
     ));
+    writeSystemLog('API Failure', sprintf('Admin workflow action %s failed: %s',
+        preg_replace('/[^A-Za-z0-9_-]/', '', $action) ?: 'unknown', $error->getMessage()),
+        '/api/admin-workflow.php', 500, (string) ($actor['email'] ?? ''));
     $permissionFailure = str_contains(strtolower($error->getMessage()), 'permission-denied')
         || str_contains(strtolower($error->getMessage()), 'permission denied')
         || str_contains(strtolower($error->getMessage()), 'http 403');

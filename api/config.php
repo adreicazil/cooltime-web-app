@@ -455,11 +455,14 @@ function sendResendEmail(string $email, string $subject, string $html, string $t
         $curlError = curl_error($curl);
     }
     if ($response === false) {
+        writeSystemLog('API Failure', 'Resend request failed: ' . $curlError, '/api/config.php (Resend)', $status ?: 502);
         throw new RuntimeException('Resend API request failed: ' . $curlError);
     }
     if ($status < 200 || $status >= 300) {
         $decoded = json_decode($response, true);
         $message = is_array($decoded) ? (string) ($decoded['message'] ?? $decoded['name'] ?? '') : '';
+        writeSystemLog('API Failure', 'Resend returned HTTP ' . $status . ($message !== '' ? ': ' . $message : '.'),
+            '/api/config.php (Resend)', $status);
         throw new RuntimeException('Resend API returned HTTP ' . $status . ($message !== '' ? ': ' . $message : '.'));
     }
 }
@@ -900,7 +903,39 @@ function firestorePatchDocument(array $account, string $collection, string $docu
         error_log(sprintf('Firestore document update failed (collection=%s, id=%s, HTTP=%d, cURL=%s, response=%s).',
             $collection, $documentId, $result['status'], $result['error'] ?: 'none',
             substr(preg_replace('/\s+/', ' ', $result['body']) ?? '', 0, 500) ?: '[empty]'));
+        writeSystemLog('API Failure', sprintf('Firestore update %s/%s failed: HTTP %d; %s', $collection, $documentId,
+            $result['status'], $result['error'] ?: substr(preg_replace('/\s+/', ' ', $result['body']) ?? '', 0, 300)),
+            '/api/config.php', (int) $result['status']);
         throw new RuntimeException('Firestore document update failed (HTTP ' . $result['status'] . ').');
+    }
+}
+
+function writeSystemLog(string $event, string $details, string $endpoint = '', ?int $statusCode = null, string $actorEmail = ''): void
+{
+    try {
+        $account = firebaseServiceAccount();
+        $fields = [
+            'createdAt' => ['timestampValue' => gmdate('Y-m-d\TH:i:s\Z')],
+            'timestamp' => ['timestampValue' => gmdate('Y-m-d\TH:i:s\Z')],
+            'event' => ['stringValue' => substr($event, 0, 120)],
+            'type' => ['stringValue' => substr($event, 0, 120)],
+            'details' => ['stringValue' => substr($details, 0, 1800)],
+            'message' => ['stringValue' => substr($details, 0, 1800)],
+            'endpoint' => ['stringValue' => substr($endpoint, 0, 200)],
+        ];
+        if ($statusCode !== null) $fields['statusCode'] = ['integerValue' => (string) $statusCode];
+        if ($actorEmail !== '') $fields['email'] = ['stringValue' => substr($actorEmail, 0, 254)];
+        $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id'])
+            . '/databases/(default)/documents/system_logs';
+        $response = secureHttpRequest($url, 'POST', [
+            'Authorization: Bearer ' . firebaseAdminAccessToken(), 'Content-Type: application/json',
+        ], json_encode(['fields' => $fields], JSON_THROW_ON_ERROR), 10);
+        if ($response['status'] < 200 || $response['status'] >= 300) {
+            error_log(sprintf('System log write failed (HTTP=%d, cURL=%s, response=%s).', $response['status'],
+                $response['error'] ?: 'none', substr(preg_replace('/\s+/', ' ', $response['body']) ?? '', 0, 300)));
+        }
+    } catch (Throwable $error) {
+        error_log('System log write failed: ' . $error->getMessage());
     }
 }
 
