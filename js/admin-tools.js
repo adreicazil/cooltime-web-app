@@ -365,6 +365,7 @@ async function initialize() {
     alert('Your account does not have super administrator access.');
     return;
   }
+  await verifyWalkinPaymentReturn();
   configurePosFilters();
   if (isDashboardPage) {
     modulePaginators.bookings = setupModulePagination({
@@ -551,6 +552,27 @@ async function initialize() {
     on('#form-paymongo-settings', 'submit', savePayMongoSettings);
     on('#form-template-settings', 'submit', saveTemplateSettings);
     on('#template-type-select', 'change', loadNotificationTemplate);
+  }
+}
+
+async function verifyWalkinPaymentReturn() {
+  if (!isAdminDashboard) return;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('payment') !== 'success') return;
+  const invoiceId = params.get('invoice') || '';
+  if (!invoiceId) { alert('The PayMongo return did not include an invoice reference.'); return; }
+  try {
+    const result = await api('api/admin-workflow.php', { action: 'verify_walkin_payment', invoiceId });
+    if (result.paymentStatus === 'paid') {
+      params.delete('payment');
+      params.delete('invoice');
+      const query = params.toString();
+      window.history.replaceState({}, document.title, `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+      alert('Walk-in PayMongo payment verified and recorded.');
+    }
+    else alert('PayMongo has not confirmed this payment yet. Refresh the dashboard to check again.');
+  } catch (error) {
+    alert(`Payment verification needs attention: ${readableError(error)}`);
   }
 }
 
@@ -933,19 +955,19 @@ async function bookingAction(event) {
     return;
   }
   if (button.classList.contains('settle-walkin-payment')) {
-    const method = await prompt('Select settlement method:', 'cash', { choices: ['cash / OTC', 'PayMongo E-Wallet / GCash QR'] });
+    const method = await prompt('Select settlement method:', 'Cash / OTC', { choices: ['Cash / OTC', 'PayMongo E-Wallet / GCash QR'] });
     if (!method) return;
     button.disabled = true;
     try {
-      if (method !== 'cash / OTC') {
+      if (String(method).toLowerCase() !== 'cash / otc') {
         const invoice = invoiceForBooking(booking);
-        const response = await fetch('api/create-checkout-session.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceId: invoice?.id || booking.invoiceId, bookingId: booking.id, referenceId: booking.referenceNumber, forceRefresh: true }) });
+        const response = await fetch('api/create-checkout-session.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceId: invoice?.id || booking.invoiceId, bookingId: booking.id, referenceId: booking.referenceNumber, source: 'walk_in_pos', is_guest: true, forceRefresh: true }) });
         const checkout = await response.json();
         if (!response.ok || !checkout.ok || !checkout.checkoutUrl) throw new Error(checkout.message || 'PayMongo checkout could not be started.');
         window.location.assign(checkout.checkoutUrl);
         return;
       }
-      await api('api/admin-workflow.php', { action: 'settle_walkin_payment', bookingId: booking.id, paymentMethod: 'cash' });
+      await api('api/admin-workflow.php', { action: 'settle_walkin_payment', bookingId: booking.id, paymentMethod: 'Cash / OTC' });
       alert('Walk-in payment recorded and receipt email sent.');
       await loadCoreData();
     } catch (error) { alert(readableError(error)); button.disabled = false; }

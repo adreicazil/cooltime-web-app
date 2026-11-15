@@ -105,7 +105,7 @@ try {
     if (!is_finite($price) || $price<=0) jsonResponse(['ok'=>false,'message'=>'Invalid field: service price is not configured.'],422);
 
     $branch = $branchLabel;
-    $methodName='unpaid_at_intake';
+    $methodName='OTC / Walk-In';
     $paymentStatus='unpaid';
     $bookingId='walkin_'.bin2hex(random_bytes(12)); $invoiceId='walkin_inv_'.bin2hex(random_bytes(12));
     $now=gmdate('Y-m-d\\TH:i:s\\Z');
@@ -126,7 +126,8 @@ try {
       'paymentStatus'=>['stringValue'=>$paymentStatus],'paymentMethod'=>['stringValue'=>$methodName],
       'paymentBalance'=>['doubleValue'=>$price],
       'payment_status'=>['stringValue'=>$paymentStatus],'payment_method'=>['stringValue'=>$methodName],
-      'referenceNumber'=>['stringValue'=>$reference],'invoiceNumber'=>['stringValue'=>$reference],
+      'referenceNumber'=>['stringValue'=>$reference],'invoiceReference'=>['stringValue'=>$reference],
+      'walkInReferenceId'=>['stringValue'=>$reference],'invoiceNumber'=>['stringValue'=>$reference],
       'invoiceId'=>['stringValue'=>$invoiceId],'createdAt'=>['timestampValue'=>$now],'updatedAt'=>['timestampValue'=>$now],
     ];
     if ($phone!=='') $bookingFields['phone']=['stringValue'=>$phone];
@@ -137,7 +138,10 @@ try {
       'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'source'=>['stringValue'=>'walk_in_pos'],'is_guest'=>['booleanValue'=>true],
       'paymentMethod'=>['stringValue'=>$methodName],'paymentStatus'=>['stringValue'=>$paymentStatus],
       'payment_method'=>['stringValue'=>$methodName],'payment_status'=>['stringValue'=>$paymentStatus],
-      'referenceNumber'=>['stringValue'=>$reference],'invoiceNumber'=>['stringValue'=>$reference],'servicesAdded'=>['arrayValue'=>['values'=>[['stringValue'=>$serviceId]]]],
+      'bookingType'=>['stringValue'=>'walk_in'],'referenceNumber'=>['stringValue'=>$reference],
+      'invoiceReference'=>['stringValue'=>$reference],'walkInReferenceId'=>['stringValue'=>$reference],
+      'invoiceNumber'=>['stringValue'=>$reference],'amount'=>['doubleValue'=>$price],
+      'servicesAdded'=>['arrayValue'=>['values'=>[['stringValue'=>$serviceId]]]],
       'serviceDetails'=>['arrayValue'=>['values'=>[['mapValue'=>['fields'=>['id'=>['stringValue'=>$serviceId],'name'=>['stringValue'=>$serviceName],'price'=>['doubleValue'=>$price],'quantity'=>['integerValue'=>'1'],'lineTotal'=>['doubleValue'=>$price]]]]]]],
       'runningTotal'=>['doubleValue'=>$price],'finalAmount'=>['doubleValue'=>$price],'totalAmount'=>['doubleValue'=>$price],
       'downpaymentAmount'=>['doubleValue'=>0],'balanceDue'=>['doubleValue'=>$price],'balance_due'=>['doubleValue'=>$price],
@@ -162,7 +166,9 @@ try {
         error_log(sprintf('Walk-in booking saved, but confirmation email failed at %s:%d: %s',
             $emailError->getFile(), $emailError->getLine(), $emailError->getMessage()));
     }
-    jsonResponse(['ok'=>true,'bookingId'=>$bookingId,'invoiceId'=>$invoiceId,'amount'=>$price,'referenceNumber'=>$reference,'customerName'=>$name,'branch'=>$branchLabel,'serviceName'=>$serviceName]);
+    jsonResponse(['ok'=>true,'bookingId'=>$bookingId,'invoiceId'=>$invoiceId,'amount'=>$price,
+        'referenceNumber'=>$reference,'invoiceReference'=>$reference,'walkInReferenceId'=>$reference,
+        'customerName'=>$name,'branch'=>$branchLabel,'serviceName'=>$serviceName]);
 } catch(Throwable $error) {
     error_log(sprintf('Walk-in booking creation failed at %s:%d: %s', $error->getFile(), $error->getLine(), $error->getMessage()));
     jsonResponse(['ok'=>false,'message'=>'Unable to save this booking. Please retry shortly.'],500);

@@ -173,8 +173,8 @@ try {
     $appointmentDate = (string)($invoice['date'] ?? $invoice['appointmentDate'] ?? $booking['date'] ?? $booking['appointmentDate'] ?? '');
     if ($appointmentDate === '') $appointmentDate = (new DateTimeImmutable('now', new DateTimeZone('Asia/Manila')))->format('Y-m-d');
     $expectedDateCode = preg_match('/^\d{4}-\d{2}-\d{2}$/', $appointmentDate) ? str_replace('-', '', $appointmentDate) : '';
-    $referenceNumber = (string)($invoice['referenceNumber'] ?? $invoice['invoiceNumber'] ?? '');
-    if ($expectedDateCode === '' || !preg_match('/^PMO-[A-Z]{3}-' . preg_quote($expectedDateCode, '/') . '-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/', $referenceNumber)) {
+    $referenceNumber = (string)($invoice['referenceNumber'] ?? $invoice['invoiceReference'] ?? $invoice['walkInReferenceId'] ?? $invoice['invoiceNumber'] ?? '');
+    if (!$isGuestWalkIn && ($expectedDateCode === '' || !preg_match('/^PMO-[A-Z]{3}-' . preg_quote($expectedDateCode, '/') . '-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$/', $referenceNumber))) {
         $referenceNumber = cooltimeReferenceNumber('PMO', $branchLabel, $appointmentDate);
         $referenceFields = ['referenceNumber' => ['stringValue' => $referenceNumber], 'invoiceNumber' => ['stringValue' => $referenceNumber],
             'branchId' => ['stringValue' => $branchId], 'branch' => ['stringValue' => $branchLabel]];
@@ -186,7 +186,9 @@ try {
     $returnOrigin = paymongoReturnOrigin();
     $returnNonce = bin2hex(random_bytes(16));
     $cancelSignature = hash_hmac('sha256', $invoiceId . '|' . $returnNonce, $secret);
-    $successUrl = $returnOrigin . '/api/payment-return.php?status=success&invoice=' . rawurlencode($invoiceId) . '&nonce=' . rawurlencode($returnNonce) . '&signature=' . rawurlencode($cancelSignature);
+    $successUrl = $isGuestWalkIn
+        ? $returnOrigin . '/admin-dashboard.html?payment=success&invoice=' . rawurlencode($invoiceId)
+        : $returnOrigin . '/api/payment-return.php?status=success&invoice=' . rawurlencode($invoiceId) . '&nonce=' . rawurlencode($returnNonce) . '&signature=' . rawurlencode($cancelSignature);
     $cancelUrl = $returnOrigin . '/api/payment-return.php?status=cancelled&invoice=' . rawurlencode($invoiceId) . '&nonce=' . rawurlencode($returnNonce) . '&signature=' . rawurlencode($cancelSignature);
     $result = httpJsonRequest('https://api.paymongo.com/v1/checkout_sessions', ['data' => ['attributes' => [
         'line_items' => [['currency' => 'PHP', 'amount' => $amountCentavos, 'name' => 'CoolTime invoice ' . $referenceNumber, 'quantity' => 1]],
