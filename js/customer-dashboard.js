@@ -57,7 +57,8 @@ const notificationFields = [
   ['Branch Location', 'branchName'], ['Scheduled Date', 'scheduledDate'], ['Scheduled Time', 'scheduledTime'],
   ['Vehicle Year', 'vehicleYear'], ['Vehicle Make', 'vehicleMake'], ['Vehicle Model', 'vehicleModel'],
   ['Plate Number', 'vehiclePlateNumber'], ['Status', 'bookingStatus'], ['Payment Status', 'paymentStatus'],
-  ['Payment Balance (PHP)', 'paymentBalance']
+  ['Payment Balance (PHP)', 'paymentBalance'], ['Reference Number', 'referenceNumber'],
+  ['Booking ID', 'bookingId'], ['Invoice ID', 'invoiceId']
 ];
 
 function formatNotificationAmount(value) {
@@ -166,6 +167,7 @@ notificationPagination?.addEventListener('click', (event) => {
 
 function showCustomerNotification(item) {
   if (!notificationDialog || !item) return;
+  item = hydratePaymentNotification(item);
   const title = notificationDialog.querySelector('#notificationDetailTitle');
   const content = notificationDialog.querySelector('.notification-detail-content');
   if (title) title.textContent = normalizeBranchText(item.message || item.title || 'Notification details');
@@ -176,6 +178,60 @@ function showCustomerNotification(item) {
   }).filter(Boolean).join('');
   if (content) content.innerHTML = `<dl>${values || '<dd>No booking details are attached to this notification.</dd>'}</dl>`;
   notificationDialog.showModal();
+}
+
+function hydratePaymentNotification(notification) {
+  const type = String(notification.type || notification.category || notification.title || '').replaceAll('_', ' ').replaceAll('-', ' ').toUpperCase();
+  if (!type.includes('PAYMENT CONFIRMED')) return notification;
+  const firstValue = (...values) => values.find((value) => {
+    if (value === undefined || value === null || String(value).trim() === '') return false;
+    const normalized = String(value).trim().toLowerCase();
+    return !['—', '–', '-', 'n/a', 'not available', 'branch', 'customer', 'service'].includes(normalized) && !normalized.endsWith(' unavailable');
+  });
+  const messageReference = String(notification.message || '').match(/\bRef:\s*([^\s)]+)/i)?.[1] || '';
+  const references = [notification.invoiceId, notification.referenceNumber, notification.referenceNo, notification.referenceId, messageReference].filter(Boolean).map(String);
+  const invoice = invoices.find((item) => references.includes(String(item.id || ''))
+    || references.some((reference) => [item.referenceNumber, item.referenceNo, item.invoiceNumber, item.referenceId].filter(Boolean).map(String).includes(reference)));
+  const bookingId = firstValue(notification.bookingId, invoice?.bookingId,
+    String(invoice?.id || '').startsWith('web_') ? String(invoice.id).slice(4) : '');
+  const booking = bookings.find((item) => String(item.id || '') === String(bookingId || '')
+    || references.some((reference) => [item.referenceNumber, item.referenceNo, item.referenceId, item.invoiceId].filter(Boolean).map(String).includes(reference)));
+  if (!invoice && !booking) return notification;
+
+  const vehicle = booking?.vehicle || invoice?.vehicle || {};
+  const branchName = normalizeBranchLabel(firstValue(notification.branchName, notification.branchLocation, notification.branch,
+    booking?.branchName, booking?.branchLocation, booking?.branch, booking?.branchId,
+    invoice?.branchName, invoice?.branchLocation, invoice?.branch, invoice?.branchId, ''), '');
+  const serviceName = firstValue(notification.serviceName, notification.servicePerformed, booking?.serviceName, booking?.servicePerformed,
+    invoice?.serviceName, invoice?.servicePerformed, booking?.serviceId, invoice?.serviceId, '');
+  const serviceCost = firstValue(notification.serviceCost, notification.amount, invoice?.totalAmount, invoice?.runningTotal,
+    invoice?.finalAmount, booking?.serviceCost, booking?.servicePrice, 0);
+  const customerName = firstValue(notification.customerName, booking?.customerName, invoice?.customerName, '');
+  const scheduledDate = firstValue(notification.scheduledDate, notification.preferredDate, booking?.date, booking?.appointmentDate,
+    booking?.preferredDate, invoice?.date, invoice?.scheduledDate, invoice?.preferredDate, '');
+  const scheduledTime = firstValue(notification.scheduledTime, notification.preferredTime, booking?.timeSlot, booking?.preferredTime,
+    invoice?.timeSlot, invoice?.scheduledTime, invoice?.preferredTime, '');
+  const vehicleYear = firstValue(notification.vehicleYear, vehicle.year, booking?.vehicleYear, invoice?.vehicleYear, '');
+  const vehicleMake = firstValue(notification.vehicleMake, vehicle.make, booking?.vehicleMake, invoice?.vehicleMake, '');
+  const vehicleModel = firstValue(notification.vehicleModel, vehicle.model, booking?.vehicleModel, invoice?.vehicleModel, '');
+  const plateNumber = firstValue(notification.vehiclePlateNumber, notification.plateNumber, vehicle.plateNumber, vehicle.plate_number,
+    vehicle.vehiclePlate, booking?.vehiclePlateNumber, booking?.plateNumber, booking?.vehiclePlate, invoice?.vehiclePlateNumber, invoice?.plateNumber, '');
+  const status = firstValue(booking?.status, notification.status, notification.bookingStatus, invoice?.serviceStatus, 'completed');
+  const resolvedInvoiceId = firstValue(notification.invoiceId, invoice?.id, '');
+  const resolvedReference = firstValue(notification.referenceNumber, notification.referenceNo, invoice?.referenceNumber,
+    invoice?.referenceNo, invoice?.invoiceNumber, booking?.referenceNumber, messageReference, '');
+
+  return {
+    ...notification,
+    customerName, serviceName, servicePerformed: serviceName,
+    serviceCost, amount: serviceCost,
+    branchName, branch: branchName, branchLocation: branchName,
+    scheduledDate, preferredDate: scheduledDate, scheduledTime, preferredTime: scheduledTime,
+    vehicleYear, vehicleMake, vehicleModel, vehiclePlateNumber: plateNumber, plateNumber,
+    status, bookingStatus: status, paymentStatus: 'paid', paymentBalance: 0,
+    bookingId: firstValue(notification.bookingId, booking?.id, bookingId, ''),
+    invoiceId: resolvedInvoiceId, referenceNumber: resolvedReference,
+  };
 }
 
 notificationList?.addEventListener('click', (event) => {

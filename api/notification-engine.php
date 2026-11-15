@@ -18,7 +18,7 @@ function notificationCreate(array $account, string $id, array $data): ?bool
         if ($value === null) continue;
         if ($key === 'createdAt') $fields[$key] = ['timestampValue' => (string) $value];
         elseif (is_bool($value)) $fields[$key] = ['booleanValue' => $value];
-        elseif (is_numeric($value) && in_array($key, ['serviceCost', 'paymentBalance'], true)) $fields[$key] = ['doubleValue' => (float) $value];
+        elseif (is_numeric($value) && in_array($key, ['serviceCost', 'amount', 'paymentBalance'], true)) $fields[$key] = ['doubleValue' => (float) $value];
         else $fields[$key] = ['stringValue' => substr((string) $value, 0, 2000)];
     }
     $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id'])
@@ -35,14 +35,14 @@ function notificationCreate(array $account, string $id, array $data): ?bool
     return null;
 }
 
-function notifyPaymentConfirmed(array $account, string $customerId, string $invoiceId, string $referenceNumber, float $amount, string $createdAt): ?bool
+function notifyPaymentConfirmed(array $account, string $customerId, string $invoiceId, string $referenceNumber, float $amount, string $createdAt, array $metadata = []): ?bool
 {
     $customerId = trim($customerId);
     if ($customerId === '' || $invoiceId === '') return null;
     $referenceNumber = trim($referenceNumber) !== '' ? trim($referenceNumber) : $invoiceId;
     $amount = max(0, $amount);
     $message = 'Payment confirmed: your bill (Ref: ' . $referenceNumber . ') of PHP ' . number_format($amount, 2) . ' has been paid.';
-    $record = [
+    $record = array_merge($metadata, [
         'userId' => $customerId,
         'type' => 'PAYMENT CONFIRMED',
         'category' => 'PAYMENT CONFIRMED',
@@ -53,7 +53,7 @@ function notifyPaymentConfirmed(array $account, string $customerId, string $invo
         'paymentBalance' => 0,
         'recipientRole' => 'customer',
         'createdAt' => $createdAt,
-    ];
+    ]);
     try {
         return notificationCreate($account, 'pay_notif_' . hash('sha256', $invoiceId), $record);
     } catch (Throwable $error) {
@@ -68,7 +68,76 @@ function notifyInvoicePaymentConfirmed(array $account, array $invoice, string $i
     if ($customerId === '') $customerId = trim((string) ($invoice['userId'] ?? ''));
     $referenceNumber = (string) ($invoice['referenceNumber'] ?? $invoice['referenceNo'] ?? $invoice['invoiceNumber'] ?? $invoiceId);
     $amount = (float) ($invoice['totalAmount'] ?? $invoice['runningTotal'] ?? $invoice['finalAmount'] ?? 0);
-    return notifyPaymentConfirmed($account, $customerId, $invoiceId, $referenceNumber, $amount, $createdAt);
+    try {
+    $bookingId = trim((string) ($invoice['bookingId'] ?? ''));
+    if ($bookingId === '' && str_starts_with($invoiceId, 'web_')) $bookingId = substr($invoiceId, 4);
+    $booking = $bookingId !== '' ? notificationReadDocument($account, 'bookings', $bookingId) : null;
+    $metadata = [];
+    if ($booking) {
+        $booking['id'] = $bookingId;
+        if (trim((string) ($booking['customerId'] ?? '')) === '') $booking['customerId'] = $customerId;
+        $metadata = notificationBookingDetails($account, $booking, $invoice);
+    } else {
+        $customer = $customerId !== '' ? notificationReadDocument($account, 'users', $customerId) ?? [] : [];
+        $serviceId = (string) ($invoice['serviceId'] ?? $invoice['service_id'] ?? '');
+        $service = $serviceId !== '' ? notificationReadDocument($account, 'services', $serviceId) ?? [] : [];
+        $vehicleId = (string) ($invoice['vehicleId'] ?? $invoice['vehicle_id'] ?? '');
+        $vehicle = $vehicleId !== '' ? notificationReadDocument($account, 'vehicles', $vehicleId) ?? [] : [];
+        $customerName = trim((string) ($customer['name'] ?? ''));
+        if ($customerName === '') $customerName = trim((string) ($customer['username'] ?? $invoice['customerName'] ?? ''));
+        $serviceName = trim((string) ($service['name'] ?? ''));
+        if ($serviceName === '') $serviceName = trim((string) ($invoice['serviceName'] ?? $invoice['servicePerformed'] ?? ''));
+        $branchValue = '';
+        foreach ([$invoice['branchName'] ?? '', $invoice['branch'] ?? '', $invoice['branchId'] ?? '', $invoice['branchLocation'] ?? ''] as $candidate) {
+            if (trim((string) $candidate) !== '') { $branchValue = (string) $candidate; break; }
+        }
+        $branch = normalizeBranchLabel($branchValue, '');
+        $metadata = [
+            'customerName' => $customerName,
+            'serviceName' => $serviceName,
+            'servicePerformed' => $serviceName,
+            'branchName' => $branch, 'branch' => $branch, 'branchLocation' => $branch,
+            'scheduledDate' => (string) ($invoice['date'] ?? $invoice['scheduledDate'] ?? $invoice['preferredDate'] ?? ''),
+            'preferredDate' => (string) ($invoice['preferredDate'] ?? $invoice['date'] ?? $invoice['scheduledDate'] ?? ''),
+            'scheduledTime' => (string) ($invoice['timeSlot'] ?? $invoice['scheduledTime'] ?? $invoice['preferredTime'] ?? ''),
+            'preferredTime' => (string) ($invoice['preferredTime'] ?? $invoice['timeSlot'] ?? $invoice['scheduledTime'] ?? ''),
+            'vehicleYear' => (string) ($vehicle['year'] ?? $invoice['vehicleYear'] ?? ''),
+            'vehicleMake' => (string) ($vehicle['make'] ?? $invoice['vehicleMake'] ?? ''),
+            'vehicleModel' => (string) ($vehicle['model'] ?? $invoice['vehicleModel'] ?? ''),
+            'vehiclePlateNumber' => (string) ($vehicle['plateNumber'] ?? $vehicle['plate_number'] ?? $invoice['plateNumber'] ?? ''),
+            'plateNumber' => (string) ($vehicle['plateNumber'] ?? $vehicle['plate_number'] ?? $invoice['plateNumber'] ?? ''),
+            'bookingId' => $bookingId,
+        ];
+    }
+    $status = (string) (($booking['status'] ?? '') ?: ($invoice['serviceStatus'] ?? 'completed'));
+    $rawBranchName = '';
+    foreach ([$metadata['branchName'] ?? '', $metadata['branch'] ?? '', $metadata['branchLocation'] ?? ''] as $candidate) {
+        $candidate = trim((string) $candidate);
+        if ($candidate !== '' && !in_array(strtolower($candidate), ['branch', '—', '–', '-'], true)) { $rawBranchName = $candidate; break; }
+    }
+    if (in_array(strtolower(trim($rawBranchName)), ['', 'branch', '—', '–', '-'], true)) {
+        $rawBranchName = (string) ($booking['branchName'] ?? $booking['branch'] ?? $booking['branchId']
+            ?? $invoice['branchName'] ?? $invoice['branch'] ?? $invoice['branchId'] ?? $invoice['branchLocation'] ?? '');
+    }
+    $branchName = normalizeBranchLabel($rawBranchName, '');
+    $metadata = array_merge($metadata, [
+        'customerId' => $customerId,
+        'serviceCost' => $amount, 'amount' => $amount,
+        'servicePerformed' => (string) ($metadata['serviceName'] ?? $invoice['servicePerformed'] ?? $invoice['serviceName'] ?? ''),
+        'branchName' => $branchName, 'branch' => $branchName, 'branchLocation' => $branchName,
+        'preferredDate' => (string) ($metadata['scheduledDate'] ?? $invoice['preferredDate'] ?? $invoice['date'] ?? ''),
+        'preferredTime' => (string) ($metadata['scheduledTime'] ?? $invoice['preferredTime'] ?? $invoice['timeSlot'] ?? ''),
+        'plateNumber' => (string) ($metadata['vehiclePlateNumber'] ?? $invoice['plateNumber'] ?? ''),
+        'status' => $status, 'bookingStatus' => $status,
+        'paymentStatus' => 'paid', 'paymentBalance' => 0,
+        'bookingId' => $bookingId,
+        'invoiceId' => $invoiceId, 'referenceNumber' => $referenceNumber,
+    ]);
+    return notifyPaymentConfirmed($account, $customerId, $invoiceId, $referenceNumber, $amount, $createdAt, $metadata);
+    } catch (Throwable $error) {
+        error_log('CoolTime payment notification metadata lookup failed: ' . $error->getMessage());
+        return notifyPaymentConfirmed($account, $customerId, $invoiceId, $referenceNumber, $amount, $createdAt);
+    }
 }
 
 function notificationReadDocument(array $account, string $collection, string $id): ?array
@@ -108,7 +177,7 @@ function notificationReadDocument(array $account, string $collection, string $id
     return $fields;
 }
 
-function notificationBookingDetails(array $account, array $booking): array
+function notificationBookingDetails(array $account, array $booking, ?array $invoiceOverride = null): array
 {
     $service = notificationReadDocument($account, 'services', (string) ($booking['serviceId'] ?? '')) ?? [];
     $vehicle = notificationReadDocument($account, 'vehicles', (string) ($booking['vehicleId'] ?? '')) ?? [];
@@ -126,25 +195,33 @@ function notificationBookingDetails(array $account, array $booking): array
             ?? [];
         if ($branch) break;
     }
-    $invoice = notificationReadDocument($account, 'invoices', 'web_' . (string) ($booking['id'] ?? '')) ?? [];
+    $invoice = $invoiceOverride ?? notificationReadDocument($account, 'invoices', 'web_' . (string) ($booking['id'] ?? '')) ?? [];
     $paymentStatus = (string) ($invoice['status'] ?? 'unbilled');
     $paymentBalance = (float) ($invoice['balance_due'] ?? $invoice['balanceDue'] ?? $invoice['runningTotal'] ?? 0);
     if (in_array(strtolower($paymentStatus), ['paid', 'cancelled', 'canceled'], true)) $paymentBalance = 0;
+    $customerName = trim((string) ($customer['name'] ?? ''));
+    if ($customerName === '') $customerName = trim((string) ($customer['username'] ?? ''));
+    if ($customerName === '') $customerName = trim((string) ($booking['customerName'] ?? 'Customer'));
+    $serviceName = trim((string) ($service['name'] ?? ''));
+    if ($serviceName === '') $serviceName = trim((string) ($booking['serviceName'] ?? $booking['serviceId'] ?? 'Service'));
+    $branchValue = trim((string) ($branch['name'] ?? ''));
+    if ($branchValue === '') $branchValue = trim((string) ($booking['branchName'] ?? $booking['branch'] ?? $branchId));
+    $branchName = normalizeBranchLabel($branchValue, '');
     return [
         'bookingId' => (string) ($booking['id'] ?? ''),
         'customerId' => (string) ($booking['customerId'] ?? ''),
-        'customerName' => (string) ($customer['name'] ?? $customer['username'] ?? $booking['customerName'] ?? 'Customer'),
+        'customerName' => $customerName,
         'customerUsername' => (string) ($customer['username'] ?? $customer['name'] ?? 'Customer'),
         'customerEmail' => (string) ($customer['email'] ?? $booking['customerEmail'] ?? ''),
-        'serviceName' => (string) ($service['name'] ?? $booking['serviceName'] ?? $booking['serviceId'] ?? 'Service'),
-        'serviceCost' => (float) ($service['price'] ?? $invoice['runningTotal'] ?? $invoice['totalAmount'] ?? 0),
-        'branchName' => normalizeBranchLabel((string) ($branch['name'] ?? $booking['branch'] ?? $branchId ?? ''), 'Branch'),
-        'scheduledDate' => (string) ($booking['date'] ?? ''),
-        'scheduledTime' => (string) ($booking['timeSlot'] ?? $booking['time'] ?? ''),
-        'vehicleYear' => (string) ($vehicle['year'] ?? ''),
-        'vehicleMake' => (string) ($vehicle['make'] ?? ''),
-        'vehicleModel' => (string) ($vehicle['model'] ?? ''),
-        'vehiclePlateNumber' => (string) ($vehicle['plateNumber'] ?? ''),
+        'serviceName' => $serviceName,
+        'serviceCost' => (float) ($invoice['totalAmount'] ?? $invoice['runningTotal'] ?? $invoice['finalAmount'] ?? $service['price'] ?? 0),
+        'branchName' => $branchName,
+        'scheduledDate' => (string) ($booking['date'] ?? $booking['appointmentDate'] ?? $booking['preferredDate'] ?? ''),
+        'scheduledTime' => (string) ($booking['timeSlot'] ?? $booking['preferredTime'] ?? $booking['time'] ?? ''),
+        'vehicleYear' => (string) ($vehicle['year'] ?? $booking['vehicleYear'] ?? ''),
+        'vehicleMake' => (string) ($vehicle['make'] ?? $booking['vehicleMake'] ?? ''),
+        'vehicleModel' => (string) ($vehicle['model'] ?? $booking['vehicleModel'] ?? ''),
+        'vehiclePlateNumber' => (string) ($vehicle['plateNumber'] ?? $vehicle['plate_number'] ?? $booking['plateNumber'] ?? $booking['vehiclePlate'] ?? ''),
         'bookingStatus' => (string) ($booking['status'] ?? ''),
         'paymentStatus' => $paymentStatus,
         'paymentBalance' => $paymentBalance,
