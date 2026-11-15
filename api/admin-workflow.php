@@ -93,6 +93,34 @@ function adminWorkflowList(array $account, string $collection): array
     return $rows;
 }
 
+function adminWorkflowListAdminAccounts(array $account): array
+{
+    $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id']) . '/databases/(default)/documents:runQuery';
+    $payload = ['structuredQuery' => [
+        'from' => [['collectionId' => 'users']],
+        'where' => ['fieldFilter' => [
+            'field' => ['fieldPath' => 'role'], 'op' => 'IN',
+            'value' => ['arrayValue' => ['values' => [['stringValue' => 'admin'], ['stringValue' => 'super_admin']]]],
+        ]],
+    ]];
+    $response = secureHttpRequest($url, 'POST', ['Authorization: Bearer ' . firebaseAdminAccessToken(), 'Content-Type: application/json'], json_encode($payload, JSON_THROW_ON_ERROR), 20);
+    if ($response['status'] < 200 || $response['status'] >= 300) {
+        throw new RuntimeException('Unable to read administrative accounts (HTTP ' . $response['status'] . ').');
+    }
+    $documents = json_decode($response['body'], true);
+    if (!is_array($documents)) throw new RuntimeException('Firestore returned invalid administrative account data.');
+    $rows = [];
+    foreach ($documents as $entry) {
+        $document = $entry['document'] ?? null;
+        if (!is_array($document)) continue;
+        $path = explode('/', (string) ($document['name'] ?? ''));
+        $row = ['id' => (string) end($path)];
+        foreach (($document['fields'] ?? []) as $field => $value) $row[$field] = adminWorkflowDecodeValue($value);
+        if (in_array(normalizeAccountRole($row['role'] ?? ''), ['admin', 'super_admin'], true)) $rows[] = $row;
+    }
+    return $rows;
+}
+
 function adminWorkflowCommit(array $account, array $writes): void
 {
     $formatted = [];
@@ -310,9 +338,7 @@ try {
         if (normalizeAccountRole($actorProfile['role'] ?? '') !== 'super_admin') {
             jsonResponse(['ok' => false, 'message' => 'Super administrator access is required.'], 403);
         }
-        $accounts = array_values(array_filter(adminWorkflowList($account, 'users'), static function (array $row): bool {
-            return in_array(normalizeAccountRole($row['role'] ?? ''), ['admin', 'staff'], true);
-        }));
+        $accounts = adminWorkflowListAdminAccounts($account);
         jsonResponse(['ok' => true, 'accounts' => $accounts]);
     }
     if ($action === 'send_email') {

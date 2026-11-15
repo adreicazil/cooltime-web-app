@@ -65,9 +65,11 @@ try {
     $uid = trim((string) ($data['uid'] ?? ''));
     $name = trim((string) ($data['name'] ?? ''));
     $email = strtolower(trim((string) ($data['email'] ?? '')));
-    $role = strtolower(trim((string) ($data['role'] ?? 'customer')));
+    $role = strtolower(trim((string) ($data['role'] ?? 'admin')));
     $status = strtolower(trim((string) ($data['status'] ?? 'active')));
-    if (!in_array($role, ['customer', 'staff', 'admin', 'super_admin'], true) || !in_array($status, ['active', 'disabled'], true)) jsonResponse(['ok' => false, 'message' => 'Role or status is invalid.'], 422);
+    if ($role === 'customer') jsonResponse(['ok' => false, 'message' => 'Customer accounts cannot be managed here.'], 403);
+    if (!in_array($role, ['admin', 'super_admin'], true)) jsonResponse(['ok' => false, 'message' => 'Only admin accounts can be managed here.'], 403);
+    if (!in_array($status, ['active', 'disabled'], true)) jsonResponse(['ok' => false, 'message' => 'Role or status is invalid.'], 422);
     if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) jsonResponse(['ok' => false, 'message' => 'Name and valid email are required.'], 422);
 
     if ($action === 'create') {
@@ -77,8 +79,15 @@ try {
         $created = accountEndpointRequest('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' . rawurlencode($apiKey), ['email' => $email, 'password' => $password, 'returnSecureToken' => false]);
         $uid = (string) ($created['body']['localId'] ?? '');
         if ($created['status'] < 200 || $created['status'] >= 300 || $uid === '') jsonResponse(['ok' => false, 'message' => $created['body']['error']['message'] ?? 'Firebase account creation failed.'], 422);
-    } elseif (!preg_match('/^[A-Za-z0-9_-]{1,150}$/', $uid) || !accountEndpointRead($account, $uid)) {
-        jsonResponse(['ok' => false, 'message' => 'A valid existing account is required.'], 404);
+    } elseif (in_array($action, ['update', 'delete'], true)) {
+        if (!preg_match('/^[A-Za-z0-9_-]{1,150}$/', $uid)) jsonResponse(['ok' => false, 'message' => 'A valid existing account is required.'], 404);
+        $existingProfile = accountEndpointRead($account, $uid);
+        if (!$existingProfile) jsonResponse(['ok' => false, 'message' => 'A valid existing account is required.'], 404);
+        if (!in_array(normalizeAccountRole($existingProfile['role'] ?? ''), ['admin', 'super_admin'], true)) {
+            jsonResponse(['ok' => false, 'message' => 'Customer accounts cannot be managed here.'], 403);
+        }
+    } else {
+        jsonResponse(['ok' => false, 'message' => 'Unsupported account action.'], 400);
     }
 
     if ($action === 'update' || $action === 'create') {

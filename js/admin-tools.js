@@ -1,6 +1,6 @@
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
 import { auth, authReady, db } from './firebase-config.js';
-import { addDoc, collection, limit, onSnapshot, orderBy, query, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { addDoc, collection, limit, onSnapshot, orderBy, query, serverTimestamp, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { getAuthenticatedUser, hasOtpVerification, normalizeRole } from './auth-guard.js';
 import { logoutUser } from './auth.js';
 import { normalizeBranchId, normalizeBranchLabel, normalizeBranchText } from './branch-utils.js';
@@ -593,7 +593,7 @@ async function loadCoreData() {
   const [bookingRows, accountRows, serviceRows, invoiceRows, paymentRows, feedbackRows, inquiryRows, vehicleRows, branchRows] = [
     'bookings', 'users', 'services', 'invoices', 'payments', 'feedback', 'inquiries', 'vehicles', 'branches'
   ].map((name) => adminRows[name] || []);
-  bookings = bookingRows; accounts = accountRows.filter((item) => ['customer', 'staff', 'admin'].includes(String(item.role || '').toLowerCase())); customers = accountRows.filter((item) => item.role === 'customer'); services = serviceRows;
+  bookings = bookingRows; accounts = accountRows.filter((item) => ['admin', 'super_admin'].includes(String(item.role || '').toLowerCase())); customers = accountRows.filter((item) => item.role === 'customer'); services = serviceRows;
   invoices = invoiceRows; payments = paymentRows; submissions = [...feedbackRows.map((x) => ({ ...x, collection: 'feedback' })), ...inquiryRows.map((x) => ({ ...x, collection: 'inquiries' }))];
   usersById = Object.fromEntries(accountRows.map((item) => [item.id, item]));
   servicesById = Object.fromEntries(services.map((item) => [item.id, item]));
@@ -610,7 +610,7 @@ async function loadCoreData() {
 
 function watchDashboardNotifications() {
   if (!isDashboardPage) return;
-  const listen = (name, apply, constraints = []) => onSnapshot(query(collection(db, name), ...constraints), (snapshot) => {
+  const listen = (name, apply, constraints = [], collectionName = name) => onSnapshot(query(collection(db, collectionName), ...constraints), (snapshot) => {
     const rows = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
     adminRows[name] = rows;
     apply(rows);
@@ -624,15 +624,33 @@ function watchDashboardNotifications() {
     renderBookings();
     renderDashboardOverview();
   });
-  listen('users', (rows) => {
-    usersById = Object.fromEntries(rows.map((item) => [item.id, item]));
-    accounts = rows.filter((item) => ['customer', 'staff', 'admin'].includes(String(item.role || '').toLowerCase()));
-    customers = rows.filter((item) => String(item.role || '').toLowerCase() === 'customer');
-    renderCustomers();
-    renderBookings();
-    if (role === 'super_admin' && isSuperAdminDashboard) renderAccounts();
-    renderDashboardOverview();
-  });
+  if (isSuperAdminDashboard) {
+    const updateCombinedUsers = () => {
+      usersById = Object.fromEntries([...accounts, ...customers].map((item) => [item.id, item]));
+      adminRows.users = [...accounts, ...customers];
+      renderCustomers();
+      renderBookings();
+      renderAccounts();
+      renderDashboardOverview();
+    };
+    listen('manageable_admin_accounts', (rows) => {
+      accounts = rows.filter((item) => ['admin', 'super_admin'].includes(String(item.role || '').toLowerCase()));
+      updateCombinedUsers();
+    }, [where('role', 'in', ['admin', 'super_admin'])], 'users');
+    listen('customer_records', (rows) => {
+      customers = rows.filter((item) => String(item.role || '').toLowerCase() === 'customer');
+      updateCombinedUsers();
+    }, [where('role', '==', 'customer')], 'users');
+  } else {
+    listen('users', (rows) => {
+      usersById = Object.fromEntries(rows.map((item) => [item.id, item]));
+      accounts = rows.filter((item) => ['admin', 'super_admin'].includes(String(item.role || '').toLowerCase()));
+      customers = rows.filter((item) => String(item.role || '').toLowerCase() === 'customer');
+      renderCustomers();
+      renderBookings();
+      renderDashboardOverview();
+    });
+  }
   listen('branches', (rows) => {
     branches = rows;
     branchesById = Object.fromEntries(rows.map((item) => [item.id, item]));
@@ -1941,14 +1959,17 @@ window.setAccountsPage = setAccountsPage;
 function renderAccounts() {
   const target = $('#accountResults');
   if (!target) return;
-  const roleLabels = { customer: 'Customer', staff: 'Staff', admin: 'Admin', super_admin: 'Super Admin' };
-  setHTML(target, accounts.map((item, index) => {
+  const roleLabels = { admin: 'Admin', super_admin: 'Super Admin' };
+  const administrativeAccounts = accounts.filter((item) => {
+    const normalizedRole = String(item.role || '').toLowerCase();
+    return normalizedRole !== 'customer' && ['admin', 'super_admin'].includes(normalizedRole);
+  });
+  setHTML(target, administrativeAccounts.map((item, index) => {
     const detailsId = `account-edit-${index}`;
     const name = item.name || item.username || '';
-    const role = item.role || 'customer';
+    const role = String(item.role || '').toLowerCase();
     const status = item.status || 'active';
-    const roleOptions = [['customer', 'Customer'], ['admin', 'Admin'], ['super_admin', 'Super Admin']];
-    if (role === 'staff') roleOptions.splice(1, 0, ['staff', 'Staff']);
+    const roleOptions = [['admin', 'Admin'], ['super_admin', 'Super Admin']];
     return `<tr class="account-summary-row account-row-item" data-account-row data-role="${esc(role.replaceAll('_', ' '))}" tabindex="0" aria-expanded="false" aria-controls="${detailsId}"><td>${esc(name)}</td><td>${esc(item.email)}</td><td>${esc(roleLabels[role] || role)}</td><td>${esc(status)}</td></tr><tr class="account-edit-row"><td colspan="4"><div class="account-edit-accordion" id="${detailsId}" inert><form class="account-edit-form" data-id="${esc(item.id)}"><div class="account-edit-fields"><input name="name" value="${esc(name)}" placeholder="Username" aria-label="Username" required><input name="email" type="email" value="${esc(item.email)}" placeholder="Email" aria-label="Email" required><input name="password" type="password" placeholder="Password (leave blank to keep current)" aria-label="Password (leave blank to keep current)"><select name="role" aria-label="Role">${roleOptions.map(([value, label]) => `<option value="${value}"${role === value ? ' selected' : ''}>${label}</option>`).join('')}</select><select name="status" aria-label="Status"><option value="active"${status === 'active' ? ' selected' : ''}>Active</option><option value="disabled"${status === 'disabled' ? ' selected' : ''}>Disabled</option></select></div><div class="account-form-actions"><button class="btn-save-account" type="submit">Save changes</button><button class="btn-cancel-account-action btn-cancel-account-edit" type="button">Cancel</button><button class="account-delete btn-delete-account" type="button" data-id="${esc(item.id)}">Delete</button></div><output></output></form></div></td></tr>`;
   }).join('') || '<tr><td colspan="4">No accounts found.</td></tr>');
   filterAccountRows();
