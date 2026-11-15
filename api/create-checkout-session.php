@@ -91,6 +91,8 @@ try {
     $invoiceId = trim((string) ($data['invoiceId'] ?? $data['billId'] ?? ''));
     $requestedBookingId = trim((string) ($data['bookingId'] ?? ''));
     $forceRefresh = filter_var($data['forceRefresh'] ?? false, FILTER_VALIDATE_BOOLEAN);
+    $requestedReturnPage = trim((string) ($data['returnPage'] ?? ''));
+    $requestedCashierAdminName = trim((string) ($data['cashierAdminName'] ?? ''));
     if (!preg_match('/^[A-Za-z0-9_-]{1,150}$/', $invoiceId)) jsonResponse(['ok' => false, 'message' => 'A valid invoice is required.'], 400);
     $account = firebaseServiceAccount();
     $invoice = firestoreReadDocument($account, 'invoices', $invoiceId);
@@ -100,7 +102,20 @@ try {
     $isGuestWalkIn = strtolower((string)($invoice['source'] ?? '')) === 'walk_in_pos' && (bool)($invoice['is_guest'] ?? false);
     $user = null;
     $isAdmin = false;
-    if (!$isGuestWalkIn) {
+    $cashierAdminName = '';
+    $cashierAdminEmail = '';
+    if ($isGuestWalkIn) {
+        $cashierUser = firebaseUserFromToken(authorizationToken());
+        requireOtpSession($cashierUser);
+        $cashierProfile = firestoreReadDocument($account, 'users', $cashierUser['uid']);
+        if (strtolower((string) ($cashierProfile['status'] ?? 'active')) !== 'active'
+            || !in_array(normalizeAccountRole($cashierProfile['role'] ?? ''), ['admin', 'super_admin'], true)) {
+            jsonResponse(['ok' => false, 'message' => 'Administrator access is required to start walk-in checkout.'], 403);
+        }
+        $cashierAdminName = trim((string) ($cashierProfile['name'] ?? $cashierProfile['displayName'] ?? ''));
+        $cashierAdminEmail = (string) ($cashierUser['email'] ?? '');
+        if ($cashierAdminName === '') $cashierAdminName = $cashierAdminEmail !== '' ? $cashierAdminEmail : $requestedCashierAdminName;
+    } else {
         $user = firebaseUserFromToken(authorizationToken());
         requireOtpSession($user);
         $profile = firestoreReadDocument($account, 'users', $user['uid']);
@@ -186,16 +201,21 @@ try {
     $returnOrigin = paymongoReturnOrigin();
     $returnNonce = bin2hex(random_bytes(16));
     $cancelSignature = hash_hmac('sha256', $invoiceId . '|' . $returnNonce, $secret);
+    $walkInReturnPage = in_array($requestedReturnPage, ['admin-dashboard.html', 'super-dashboard.html'], true)
+        ? $requestedReturnPage : 'admin-dashboard.html';
     $successUrl = $isGuestWalkIn
-        ? $returnOrigin . '/admin-dashboard.html?payment=success&invoice=' . rawurlencode($invoiceId)
+        ? $returnOrigin . '/' . $walkInReturnPage . '?payment=success&invoice=' . rawurlencode($invoiceId)
         : $returnOrigin . '/api/payment-return.php?status=success&invoice=' . rawurlencode($invoiceId) . '&nonce=' . rawurlencode($returnNonce) . '&signature=' . rawurlencode($cancelSignature);
-    $cancelUrl = $returnOrigin . '/api/payment-return.php?status=cancelled&invoice=' . rawurlencode($invoiceId) . '&nonce=' . rawurlencode($returnNonce) . '&signature=' . rawurlencode($cancelSignature);
+    $cancelUrl = $isGuestWalkIn
+        ? $returnOrigin . '/' . $walkInReturnPage . '?payment=cancelled&invoice=' . rawurlencode($invoiceId)
+        : $returnOrigin . '/api/payment-return.php?status=cancelled&invoice=' . rawurlencode($invoiceId) . '&nonce=' . rawurlencode($returnNonce) . '&signature=' . rawurlencode($cancelSignature);
     $result = httpJsonRequest('https://api.paymongo.com/v1/checkout_sessions', ['data' => ['attributes' => [
         'line_items' => [['currency' => 'PHP', 'amount' => $amountCentavos, 'name' => 'CoolTime invoice ' . $referenceNumber, 'quantity' => 1]],
         'payment_method_types' => ['qrph', 'gcash', 'paymaya'],
         'description' => 'CoolTime service invoice ' . $referenceNumber,
         'reference_number' => $referenceNumber,
-        'metadata' => ['invoiceId' => $invoiceId, 'referenceNumber' => $referenceNumber],
+        'metadata' => ['invoiceId' => $invoiceId, 'referenceNumber' => $referenceNumber]
+            + ($isGuestWalkIn ? ['cashierAdminName' => $cashierAdminName, 'cashierAdminEmail' => $cashierAdminEmail] : []),
         'success_url' => $successUrl,
         'cancel_url' => $cancelUrl,
         'send_email_receipt' => false,
@@ -230,6 +250,7 @@ try {
         'amount' => ['integerValue' => (string) $amountCentavos],
         'currency' => ['stringValue' => 'PHP'],
         'method' => ['stringValue' => 'paymongo_checkout'],
+        ...($isGuestWalkIn ? ['cashierAdminName' => ['stringValue' => $cashierAdminName], 'cashierAdminEmail' => ['stringValue' => $cashierAdminEmail]] : []),
         'status' => ['stringValue' => 'pending'],
         'referenceNumber' => ['stringValue' => $referenceNumber],
         'providerReference' => ['stringValue' => (string) $session['id']],
@@ -245,6 +266,7 @@ try {
     }
     firestoreCheckoutMark($account, $invoiceId, [
         'branchId' => ['stringValue' => $branchId], 'branch' => ['stringValue' => $branchLabel],
+        ...($isGuestWalkIn ? ['cashierAdminName' => ['stringValue' => $cashierAdminName], 'cashierAdminEmail' => ['stringValue' => $cashierAdminEmail]] : []),
         'checkoutSessionId' => ['stringValue' => (string) $session['id']],
         'checkoutUrl' => ['stringValue' => $checkoutUrl],
         'latestPaymentSessionId' => ['stringValue' => (string) $session['id']],

@@ -271,7 +271,7 @@ function adminWorkflowExpireCheckout(string $sessionId): void
     }
 }
 
-function adminWorkflowPaymongoStatus(string $sessionId): string
+function adminWorkflowPaymongoStatus(string $sessionId, ?array &$sessionAttributes = null): string
 {
     if (!preg_match('/^[A-Za-z0-9_-]{1,150}$/', $sessionId)) return 'expired';
     $secret = environment('PAYMONGO_SECRET_KEY', false);
@@ -288,6 +288,7 @@ function adminWorkflowPaymongoStatus(string $sessionId): string
         throw new RuntimeException('PayMongo could not verify the checkout session.');
     }
     $session = json_decode($response['body'], true)['data']['attributes'] ?? [];
+    $sessionAttributes = $session;
     foreach (($session['payments'] ?? []) as $payment) {
         if (strtolower((string) ($payment['attributes']['status'] ?? '')) === 'paid') return 'paid';
     }
@@ -310,7 +311,7 @@ function adminWorkflowSettlePaymongoInvoice(array $account, array $booking, arra
     adminWorkflowCommit($account, $writes);
 }
 
-function adminWorkflowSettleWalkinPaymongo(array $account, array $booking, array $invoice, string $bookingId, string $invoiceId, string $sessionId): void
+function adminWorkflowSettleWalkinPaymongo(array $account, array $booking, array $invoice, string $bookingId, string $invoiceId, string $sessionId, string $cashierAdminName = ''): void
 {
     $now = gmdate('Y-m-d\\TH:i:s\\Z');
     $amount = (float) ($invoice['amount'] ?? $invoice['runningTotal'] ?? $invoice['totalAmount'] ?? $invoice['finalAmount'] ?? 0);
@@ -320,10 +321,14 @@ function adminWorkflowSettleWalkinPaymongo(array $account, array $booking, array
         if (trim((string) $candidateReference) !== '') { $reference = trim((string) $candidateReference); break; }
     }
     $paymentId = 'paymongo_' . $sessionId;
-    $posId = 'walkin_pos_paymongo_' . $sessionId;
+    $cashierAdminName = trim($cashierAdminName ?: (string) ($invoice['cashierAdminName'] ?? ''));
+    if ($cashierAdminName === '') $cashierAdminName = trim((string) ($invoice['cashierAdminEmail'] ?? 'Administrator'));
+    $cashierName = 'PayMongo (' . $cashierAdminName . ')';
+    $posId = 'walkin_pos_' . $bookingId;
     $methodFields = [
         'status' => ['stringValue' => 'paid'], 'paymentStatus' => ['stringValue' => 'paid'],
         'paymentMethod' => ['stringValue' => 'PayMongo'], 'paymentBalance' => ['doubleValue' => 0],
+        'cashierName' => ['stringValue' => $cashierName], 'cashierAdminName' => ['stringValue' => $cashierAdminName],
         'balanceDue' => ['doubleValue' => 0], 'balance_due' => ['doubleValue' => 0],
         'latestPaymentSessionId' => ['nullValue' => null], 'checkoutSessionId' => ['nullValue' => null],
         'checkoutUrl' => ['nullValue' => null], 'paidAt' => ['timestampValue' => $now], 'updatedAt' => ['timestampValue' => $now],
@@ -335,6 +340,7 @@ function adminWorkflowSettleWalkinPaymongo(array $account, array $booking, array
         'amount' => ['integerValue' => (string) (int) round($amount * 100)], 'amountUnit' => ['stringValue' => 'centavos'],
         'currency' => ['stringValue' => 'PHP'], 'method' => ['stringValue' => 'PayMongo'],
         'paymentMethod' => ['stringValue' => 'PayMongo'], 'status' => ['stringValue' => 'paid'],
+        'cashierName' => ['stringValue' => $cashierName], 'cashierAdminName' => ['stringValue' => $cashierAdminName],
         'source' => ['stringValue' => 'walk_in_pos'], 'referenceNumber' => ['stringValue' => $reference],
         'providerReference' => ['stringValue' => $sessionId], 'paidAt' => ['timestampValue' => $now],
     ];
@@ -342,6 +348,7 @@ function adminWorkflowSettleWalkinPaymongo(array $account, array $booking, array
         'invoiceId' => ['stringValue' => $invoiceId], 'bookingId' => ['stringValue' => $bookingId],
         'paymentId' => ['stringValue' => $paymentId], 'source' => ['stringValue' => 'walk_in_pos'],
         'status' => ['stringValue' => 'paid'], 'paymentMethod' => ['stringValue' => 'PayMongo'],
+        'cashierName' => ['stringValue' => $cashierName], 'cashierAdminName' => ['stringValue' => $cashierAdminName],
         'method' => ['stringValue' => 'PayMongo'], 'referenceNumber' => ['stringValue' => $reference],
         'customerName' => ['stringValue' => (string) ($booking['customerName'] ?? '')],
         'customerEmail' => ['stringValue' => (string) ($booking['customerEmail'] ?? '')],
@@ -389,12 +396,39 @@ try {
         $booking = $bookingId !== '' ? adminWorkflowRead($account, 'bookings', $bookingId) : null;
         if (!$booking || strtolower((string) ($booking['bookingType'] ?? '')) !== 'walk_in') jsonResponse(['ok' => false, 'message' => 'Walk-in booking was not found.'], 404);
         if (strtolower((string) ($booking['status'] ?? '')) !== 'completed') jsonResponse(['ok' => false, 'message' => 'Complete the walk-in service before verifying payment.'], 409);
-        if (strtolower((string) ($invoice['paymentStatus'] ?? $invoice['status'] ?? '')) === 'paid') jsonResponse(['ok' => true, 'paymentStatus' => 'paid']);
+        $cashierAdminName = trim((string) ($invoice['cashierAdminName'] ?? ''));
+        if (strtolower((string) ($invoice['paymentStatus'] ?? $invoice['status'] ?? '')) === 'paid') {
+            if ($cashierAdminName !== '' && strtolower((string) ($invoice['paymentMethod'] ?? '')) !== 'cash / otc') {
+                $cashierName = 'PayMongo (' . $cashierAdminName . ')';
+                $amount = (float) ($invoice['amount'] ?? $invoice['runningTotal'] ?? $invoice['totalAmount'] ?? $invoice['finalAmount'] ?? 0);
+                $reference = (string) ($invoice['referenceNumber'] ?? $booking['referenceNumber'] ?? $invoiceId);
+                $paidFields = ['cashierName' => ['stringValue' => $cashierName], 'cashierAdminName' => ['stringValue' => $cashierAdminName]];
+                $writes = [['collection' => 'invoices', 'id' => $invoiceId, 'fields' => $paidFields]];
+                if (is_finite($amount) && $amount > 0) {
+                    $writes[] = ['collection' => 'pos_transactions', 'id' => 'walkin_pos_' . $bookingId, 'fields' => [
+                        'invoiceId' => ['stringValue' => $invoiceId], 'bookingId' => ['stringValue' => $bookingId],
+                        'source' => ['stringValue' => 'walk_in_pos'], 'status' => ['stringValue' => 'paid'],
+                        'paymentMethod' => ['stringValue' => 'PayMongo'], 'method' => ['stringValue' => 'PayMongo'],
+                        'referenceNumber' => ['stringValue' => $reference], 'customerName' => ['stringValue' => (string) ($booking['customerName'] ?? '')],
+                        'customerEmail' => ['stringValue' => (string) ($booking['customerEmail'] ?? '')], 'totalAmount' => ['doubleValue' => $amount],
+                        'cashierName' => ['stringValue' => $cashierName], 'cashierAdminName' => ['stringValue' => $cashierAdminName],
+                    ]];
+                }
+                $paymentId = (string) ($invoice['paymentId'] ?? '');
+                if ($paymentId !== '' && preg_match('/^[A-Za-z0-9_-]{1,150}$/', $paymentId)) {
+                    $writes[] = ['collection' => 'payments', 'id' => $paymentId, 'fields' => $paidFields];
+                }
+                adminWorkflowCommit($account, $writes);
+            }
+            jsonResponse(['ok' => true, 'paymentStatus' => 'paid']);
+        }
         $sessionId = (string) ($invoice['latestPaymentSessionId'] ?? $invoice['checkoutSessionId'] ?? '');
         if ($sessionId === '') jsonResponse(['ok' => false, 'message' => 'No PayMongo checkout is linked to this invoice.'], 404);
-        $checkoutStatus = adminWorkflowPaymongoStatus($sessionId);
+        $sessionAttributes = [];
+        $checkoutStatus = adminWorkflowPaymongoStatus($sessionId, $sessionAttributes);
         if ($checkoutStatus === 'paid') {
-            adminWorkflowSettleWalkinPaymongo($account, $booking, $invoice, $bookingId, $invoiceId, $sessionId);
+            $cashierAdminName = $cashierAdminName ?: trim((string) ($sessionAttributes['metadata']['cashierAdminName'] ?? ''));
+            adminWorkflowSettleWalkinPaymongo($account, $booking, $invoice, $bookingId, $invoiceId, $sessionId, $cashierAdminName);
             jsonResponse(['ok' => true, 'paymentStatus' => 'paid']);
         }
         jsonResponse(['ok' => true, 'paymentStatus' => $checkoutStatus]);
@@ -419,7 +453,7 @@ try {
     }
     if ($action === 'verify_session') {
         jsonResponse(['ok' => true, 'role' => normalizeAccountRole($actorProfile['role'] ?? ''), 'profile' => [
-            'name' => (string) ($actorProfile['name'] ?? $actorProfile['username'] ?? ''),
+            'name' => (string) ($actorProfile['name'] ?? $actorProfile['displayName'] ?? ''),
             'email' => (string) $actor['email'],
         ]]);
     }
@@ -497,7 +531,9 @@ try {
         $paymentId = 'walkin_payment_' . $bookingId;
         $posId = 'walkin_pos_' . $bookingId;
         $reference = (string) ($booking['referenceNumber'] ?? $invoice['referenceNumber'] ?? $bookingId);
-        $cashierName = trim((string) ($actorProfile['name'] ?? $actorProfile['displayName'] ?? $actorProfile['username'] ?? $actor['email']));
+        $cashierName = trim((string) ($actorProfile['name'] ?? ''));
+        if ($cashierName === '') $cashierName = trim((string) ($actorProfile['displayName'] ?? ''));
+        if ($cashierName === '') $cashierName = trim((string) ($actor['email'] ?? 'Administrator'));
         $paymentFields = ['invoiceId' => ['stringValue' => $invoiceId], 'bookingId' => ['stringValue' => $bookingId], 'customerId' => ['stringValue' => ''],
             'amount' => ['integerValue' => (string) (int) round($amount * 100)], 'amountUnit' => ['stringValue' => 'centavos'], 'currency' => ['stringValue' => 'PHP'],
             'method' => ['stringValue' => $method], 'paymentMethod' => ['stringValue' => $method], 'status' => ['stringValue' => 'paid'], 'referenceNumber' => ['stringValue' => $reference],
@@ -511,7 +547,7 @@ try {
         adminWorkflowCommit($account, [
             ['collection' => 'payments', 'id' => $paymentId, 'fields' => $paymentFields],
             ['collection' => 'pos_transactions', 'id' => $posId, 'fields' => $posFields],
-            ['collection' => 'invoices', 'id' => $invoiceId, 'fields' => ['status' => ['stringValue' => 'paid'], 'paymentStatus' => ['stringValue' => 'paid'], 'paymentMethod' => ['stringValue' => $method], 'paymentId' => ['stringValue' => $paymentId], 'downpaymentAmount' => ['doubleValue' => $amount], 'balanceDue' => ['doubleValue' => 0], 'balance_due' => ['doubleValue' => 0], 'paymentBalance' => ['doubleValue' => 0], 'paidAt' => ['timestampValue' => $now], 'updatedAt' => ['timestampValue' => $now]]],
+            ['collection' => 'invoices', 'id' => $invoiceId, 'fields' => ['status' => ['stringValue' => 'paid'], 'paymentStatus' => ['stringValue' => 'paid'], 'paymentMethod' => ['stringValue' => $method], 'paymentId' => ['stringValue' => $paymentId], 'cashierId' => ['stringValue' => $actor['uid']], 'cashierName' => ['stringValue' => $cashierName], 'downpaymentAmount' => ['doubleValue' => $amount], 'balanceDue' => ['doubleValue' => 0], 'balance_due' => ['doubleValue' => 0], 'paymentBalance' => ['doubleValue' => 0], 'paidAt' => ['timestampValue' => $now], 'updatedAt' => ['timestampValue' => $now]]],
             ['collection' => 'bookings', 'id' => $bookingId, 'fields' => ['paymentStatus' => ['stringValue' => 'paid'], 'paymentBalance' => ['doubleValue' => 0], 'paymentMethod' => ['stringValue' => $method], 'updatedAt' => ['timestampValue' => $now]]],
             adminWorkflowAuditWrite($actor, $actorProfile, 'Walk-In Payment Settled', $reference, 'Walk-in payment settled by ' . $method . '; PHP ' . number_format($amount, 2) . '.', $now),
         ]);
@@ -1042,6 +1078,7 @@ try {
         jsonResponse(['ok' => true, 'message' => 'Reschedule request rejected and recorded.']);
     }
     if ($action === 'complete_booking') {
+        try {
         $bookingId = trim((string) ($input['bookingId'] ?? ''));
         $downpayment = (float) ($input['downpaymentAmount'] ?? -1);
         $method = strtolower(trim((string) ($input['paymentMethod'] ?? '')));
@@ -1195,6 +1232,13 @@ try {
             . ', remaining balance PHP ' . number_format($balance, 2) . '.';
         $writes[] = adminWorkflowAuditWrite($actor, $actorProfile, 'Booking Service Completed', (string) ($booking['referenceNumber'] ?? $bookingId), $settlementDetails, $now);
         adminWorkflowCommit($account, $writes);
+        try {
+            invalidateSlotAvailabilityCache($bookingBranchId, (string) ($booking['date'] ?? $booking['appointmentDate'] ?? ''));
+        } catch (Throwable $cacheError) {
+            error_log(sprintf('Booking completed, but slot cache invalidation failed at %s:%d: %s',
+                $cacheError->getFile(), $cacheError->getLine(), $cacheError->getMessage()));
+        }
+        try {
         if ($balance <= 0) {
             $paymentInvoice = $invoice;
             if (trim((string) ($paymentInvoice['customerId'] ?? '')) === '') {
@@ -1220,7 +1264,16 @@ try {
             : 'Service completed: your appointment is complete.';
         $customerEmail = (string) ($customer['email'] ?? $booking['customerEmail'] ?? '');
         notifyCustomerRecipient($account, 'service_completed_' . $bookingId, (string) ($booking['customerId'] ?? ''), $customerEmail, 'service_completed', $details['message'], $details, 'CoolTime service completed — invoice ' . $invoiceId);
+        } catch (Throwable $notificationError) {
+            error_log(sprintf('Booking completed, but completion notification failed at %s:%d: %s',
+                $notificationError->getFile(), $notificationError->getLine(), $notificationError->getMessage()));
+        }
         jsonResponse(['ok' => true, 'invoiceId' => $invoiceId, 'runningTotal' => $total, 'downpaymentAmount' => $downpayment, 'balanceDue' => $balance]);
+        } catch (Throwable $completionError) {
+            error_log(sprintf('Complete Service failed for booking %s at %s:%d: %s',
+                $bookingId ?? 'unknown', $completionError->getFile(), $completionError->getLine(), $completionError->getMessage()));
+            jsonResponse(['ok' => false, 'message' => 'Unable to complete the booking. Please retry.'], 500);
+        }
     }
     if ($action === 'submission_decision') {
         $collection = (string) ($input['collection'] ?? '');

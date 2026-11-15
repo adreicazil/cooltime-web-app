@@ -269,10 +269,10 @@ async function initializeDashboard(user) {
   if (!hasOtpVerification(user)) { window.location.replace('otp.html'); return; }
   const profile = await getUserProfile(user.uid);
   const role = normalizeRole(profile?.role);
-  const requiredRole = document.body.dataset.requiredRole;
+  const requiredRoles = String(document.body.dataset.requiredRole || '').split(',').map(normalizeRole).filter(Boolean);
   if (!profile || String(profile.status || 'active').trim().toLowerCase() !== 'active'
     || !['admin', 'super_admin'].includes(role)
-    || (requiredRole && role !== normalizeRole(requiredRole))) return denyAccess();
+    || (requiredRoles.length && !requiredRoles.includes(role))) return denyAccess();
   const username = String(profile.name || user.displayName || profile.username || user.email?.split('@')[0] || 'User').trim() || 'User';
   window.cooltimeDashboardIdentity = username;
   const greeting = document.getElementById(role === 'super_admin' ? 'superadmin-username-display' : 'admin-username-display');

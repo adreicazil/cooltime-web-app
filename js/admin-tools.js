@@ -15,7 +15,7 @@ const isAdminDashboard = document.body.dataset.adminDashboard === 'true';
 const isDashboardPage = isSuperAdminDashboard || isAdminDashboard;
 const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (ch) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
 const money = (value) => `₱${Number(value || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-let actor, role, bookings = [], accounts = [], services = [], invoices = [], payments = [], submissions = [], customers = [], vehicles = [], branches = [], legacyPosTransactions = [], auditLogs = [];
+let actor, role, adminDisplayName = '', bookings = [], accounts = [], services = [], invoices = [], payments = [], submissions = [], customers = [], vehicles = [], branches = [], legacyPosTransactions = [], auditLogs = [];
 let usersById = {}, servicesById = {}, paymentsByInvoice = {}, vehiclesById = {}, branchesById = {};
 let adminRows = {};
 let reportHistoryData = [];
@@ -357,6 +357,7 @@ async function initialize() {
   if (!hasOtpVerification(actor)) { window.location.replace('otp.html'); return; }
   const access = await api('api/admin-workflow.php', { action: 'verify_session' });
   role = normalizeRole(access.role);
+  adminDisplayName = String(access.profile?.name || access.profile?.displayName || actor.displayName || actor.email || '').trim() || String(actor.email || 'Administrator');
   if (!['admin', 'super_admin'].includes(role)) {
     alert('Your account does not have administrator access.');
     return;
@@ -556,10 +557,19 @@ async function initialize() {
 }
 
 async function verifyWalkinPaymentReturn() {
-  if (!isAdminDashboard) return;
+  if (!isDashboardPage) return;
   const params = new URLSearchParams(window.location.search);
-  if (params.get('payment') !== 'success') return;
+  const returnStatus = params.get('payment');
+  if (!['success', 'cancelled'].includes(returnStatus)) return;
   const invoiceId = params.get('invoice') || '';
+  if (returnStatus === 'cancelled') {
+    params.delete('payment');
+    params.delete('invoice');
+    const query = params.toString();
+    window.history.replaceState({}, document.title, `${window.location.pathname}${query ? `?${query}` : ''}${window.location.hash}`);
+    alert('PayMongo checkout was cancelled. The walk-in balance remains unpaid.');
+    return;
+  }
   if (!invoiceId) { alert('The PayMongo return did not include an invoice reference.'); return; }
   try {
     const result = await api('api/admin-workflow.php', { action: 'verify_walkin_payment', invoiceId });
@@ -961,7 +971,8 @@ async function bookingAction(event) {
     try {
       if (String(method).toLowerCase() !== 'cash / otc') {
         const invoice = invoiceForBooking(booking);
-        const response = await fetch('api/create-checkout-session.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceId: invoice?.id || booking.invoiceId, bookingId: booking.id, referenceId: booking.referenceNumber, source: 'walk_in_pos', is_guest: true, forceRefresh: true }) });
+        const returnPage = isSuperAdminDashboard ? 'super-dashboard.html' : 'admin-dashboard.html';
+        const response = await fetch('api/create-checkout-session.php', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await actor.getIdToken()}` }, body: JSON.stringify({ invoiceId: invoice?.id || booking.invoiceId, bookingId: booking.id, referenceId: booking.referenceNumber, source: 'walk_in_pos', is_guest: true, cashierAdminName: adminDisplayName, returnPage, forceRefresh: true }) });
         const checkout = await response.json();
         if (!response.ok || !checkout.ok || !checkout.checkoutUrl) throw new Error(checkout.message || 'PayMongo checkout could not be started.');
         window.location.assign(checkout.checkoutUrl);
