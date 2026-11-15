@@ -20,6 +20,7 @@ let usersById = {}, servicesById = {}, paymentsByInvoice = {}, vehiclesById = {}
 let adminRows = {};
 let reportHistoryData = [];
 let overviewMetric = 'bookings';
+const dashboardUnsubscribers = [];
 const modulePaginators = {};
 const moduleRowsPerPage = 15;
 let allSystemLogs = [];
@@ -186,6 +187,7 @@ function createOverviewServiceRowHTML(service) {
 
 function renderDashboardOverview() {
   if (!isDashboardPage) return;
+  renderDashboardKpis();
   const bookingsTarget = $('#overview-bookings-list');
   const serviceTarget = $('#overview-services-list');
   const inquiriesTarget = $('#overview-inquiries-list');
@@ -266,6 +268,91 @@ function renderDashboardOverview() {
       context.fillStyle = '#fff'; context.fillText(valueLabel, x + barWidth / 2, Math.max(8, bottom - height - 5));
     }
   });
+}
+
+function dashboardActive(record) {
+  if (record.active === false || record.isActive === false) return false;
+  return !['disabled', 'inactive', 'archived', 'deleted', 'suspended'].includes(String(record.status || 'active').trim().toLowerCase());
+}
+
+function manilaDateKey(value) {
+  let date = value?.toDate?.() || (value instanceof Date ? value : typeof value === 'number' ? new Date(value) : value ? new Date(value) : null);
+  if (!date || Number.isNaN(date.getTime())) return '';
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(date).map((part) => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function paidSettlement(transaction) {
+  const status = String(transaction.status || '').trim().toLowerCase();
+  if (status === 'voided') return false;
+  return String(transaction.paymentStatus || '').trim().toLowerCase() === 'paid' || status === 'paid';
+}
+
+function settlementAmount(transaction) {
+  const raw = Number(transaction.amountPaid ?? transaction.amount ?? transaction.total
+    ?? transaction.totalAmount ?? transaction.finalAmount ?? transaction.runningTotal ?? 0);
+  if (!Number.isFinite(raw)) return 0;
+  return String(transaction.amountUnit || '').toLowerCase() === 'centavos' ? raw / 100 : raw;
+}
+
+function renderDashboardKpis() {
+  const setMetric = (name, value) => {
+    document.querySelectorAll(`.admin-metric-value[data-metric="${name}"], .superadmin-metric-value[data-metric="${name}"]`)
+      .forEach((element) => { element.textContent = value; });
+  };
+  const customerCount = customers.filter((item) => {
+    const status = String(item.status || 'active').trim().toLowerCase();
+    return String(item.role || '').toLowerCase() === 'customer' && dashboardActive(item) && ['active', 'valid'].includes(status);
+  }).length;
+  const accountCount = accounts.filter((item) => ['admin', 'super_admin'].includes(String(item.role || '').toLowerCase())).length;
+  const vehicleKeys = new Set();
+  const registeredVehicleKeys = new Map();
+  const vehicleKey = (record, fallbackId = '') => {
+    const plate = String(record.plateNumber || record.plate_number || record.plate || record.vehiclePlate || '').replace(/[^a-z0-9]/gi, '').toUpperCase();
+    return plate ? `plate:${plate}` : (record.id || fallbackId ? `id:${record.id || fallbackId}` : '');
+  };
+  vehicles.forEach((vehicle) => {
+    const key = vehicleKey(vehicle, vehicle.id);
+    if (key) { vehicleKeys.add(key); registeredVehicleKeys.set(vehicle.id, key); }
+  });
+  bookings.forEach((booking) => {
+    const id = String(booking.vehicleId || booking.vehicle_id || '');
+    const key = id && registeredVehicleKeys.get(id) ? registeredVehicleKeys.get(id) : vehicleKey(booking, id);
+    if (key) vehicleKeys.add(key);
+  });
+  const activeBranches = new Set(branches.filter(dashboardActive).map((branch) =>
+    String(branch.id || branch.name || '').trim().toLowerCase()).filter(Boolean));
+
+  const settlementGroups = new Map();
+  [...invoices, ...legacyPosTransactions].forEach((transaction) => {
+    const key = String(transaction.invoiceId || (transaction._collection === 'pos_transactions'
+      ? transaction.bookingId || transaction.referenceNumber || transaction.id
+      : transaction.id || transaction.bookingId || transaction.referenceNumber) || '');
+    if (!key) return;
+    if (!settlementGroups.has(key)) settlementGroups.set(key, []);
+    settlementGroups.get(key).push(transaction);
+  });
+  const transactions = [...settlementGroups.values()].flatMap((group) => {
+    if (group.some((transaction) => String(transaction.status || '').trim().toLowerCase() === 'voided')) return [];
+    const paid = group.filter(paidSettlement);
+    if (!paid.length) return [];
+    // Prefer a POS settlement record when both its invoice and transaction exist.
+    return [paid.find((transaction) => transaction._collection === 'pos_transactions') || paid[0]];
+  });
+  const today = manilaDateKey(new Date());
+  const todaySales = transactions.reduce((sum, transaction) => {
+    const settledAt = transaction.paidAt || transaction.settledAt || transaction.updatedAt || transaction.createdAt;
+    return manilaDateKey(settledAt) === today ? sum + settlementAmount(transaction) : sum;
+  }, 0);
+
+  setMetric('bookings', String(bookings.length));
+  setMetric('customers', String(customerCount));
+  setMetric('accounts', String(accountCount));
+  setMetric('vehicles', String(vehicleKeys.size));
+  setMetric('todaySales', `PHP ${todaySales.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  setMetric('branches', String(activeBranches.size));
 }
 
 async function recordClientApiFailure(path, payload, status, message) {
@@ -645,14 +732,18 @@ async function loadCoreData() {
 
 function watchDashboardNotifications() {
   if (!isDashboardPage) return;
-  const listen = (name, apply, constraints = [], collectionName = name) => onSnapshot(query(collection(db, collectionName), ...constraints), (snapshot) => {
-    const rows = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-    adminRows[name] = rows;
-    apply(rows);
-  }, (error) => {
+  const listen = (name, apply, constraints = [], collectionName = name) => {
+    const unsubscribe = onSnapshot(query(collection(db, collectionName), ...constraints), (snapshot) => {
+      const rows = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+      adminRows[name] = rows;
+      apply(rows);
+    }, (error) => {
     console.error(`${name} could not be refreshed:`, error);
     if (name !== 'system_logs') recordClientApiFailure(`Firestore/${name}`, { action: 'onSnapshot' }, error?.code || 0, error?.message || 'Listener failed');
-  });
+    });
+    dashboardUnsubscribers.push(unsubscribe);
+    return unsubscribe;
+  };
 
   listen('bookings', (rows) => {
     bookings = rows;
@@ -690,11 +781,13 @@ function watchDashboardNotifications() {
     branches = rows;
     branchesById = Object.fromEntries(rows.map((item) => [item.id, item]));
     renderPos();
+    renderDashboardOverview();
   });
   listen('vehicles', (rows) => {
     vehicles = rows;
     vehiclesById = Object.fromEntries(rows.map((item) => [item.id, item]));
     renderBookings();
+    renderDashboardOverview();
   });
   listen('feedback', (rows) => {
     submissions = [...rows.map((item) => ({ ...item, collection: 'feedback' })), ...(adminRows.inquiries || []).map((item) => ({ ...item, collection: 'inquiries' }))];
@@ -737,6 +830,7 @@ function watchDashboardNotifications() {
   listen('pos_transactions', (rows) => {
     legacyPosTransactions = rows.map((item) => ({ ...item, _collection: 'pos_transactions' }));
     renderPos();
+    renderDashboardOverview();
   });
   if (role === 'super_admin') {
     listen('audit_logs', (rows) => {
@@ -750,7 +844,7 @@ function watchDashboardNotifications() {
 }
 
 function watchServiceCatalog() {
-  onSnapshot(collection(db, 'services'), (snapshot) => {
+  const unsubscribe = onSnapshot(collection(db, 'services'), (snapshot) => {
     services = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
     servicesById = Object.fromEntries(services.map((item) => [item.id, item]));
     adminRows.services = services;
@@ -758,7 +852,14 @@ function watchServiceCatalog() {
     renderBookings();
     renderDashboardOverview();
   }, (error) => console.error('Service catalog could not be refreshed:', error));
+  dashboardUnsubscribers.push(unsubscribe);
 }
+
+window.addEventListener('beforeunload', () => {
+  dashboardUnsubscribers.splice(0).forEach((unsubscribe) => {
+    try { unsubscribe(); } catch (error) { console.warn('Dashboard Firestore listener cleanup failed.', error); }
+  });
+});
 
 function normalizeBookingFilterStatus(value) {
   const status = String(value || '').toLowerCase().trim().replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
@@ -1352,6 +1453,17 @@ function posActionData(transaction) {
   return `data-transaction-id="${esc(transaction.id)}" data-transaction-collection="${esc(transaction._collection || 'invoices')}"`;
 }
 
+function inferBranchFromRef(reference) {
+  const code = String(reference || '').match(/^(?:OTC|PMO)-([A-Z]{3})-/i)?.[1]?.toUpperCase();
+  return ({ CBY: 'Cabuyao', SRO: 'Santa Rosa', SRA: 'Santa Rosa' })[code] || '';
+}
+
+function posTransactionAmount(transaction, payment) {
+  const raw = transaction.amount ?? payment?.amount;
+  if (raw == null || raw === '') return Number(transaction.totalAmount ?? transaction.finalAmount ?? transaction.runningTotal ?? 0);
+  return Number((transaction.amountUnit || payment?.amountUnit) === 'centavos' ? raw / 100 : raw);
+}
+
 function renderPos() {
   const from = $('#pos-start-date')?.value || '', to = $('#pos-end-date')?.value || '';
   const method = $('#pos-method-filter')?.value || '';
@@ -1378,14 +1490,21 @@ function renderPos() {
     const displayStatus = normalizedPosStatus(transaction);
     const statusKey = displayStatus.toLowerCase().replace(/[^a-z0-9-]/g, '-');
     const cashier = posCashier(transaction);
+    const linkedBooking = bookings.find((booking) => booking.id === transaction.bookingId) || null;
     const total = Number(transaction.totalAmount ?? transaction.finalAmount ?? transaction.runningTotal
-      ?? (payment?.amountUnit === 'centavos' ? Number(payment.amount || 0) / 100 : payment?.amount) ?? 0);
-    const lines = transaction.serviceDetails || transaction.items || transaction.lineItems || [];
+      ?? posTransactionAmount(transaction, payment) ?? 0);
+    const storedLines = [transaction.serviceDetails, transaction.items, transaction.lineItems]
+      .find((candidate) => Array.isArray(candidate) && candidate.length) || [];
+    const fallbackServiceName = transaction.serviceName || linkedBooking?.serviceName || linkedBooking?.service_name || '';
+    const fallbackAmount = posTransactionAmount(transaction, payment) || total;
+    const lines = storedLines.length ? storedLines : (fallbackServiceName ? [{
+      name: fallbackServiceName, serviceName: fallbackServiceName, qty: 1, unitPrice: fallbackAmount, total: fallbackAmount,
+    }] : []);
     const serviceRows = lines.map((line) => {
-      const quantity = Number(line.quantity || 1);
-      const price = Number(line.price ?? line.unitPrice ?? 0);
+      const quantity = Number(line.qty ?? line.quantity ?? 1);
+      const price = Number(line.unitPrice ?? line.price ?? 0);
       const name = line.name || line.serviceName || servicesById[line.serviceId || line.service_id]?.name || line.serviceId || 'Service';
-      return `<tr><td>${esc(name)}</td><td>${quantity}</td><td>${money(price)}</td><td>${money(line.lineTotal ?? line.amount ?? price * quantity)}</td></tr>`;
+      return `<tr><td>${esc(name)}</td><td>${quantity}</td><td>${money(price)}</td><td>${money(line.total ?? line.lineTotal ?? line.amount ?? price * quantity)}</td></tr>`;
     }).join('') || '<tr><td colspan="4">No itemized services recorded.</td></tr>';
     const isPaid = String(transaction.status || '').toLowerCase() === 'paid';
     const isVoidRequested = ['void_requested', 'void requested'].includes(String(transaction.status || '').toLowerCase());
@@ -1396,7 +1515,9 @@ function renderPos() {
     if (role === 'super_admin') rowAction = `${isVoidRequested ? `<button type="button" class="btn-pos-approve-void" ${attrs}>Approve Void</button><button type="button" class="btn-pos-reject-void" ${attrs}>Reject Void</button>` : ''}<details class="pos-audit-actions"><summary class="btn-super-pos-actions">Actions ▾</summary><div class="pos-audit-actions-menu"><button type="button" data-super-pos-action="flag" ${attrs}>${transaction.isFlagged ? 'Remove Flag' : 'Flag'} transaction</button><button type="button" data-super-pos-action="void" ${attrs}${isPaid ? '' : ' disabled'}>Void transaction</button><button type="button" data-super-pos-action="export" ${attrs}>Export audit summary</button></div></details>`;
     const requester = transaction.voidRequestedByName || usersById[transaction.voidRequestedBy]?.name || transaction.voidRequestedByEmail || 'Unknown admin';
     const requestDetails = isVoidRequested ? `<div class="pos-void-request-details"><strong>Void requested by ${esc(requester)}</strong><p>${esc(transaction.voidRequestReason || 'No reason provided.')}</p></div>` : '';
-    const branch = normalizeBranchLabel(branchesById[transaction.branchId]?.name || transaction.branchName || transaction.branch || transaction.branchId);
+    const branchValue = transaction.branch || transaction.branchLocation || transaction.branchName
+      || linkedBooking?.branch || linkedBooking?.branchLocation || inferBranchFromRef(transaction.referenceNumber);
+    const branch = normalizeBranchLabel(branchValue || branchesById[transaction.branchId]?.name || transaction.branchId);
     const stamp = date ? `${date.toLocaleDateString('en-PH')} ${date.toLocaleTimeString('en-PH')}` : 'Timestamp unavailable';
     const customer = transaction.customerName || (transaction.customerId ? usersById[transaction.customerId]?.name || transaction.customerId : 'Walk-in customer');
     return `<tr class="pos-main-row" tabindex="0"><td><strong class="pos-invoice-id">${esc(reference)}</strong><span class="pos-invoice-time">${esc(stamp)}</span></td><td>${esc(branch)}</td><td>${esc(cashier)}</td><td>${esc(transactionMethod(transaction, payment))}</td><td><span class="pos-status-text ${esc(statusKey)}">${esc(displayStatus)}</span></td><td class="pos-amount">${money(total)}</td><td>${rowAction}</td></tr><tr class="pos-detail-row"><td colspan="7"><div class="pos-accordion-panel"><p class="pos-accordion-summary">Reference ID: ${esc(reference)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button></p><p>Customer: ${esc(customer)} · Cashier: ${esc(cashier)} · Branch: ${esc(branch)}</p>${requestDetails}<div class="pos-detail-table-scroll"><table class="pos-detail-table"><thead><tr><th>Service</th><th>Qty</th><th>Unit</th><th>Line total</th></tr></thead><tbody>${serviceRows}</tbody></table></div><strong class="pos-total-summary">Total ${money(total)}</strong></div></td></tr>`;
@@ -1858,6 +1979,9 @@ function openNotificationDetail(item) {
   const fields = [
     ['Customer Name', item.customerName], ['Service Performed', item.serviceName],
     ['Service Cost (PHP)', item.serviceCost == null ? '' : Number(item.serviceCost).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
+    ['Reference ID', item.referenceNumber],
+    ['Payment Received (PHP)', item.paymentAmount == null ? '' : Number(item.paymentAmount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
+    ['Payment Method', item.paymentMethod], ['Cashier', item.cashierName],
     ['Branch Location', normalizeBranchLabel(item.branchName || item.branch)], ['Scheduled Date', item.scheduledDate], ['Scheduled Time', item.scheduledTime],
     ['Vehicle Year', item.vehicleYear], ['Vehicle Make', item.vehicleMake], ['Vehicle Model', item.vehicleModel],
     ['Plate Number', item.vehiclePlateNumber], ['Status', item.bookingStatus], ['Payment Status', item.paymentStatus],
@@ -2217,7 +2341,8 @@ const defaultNotificationTemplates = {
   booking_confirmation: ['CoolTime booking confirmed', 'Booking confirmation: Booking confirmed: your service appointment has been approved.'],
   appointment_cancellation: ['CoolTime cancellation request update', 'Appointment cancellation: Your service appointment has been successfully cancelled!'],
   booking_submission: ['CoolTime booking submitted', 'Booking submitted: your service appointment request has been received.'],
-  booking_reschedule: ['CoolTime appointment rescheduled', 'Reschedule successful: your service appointment is successfully rescheduled!']
+  booking_reschedule: ['CoolTime appointment rescheduled', 'Reschedule successful: your service appointment is successfully rescheduled!'],
+  payment_notice: ['CoolTime payment received', 'Payment notice: payment for your service appointment has been confirmed.']
 };
 
 function loadNotificationTemplate() {

@@ -6,6 +6,19 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/notification-engine.php';
 requirePost();
 
+function checkoutDecodeValue(array $value): mixed
+{
+    foreach (['stringValue', 'integerValue', 'doubleValue', 'booleanValue', 'timestampValue'] as $type) {
+        if (!array_key_exists($type, $value)) continue;
+        return match ($type) {
+            'integerValue' => (int) $value[$type], 'doubleValue' => (float) $value[$type], 'booleanValue' => (bool) $value[$type], default => $value[$type],
+        };
+    }
+    if (isset($value['arrayValue']['values'])) return array_map('checkoutDecodeValue', $value['arrayValue']['values']);
+    if (isset($value['mapValue']['fields'])) return array_map('checkoutDecodeValue', $value['mapValue']['fields']);
+    return null;
+}
+
 function checkoutRead(array $account, string $collection, string $id): ?array
 {
     if (!preg_match('/^[A-Za-z][A-Za-z0-9_]{0,99}$/', $collection) || !preg_match('/^[A-Za-z0-9_-]{1,150}$/', $id)) return null;
@@ -15,11 +28,7 @@ function checkoutRead(array $account, string $collection, string $id): ?array
     $doc = json_decode($response['body'], true);
     if (!is_array($doc)) throw new RuntimeException('Payment record response was invalid.');
     $result = [];
-    foreach (($doc['fields'] ?? []) as $key => $value) {
-        foreach (['stringValue', 'integerValue', 'doubleValue', 'booleanValue', 'timestampValue'] as $type) {
-            if (array_key_exists($type, $value)) { $result[$key] = $value[$type]; break; }
-        }
-    }
+    foreach (($doc['fields'] ?? []) as $key => $value) $result[$key] = checkoutDecodeValue($value);
     return $result;
 }
 
@@ -31,12 +40,23 @@ try {
     requireOtpSession($user);
     $account = firebaseServiceAccount();
     $invoice = checkoutRead($account, 'invoices', $invoiceId);
-    $invoiceCustomerId = trim((string) ($invoice['customerId'] ?? ''));
-    if ($invoiceCustomerId === '') $invoiceCustomerId = trim((string) ($invoice['userId'] ?? ''));
-    if (!$invoice || $invoiceCustomerId !== (string) $user['uid']) jsonResponse(['ok' => false, 'message' => 'Invoice not found.'], 404);
+    if (!$invoice) jsonResponse(['ok' => false, 'message' => 'Invoice not found.'], 404);
     $bookingId = trim((string) ($invoice['bookingId'] ?? ''));
     if ($bookingId === '' && str_starts_with($invoiceId, 'web_')) $bookingId = substr($invoiceId, 4);
     $booking = $bookingId !== '' ? checkoutRead($account, 'bookings', $bookingId) : null;
+    $isWalkIn = strtolower((string) ($invoice['bookingType'] ?? $booking['bookingType'] ?? '')) === 'walk_in';
+    $invoiceCustomerId = trim((string) ($invoice['customerId'] ?? ''));
+    if ($invoiceCustomerId === '') $invoiceCustomerId = trim((string) ($invoice['userId'] ?? ''));
+    if ($isWalkIn) {
+        $profile = checkoutRead($account, 'users', (string) $user['uid']) ?? [];
+        if (!in_array(normalizeAccountRole($profile['role'] ?? ''), ['admin', 'super_admin'], true)
+            || strtolower((string) ($profile['status'] ?? 'active')) !== 'active'
+            || !$booking || strtolower((string) ($booking['status'] ?? '')) !== 'completed') {
+            jsonResponse(['ok' => false, 'message' => 'A completed walk-in payment can only be verified by an administrator.'], 403);
+        }
+    } elseif ($invoiceCustomerId !== (string) $user['uid']) {
+        jsonResponse(['ok' => false, 'message' => 'Invoice not found.'], 404);
+    }
     $action = strtolower(trim((string) ($input['action'] ?? 'verify')));
     $bookingStatus = strtolower(str_replace(' ', '_', (string) ($booking['status'] ?? '')));
     if ($action === 'payment_failed') {
@@ -97,17 +117,67 @@ try {
     }
     $now = gmdate('Y-m-d\TH:i:s\Z');
     if ($status === 'paid') {
-        firestorePatchDocument($account, 'invoices', $invoiceId, [
+        $serviceName = trim((string) ($booking['serviceName'] ?? $invoice['serviceName'] ?? 'Service'));
+        $reference = (string) ($invoice['referenceNumber'] ?? $booking['referenceNumber'] ?? '');
+        $branch = trim((string) ($booking['branch'] ?? $booking['branchLocation'] ?? $booking['branchName'] ?? $invoice['branch'] ?? $invoice['branchLocation'] ?? $invoice['branchName'] ?? ''));
+        if ($branch === '' && preg_match('/^(?:OTC|PMO)-([A-Z]{3})-/i', $reference, $branchMatch)) $branch = ['CBY' => 'Cabuyao', 'SRO' => 'Santa Rosa', 'SRA' => 'Santa Rosa'][strtoupper($branchMatch[1])] ?? '';
+        if ($branch !== '') $branch = normalizeBranchLabel($branch, 'Branch');
+        $amount = (float) ($invoice['amount'] ?? $invoice['totalAmount'] ?? $invoice['finalAmount'] ?? $invoice['runningTotal'] ?? $booking['paymentBalance'] ?? 0);
+        $walkInItemsField = ['arrayValue' => ['values' => [['mapValue' => ['fields' => [
+            'name' => ['stringValue' => $serviceName], 'serviceName' => ['stringValue' => $serviceName],
+            'qty' => ['integerValue' => '1'], 'unitPrice' => ['doubleValue' => $amount], 'total' => ['doubleValue' => $amount],
+        ]]]]]];
+        $invoicePaymentFields = [
             'status' => ['stringValue' => 'paid'], 'paymentStatus' => ['stringValue' => 'paid'],
             'balanceDue' => ['doubleValue' => 0], 'balance_due' => ['doubleValue' => 0],
             'latestPaymentSessionId' => ['nullValue' => null], 'checkoutSessionId' => ['nullValue' => null], 'checkoutUrl' => ['nullValue' => null],
             'paidAt' => ['timestampValue' => $now], 'updatedAt' => ['timestampValue' => $now],
-        ]);
+        ];
+        if (trim((string) ($invoice['serviceName'] ?? '')) === '') $invoicePaymentFields['serviceName'] = ['stringValue' => $serviceName];
+        if ($branch !== '') {
+            $invoicePaymentFields['branch'] = ['stringValue' => $branch];
+            $invoicePaymentFields['branchLocation'] = ['stringValue' => $branch];
+        }
+        if ((!is_array($invoice['items'] ?? null) || !$invoice['items']) && $serviceName !== '' && is_finite($amount) && $amount > 0) {
+            $invoicePaymentFields['items'] = $walkInItemsField;
+        }
+        firestorePatchDocument($account, 'invoices', $invoiceId, $invoicePaymentFields);
         firestorePatchDocument($account, 'payments', 'paymongo_' . $sessionId, [
             'status' => ['stringValue' => 'paid'], 'paidAt' => ['timestampValue' => $now], 'updatedAt' => ['timestampValue' => $now],
         ]);
         $bookingId = (string) ($invoice['bookingId'] ?? '');
-        if ($bookingId !== '') firestorePatchDocument($account, 'bookings', $bookingId, ['paymentStatus' => ['stringValue' => 'paid'], 'latestPaymentSessionId' => ['nullValue' => null], 'checkoutSessionId' => ['nullValue' => null], 'checkoutUrl' => ['nullValue' => null], 'updatedAt' => ['timestampValue' => $now]]);
+        if ($bookingId !== '') firestorePatchDocument($account, 'bookings', $bookingId, ['paymentStatus' => ['stringValue' => 'paid'], 'paymentMethod' => ['stringValue' => 'PayMongo'], 'paymentBalance' => ['doubleValue' => 0], 'latestPaymentSessionId' => ['nullValue' => null], 'checkoutSessionId' => ['nullValue' => null], 'checkoutUrl' => ['nullValue' => null], 'updatedAt' => ['timestampValue' => $now]]);
+        if ($isWalkIn) {
+            $cashierAdminName = trim((string) ($invoice['cashierAdminName'] ?? 'Administrator'));
+            $cashierName = 'PayMongo (' . $cashierAdminName . ')';
+            $walkinFields = [
+                'invoiceId' => ['stringValue' => $invoiceId], 'bookingId' => ['stringValue' => $bookingId],
+                'source' => ['stringValue' => 'walk_in_pos'], 'status' => ['stringValue' => 'paid'],
+                'paymentStatus' => ['stringValue' => 'paid'], 'paymentMethod' => ['stringValue' => 'PayMongo'],
+                'method' => ['stringValue' => 'PayMongo'], 'referenceNumber' => ['stringValue' => $reference],
+                'customerName' => ['stringValue' => (string) ($booking['customerName'] ?? '')],
+                'customerEmail' => ['stringValue' => (string) ($booking['customerEmail'] ?? '')],
+                'branch' => ['stringValue' => $branch], 'branchLocation' => ['stringValue' => $branch],
+                'serviceName' => ['stringValue' => $serviceName],
+                'items' => $walkInItemsField,
+                'totalAmount' => ['doubleValue' => $amount], 'amount' => ['doubleValue' => $amount],
+                'cashierName' => ['stringValue' => $cashierName], 'cashierAdminName' => ['stringValue' => $cashierAdminName],
+                'paidAt' => ['timestampValue' => $now], 'createdAt' => ['timestampValue' => $now],
+            ];
+            firestorePatchDocument($account, 'pos_transactions', 'walkin_pos_' . $bookingId, $walkinFields);
+            try {
+                notifyWalkInPaymentNotice($account, [
+                    'bookingId' => $bookingId, 'invoiceId' => $invoiceId, 'customerName' => (string) ($booking['customerName'] ?? ''),
+                    'customerEmail' => (string) ($booking['customerEmail'] ?? ''), 'serviceName' => $serviceName,
+                    'serviceCost' => $amount, 'paymentAmount' => $amount, 'amount' => $amount, 'paymentMethod' => 'PayMongo',
+                    'cashierName' => $cashierName, 'branchName' => $branch, 'branch' => $branch,
+                    'scheduledDate' => (string) ($booking['date'] ?? ''), 'scheduledTime' => (string) ($booking['timeSlot'] ?? ''),
+                    'bookingStatus' => 'completed', 'paymentStatus' => 'paid', 'paymentBalance' => 0, 'referenceNumber' => $reference,
+                ], 'paid_' . $bookingId, $now);
+            } catch (Throwable $notificationError) {
+                error_log('Walk-in payment verified, but payment notice failed: ' . $notificationError->getMessage());
+            }
+        }
         notifyInvoicePaymentConfirmed($account, $invoice, $invoiceId, $now);
     } else {
         if ($status === 'expired') {

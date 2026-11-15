@@ -7,6 +7,7 @@ requirePost();
 
 function adminWorkflowRead(array $account, string $collection, string $id): ?array
 {
+    if (trim($id) === '') return null;
     $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id']) . '/databases/(default)/documents/' . rawurlencode($collection) . '/' . rawurlencode($id);
     $response = secureHttpRequest($url, 'GET', ['Authorization: Bearer ' . firebaseAdminAccessToken()], null, 15);
     if ($response['status'] === 404) return null;
@@ -146,12 +147,11 @@ function adminWorkflowEnsureBookingInvoice(array $account, array &$booking, stri
     $invoiceId = trim((string) ($booking['invoiceId'] ?? ''));
     if ($invoiceId === '') $invoiceId = strtolower((string) ($booking['bookingType'] ?? '')) === 'walk_in' ? 'walkin_inv_' . $bookingId : 'web_' . $bookingId;
     $invoice = adminWorkflowRead($account, 'invoices', $invoiceId);
-    if ($invoice) return [$invoiceId, $invoice];
 
     $serviceId = trim((string) ($booking['serviceId'] ?? $booking['service_id'] ?? ''));
     $service = $serviceId !== '' ? adminWorkflowRead($account, 'services', $serviceId) : null;
-    $serviceName = trim((string) ($booking['serviceName'] ?? $booking['service_name'] ?? $service['name'] ?? 'Service'));
-    $amount = (float) ($service['price'] ?? $booking['servicePrice'] ?? $booking['price'] ?? $booking['paymentBalance'] ?? 0);
+    $serviceName = trim((string) ($booking['serviceName'] ?? $booking['service_name'] ?? $invoice['serviceName'] ?? $service['name'] ?? 'Service'));
+    $amount = (float) ($invoice['amount'] ?? $invoice['runningTotal'] ?? $invoice['totalAmount'] ?? $invoice['finalAmount'] ?? $service['price'] ?? $booking['servicePrice'] ?? $booking['price'] ?? $booking['paymentBalance'] ?? 0);
     if (!is_finite($amount) || $amount <= 0) throw new RuntimeException('The service price is unavailable; the invoice cannot be created.');
     $isWalkIn = strtolower((string) ($booking['bookingType'] ?? '')) === 'walk_in';
     $reference = '';
@@ -160,8 +160,29 @@ function adminWorkflowEnsureBookingInvoice(array $account, array &$booking, stri
         if ($candidateReference !== '') { $reference = $candidateReference; break; }
     }
     if ($reference === '') $reference = $bookingId;
-    $branchId = normalizeBranchId((string) ($booking['branchId'] ?? $booking['branch'] ?? ''));
-    $branch = normalizeBranchLabel((string) ($booking['branch'] ?? $booking['branchName'] ?? $branchId), 'Branch');
+    $branchId = normalizeBranchId((string) ($booking['branchId'] ?? $booking['branch'] ?? $invoice['branchId'] ?? ''));
+    $branch = trim((string) ($booking['branch'] ?? $booking['branchLocation'] ?? $booking['branchName'] ?? $invoice['branch'] ?? $invoice['branchLocation'] ?? $invoice['branchName'] ?? ''));
+    if ($branch === '' && preg_match('/^(?:OTC|PMO)-([A-Z]{3})-/i', $reference, $branchMatch)) {
+        $branch = ['CBY' => 'Cabuyao', 'SRO' => 'Santa Rosa', 'SRA' => 'Santa Rosa'][strtoupper($branchMatch[1])] ?? '';
+    }
+    if ($branch === '') $branch = (string) ($branchId ?: 'Branch');
+    $branch = normalizeBranchLabel($branch, 'Branch');
+    $itemFields = ['name' => ['stringValue' => $serviceName], 'serviceName' => ['stringValue' => $serviceName],
+        'qty' => ['integerValue' => '1'], 'unitPrice' => ['doubleValue' => $amount], 'total' => ['doubleValue' => $amount]];
+    $itemsField = ['arrayValue' => ['values' => [['mapValue' => ['fields' => $itemFields]]]]];
+    if ($invoice) {
+        $backfill = [];
+        $backfill['branch'] = ['stringValue' => $branch];
+        $backfill['branchLocation'] = ['stringValue' => $branch];
+        if (trim((string) ($invoice['serviceName'] ?? '')) === '') $backfill['serviceName'] = ['stringValue' => $serviceName];
+        if (!is_array($invoice['items'] ?? null) || !$invoice['items']) $backfill['items'] = $itemsField;
+        if ($backfill) adminWorkflowCommit($account, [['collection' => 'invoices', 'id' => $invoiceId, 'fields' => $backfill]]);
+        $invoice['branch'] = $branch;
+        $invoice['branchLocation'] = $branch;
+        $invoice['serviceName'] = $invoice['serviceName'] ?? $serviceName;
+        $invoice['items'] = $invoice['items'] ?? [['name' => $serviceName, 'serviceName' => $serviceName, 'qty' => 1, 'unitPrice' => $amount, 'total' => $amount]];
+        return [$invoiceId, $invoice];
+    }
     $now = gmdate('Y-m-d\\TH:i:s\\Z');
     $fields = [
         'invoiceId' => ['stringValue' => $invoiceId], 'bookingId' => ['stringValue' => $bookingId],
@@ -171,7 +192,8 @@ function adminWorkflowEnsureBookingInvoice(array $account, array &$booking, stri
         'customerName' => ['stringValue' => (string) ($booking['customerName'] ?? '')],
         'customerEmail' => ['stringValue' => (string) ($booking['customerEmail'] ?? '')],
         'serviceId' => ['stringValue' => $serviceId], 'serviceName' => ['stringValue' => $serviceName],
-        'branchId' => ['stringValue' => $branchId], 'branch' => ['stringValue' => $branch],
+        'branchId' => ['stringValue' => $branchId], 'branch' => ['stringValue' => $branch], 'branchLocation' => ['stringValue' => $branch],
+        'items' => $itemsField,
         'referenceNumber' => ['stringValue' => $reference], 'invoiceReference' => ['stringValue' => $reference],
         'walkInReferenceId' => ['stringValue' => $reference], 'invoiceNumber' => ['stringValue' => $reference],
         'amount' => ['doubleValue' => $amount], 'runningTotal' => ['doubleValue' => $amount],
@@ -324,11 +346,19 @@ function adminWorkflowSettleWalkinPaymongo(array $account, array $booking, array
     $cashierAdminName = trim($cashierAdminName ?: (string) ($invoice['cashierAdminName'] ?? ''));
     if ($cashierAdminName === '') $cashierAdminName = trim((string) ($invoice['cashierAdminEmail'] ?? 'Administrator'));
     $cashierName = 'PayMongo (' . $cashierAdminName . ')';
+    $serviceName = trim((string) ($booking['serviceName'] ?? $invoice['serviceName'] ?? 'Service'));
+    $branch = trim((string) ($booking['branch'] ?? $booking['branchLocation'] ?? $booking['branchName'] ?? $invoice['branch'] ?? $invoice['branchLocation'] ?? $invoice['branchName'] ?? ''));
+    if ($branch === '' && preg_match('/^(?:OTC|PMO)-([A-Z]{3})-/i', $reference, $branchMatch)) $branch = ['CBY' => 'Cabuyao', 'SRO' => 'Santa Rosa', 'SRA' => 'Santa Rosa'][strtoupper($branchMatch[1])] ?? '';
+    if ($branch === '') $branch = 'Branch';
+    $branch = normalizeBranchLabel($branch, 'Branch');
+    $itemFields = ['name' => ['stringValue' => $serviceName], 'serviceName' => ['stringValue' => $serviceName], 'qty' => ['integerValue' => '1'], 'unitPrice' => ['doubleValue' => $amount], 'total' => ['doubleValue' => $amount]];
+    $itemsField = ['arrayValue' => ['values' => [['mapValue' => ['fields' => $itemFields]]]]];
     $posId = 'walkin_pos_' . $bookingId;
     $methodFields = [
         'status' => ['stringValue' => 'paid'], 'paymentStatus' => ['stringValue' => 'paid'],
         'paymentMethod' => ['stringValue' => 'PayMongo'], 'paymentBalance' => ['doubleValue' => 0],
         'cashierName' => ['stringValue' => $cashierName], 'cashierAdminName' => ['stringValue' => $cashierAdminName],
+        'branch' => ['stringValue' => $branch], 'branchLocation' => ['stringValue' => $branch], 'serviceName' => ['stringValue' => $serviceName], 'items' => $itemsField,
         'balanceDue' => ['doubleValue' => 0], 'balance_due' => ['doubleValue' => 0],
         'latestPaymentSessionId' => ['nullValue' => null], 'checkoutSessionId' => ['nullValue' => null],
         'checkoutUrl' => ['nullValue' => null], 'paidAt' => ['timestampValue' => $now], 'updatedAt' => ['timestampValue' => $now],
@@ -352,6 +382,7 @@ function adminWorkflowSettleWalkinPaymongo(array $account, array $booking, array
         'method' => ['stringValue' => 'PayMongo'], 'referenceNumber' => ['stringValue' => $reference],
         'customerName' => ['stringValue' => (string) ($booking['customerName'] ?? '')],
         'customerEmail' => ['stringValue' => (string) ($booking['customerEmail'] ?? '')],
+        'branch' => ['stringValue' => $branch], 'branchLocation' => ['stringValue' => $branch], 'serviceName' => ['stringValue' => $serviceName], 'items' => $itemsField,
         'totalAmount' => ['doubleValue' => $amount], 'amount' => ['integerValue' => (string) (int) round($amount * 100)],
         'currency' => ['stringValue' => 'PHP'], 'createdAt' => ['timestampValue' => $now],
     ];
@@ -361,12 +392,19 @@ function adminWorkflowSettleWalkinPaymongo(array $account, array $booking, array
         ['collection' => 'pos_transactions', 'id' => $posId, 'fields' => $posFields],
         ['collection' => 'bookings', 'id' => $bookingId, 'fields' => ['paymentStatus' => ['stringValue' => 'paid'], 'paymentMethod' => ['stringValue' => 'PayMongo'], 'paymentBalance' => ['doubleValue' => 0], 'updatedAt' => ['timestampValue' => $now]]],
     ]);
-    $invoice['customerEmail'] = (string) ($booking['customerEmail'] ?? $invoice['customerEmail'] ?? '');
-    $invoice['customerName'] = (string) ($booking['customerName'] ?? $invoice['customerName'] ?? '');
-    $invoice['referenceNumber'] = $reference;
-    $invoice['customerId'] = '';
-    $invoice['totalAmount'] = $amount;
-    notifyInvoicePaymentConfirmed($account, $invoice, $invoiceId, $now);
+    try {
+        notifyWalkInPaymentNotice($account, [
+            'bookingId' => $bookingId, 'invoiceId' => $invoiceId, 'customerName' => (string) ($booking['customerName'] ?? ''),
+            'customerEmail' => (string) ($booking['customerEmail'] ?? $invoice['customerEmail'] ?? ''),
+            'serviceName' => (string) ($booking['serviceName'] ?? $invoice['serviceName'] ?? 'Service'),
+            'serviceCost' => $amount, 'paymentAmount' => $amount, 'amount' => $amount, 'paymentMethod' => 'PayMongo',
+            'cashierName' => $cashierName, 'branchName' => $branch, 'branch' => $branch,
+            'scheduledDate' => (string) ($booking['date'] ?? ''), 'scheduledTime' => (string) ($booking['timeSlot'] ?? ''),
+            'bookingStatus' => 'completed', 'paymentStatus' => 'paid', 'paymentBalance' => 0, 'referenceNumber' => $reference,
+        ], 'paid_' . $bookingId, $now);
+    } catch (Throwable $notificationError) {
+        error_log('Walk-in PayMongo settlement saved, but payment notice failed: ' . $notificationError->getMessage());
+    }
 }
 
 function adminWorkflowActor(): array
@@ -396,6 +434,7 @@ try {
         $booking = $bookingId !== '' ? adminWorkflowRead($account, 'bookings', $bookingId) : null;
         if (!$booking || strtolower((string) ($booking['bookingType'] ?? '')) !== 'walk_in') jsonResponse(['ok' => false, 'message' => 'Walk-in booking was not found.'], 404);
         if (strtolower((string) ($booking['status'] ?? '')) !== 'completed') jsonResponse(['ok' => false, 'message' => 'Complete the walk-in service before verifying payment.'], 409);
+        [$invoiceId, $invoice] = adminWorkflowEnsureBookingInvoice($account, $booking, $bookingId);
         $cashierAdminName = trim((string) ($invoice['cashierAdminName'] ?? ''));
         if (strtolower((string) ($invoice['paymentStatus'] ?? $invoice['status'] ?? '')) === 'paid') {
             if ($cashierAdminName !== '' && strtolower((string) ($invoice['paymentMethod'] ?? '')) !== 'cash / otc') {
@@ -411,6 +450,9 @@ try {
                         'paymentMethod' => ['stringValue' => 'PayMongo'], 'method' => ['stringValue' => 'PayMongo'],
                         'referenceNumber' => ['stringValue' => $reference], 'customerName' => ['stringValue' => (string) ($booking['customerName'] ?? '')],
                         'customerEmail' => ['stringValue' => (string) ($booking['customerEmail'] ?? '')], 'totalAmount' => ['doubleValue' => $amount],
+                        'branch' => ['stringValue' => (string) ($invoice['branch'] ?? 'Branch')], 'branchLocation' => ['stringValue' => (string) ($invoice['branchLocation'] ?? $invoice['branch'] ?? 'Branch')],
+                        'serviceName' => ['stringValue' => (string) ($invoice['serviceName'] ?? $booking['serviceName'] ?? 'Service')],
+                        'items' => ['arrayValue' => ['values' => [['mapValue' => ['fields' => ['name' => ['stringValue' => (string) ($invoice['serviceName'] ?? $booking['serviceName'] ?? 'Service')], 'serviceName' => ['stringValue' => (string) ($invoice['serviceName'] ?? $booking['serviceName'] ?? 'Service')], 'qty' => ['integerValue' => '1'], 'unitPrice' => ['doubleValue' => $amount], 'total' => ['doubleValue' => $amount]]]]]]],
                         'cashierName' => ['stringValue' => $cashierName], 'cashierAdminName' => ['stringValue' => $cashierAdminName],
                     ]];
                 }
@@ -543,31 +585,40 @@ try {
             'method' => ['stringValue' => $method], 'paymentMethod' => ['stringValue' => $method], 'status' => ['stringValue' => 'paid'], 'referenceNumber' => ['stringValue' => $reference],
             'providerReference' => ['stringValue' => $paymentId], 'paidAt' => ['timestampValue' => $now], 'source' => ['stringValue' => 'walk_in_pos'],
             'cashierId' => ['stringValue' => $actor['uid']], 'cashierName' => ['stringValue' => $cashierName]];
+        $branch = trim((string) ($booking['branch'] ?? $booking['branchLocation'] ?? $booking['branchName'] ?? $invoice['branch'] ?? ''));
+        if ($branch === '' && preg_match('/^(?:OTC|PMO)-([A-Z]{3})-/i', $reference, $branchMatch)) $branch = ['CBY' => 'Cabuyao', 'SRO' => 'Santa Rosa', 'SRA' => 'Santa Rosa'][strtoupper($branchMatch[1])] ?? '';
+        if ($branch === '') $branch = 'Branch';
+        $branch = normalizeBranchLabel($branch, 'Branch');
+        $serviceName = trim((string) ($booking['serviceName'] ?? $invoice['serviceName'] ?? 'Service'));
+        $itemsField = ['arrayValue' => ['values' => [['mapValue' => ['fields' => ['name' => ['stringValue' => $serviceName], 'serviceName' => ['stringValue' => $serviceName], 'qty' => ['integerValue' => '1'], 'unitPrice' => ['doubleValue' => $amount], 'total' => ['doubleValue' => $amount]]]]]]];
         $posFields = ['invoiceId' => ['stringValue' => $invoiceId], 'bookingId' => ['stringValue' => $bookingId], 'paymentId' => ['stringValue' => $paymentId],
             'source' => ['stringValue' => 'walk_in_pos'], 'status' => ['stringValue' => 'paid'], 'paymentMethod' => ['stringValue' => $method],
             'method' => ['stringValue' => $method], 'referenceNumber' => ['stringValue' => $reference], 'customerName' => ['stringValue' => (string) ($booking['customerName'] ?? '')],
             'customerEmail' => ['stringValue' => (string) ($booking['customerEmail'] ?? '')], 'totalAmount' => ['doubleValue' => $amount], 'amount' => ['integerValue' => (string) (int) round($amount * 100)],
+            'branch' => ['stringValue' => $branch], 'branchLocation' => ['stringValue' => $branch], 'serviceName' => ['stringValue' => $serviceName], 'items' => $itemsField,
             'currency' => ['stringValue' => 'PHP'], 'cashierId' => ['stringValue' => $actor['uid']], 'cashierName' => ['stringValue' => $cashierName], 'createdAt' => ['timestampValue' => $now]];
         adminWorkflowCommit($account, [
             ['collection' => 'payments', 'id' => $paymentId, 'fields' => $paymentFields],
             ['collection' => 'pos_transactions', 'id' => $posId, 'fields' => $posFields],
-            ['collection' => 'invoices', 'id' => $invoiceId, 'fields' => ['status' => ['stringValue' => 'paid'], 'paymentStatus' => ['stringValue' => 'paid'], 'paymentMethod' => ['stringValue' => $method], 'paymentId' => ['stringValue' => $paymentId], 'cashierId' => ['stringValue' => $actor['uid']], 'cashierName' => ['stringValue' => $cashierName], 'downpaymentAmount' => ['doubleValue' => $amount], 'balanceDue' => ['doubleValue' => 0], 'balance_due' => ['doubleValue' => 0], 'paymentBalance' => ['doubleValue' => 0], 'paidAt' => ['timestampValue' => $now], 'updatedAt' => ['timestampValue' => $now]]],
+            ['collection' => 'invoices', 'id' => $invoiceId, 'fields' => ['status' => ['stringValue' => 'paid'], 'paymentStatus' => ['stringValue' => 'paid'], 'paymentMethod' => ['stringValue' => $method], 'paymentId' => ['stringValue' => $paymentId], 'cashierId' => ['stringValue' => $actor['uid']], 'cashierName' => ['stringValue' => $cashierName], 'branch' => ['stringValue' => $branch], 'branchLocation' => ['stringValue' => $branch], 'serviceName' => ['stringValue' => $serviceName], 'items' => $itemsField, 'downpaymentAmount' => ['doubleValue' => $amount], 'balanceDue' => ['doubleValue' => 0], 'balance_due' => ['doubleValue' => 0], 'paymentBalance' => ['doubleValue' => 0], 'paidAt' => ['timestampValue' => $now], 'updatedAt' => ['timestampValue' => $now]]],
             ['collection' => 'bookings', 'id' => $bookingId, 'fields' => ['paymentStatus' => ['stringValue' => 'paid'], 'paymentBalance' => ['doubleValue' => 0], 'paymentMethod' => ['stringValue' => $method], 'updatedAt' => ['timestampValue' => $now]]],
             adminWorkflowAuditWrite($actor, $actorProfile, 'Walk-In Payment Settled', $reference, 'Walk-in payment settled by ' . $method . '; PHP ' . number_format($amount, 2) . '.', $now),
         ]);
-        $invoice['customerEmail'] = (string) ($booking['customerEmail'] ?? $invoice['customerEmail'] ?? '');
-        $invoice['customerName'] = (string) ($booking['customerName'] ?? $invoice['customerName'] ?? '');
-        $invoice['referenceNumber'] = $reference;
-        $invoice['customerId'] = '';
-        $invoice['totalAmount'] = $amount;
-        notifyInvoicePaymentConfirmed($account, $invoice, $invoiceId, $now);
-        $receiptEmail = filter_var((string) ($booking['customerEmail'] ?? $invoice['customerEmail'] ?? ''), FILTER_VALIDATE_EMAIL);
-        if ($receiptEmail) {
-            $receiptText = 'Payment received for CoolTime walk-in service. Reference: ' . $reference . '. Amount paid: PHP ' . number_format($amount, 2) . '. Method: Cash / OTC.';
-            trySendConfiguredEmail($receiptEmail, 'CoolTime walk-in payment receipt — ' . $reference,
-                nl2br(htmlspecialchars($receiptText, ENT_QUOTES, 'UTF-8')), $receiptText);
+        $receiptEmailSent = false;
+        try {
+            $receiptEmailSent = notifyWalkInPaymentNotice($account, [
+                'bookingId' => $bookingId, 'invoiceId' => $invoiceId, 'customerName' => (string) ($booking['customerName'] ?? ''),
+                'customerEmail' => (string) ($booking['customerEmail'] ?? $invoice['customerEmail'] ?? ''),
+                'serviceName' => $serviceName, 'serviceCost' => $amount, 'paymentAmount' => $amount, 'amount' => $amount,
+                'paymentMethod' => $method, 'cashierName' => $cashierName, 'branchName' => $branch, 'branch' => $branch,
+                'scheduledDate' => (string) ($booking['date'] ?? ''), 'scheduledTime' => (string) ($booking['timeSlot'] ?? ''),
+                'bookingStatus' => 'completed', 'paymentStatus' => 'paid', 'paymentBalance' => 0, 'referenceNumber' => $reference,
+            ], 'paid_' . $bookingId, $now);
+        } catch (Throwable $notificationError) {
+            error_log('Walk-in cash settlement saved, but payment notice failed: ' . $notificationError->getMessage());
         }
-        jsonResponse(['ok' => true, 'paymentId' => $paymentId, 'message' => 'Walk-in payment recorded and receipt email sent.']);
+        jsonResponse(['ok' => true, 'paymentId' => $paymentId, 'emailSent' => $receiptEmailSent,
+            'message' => $receiptEmailSent ? 'Walk-in payment recorded and receipt email sent.' : 'Walk-in payment recorded. Receipt email was unavailable or skipped.']);
     }
     if ($action === 'save_service') {
         $serviceId = trim((string) ($input['serviceId'] ?? ''));
@@ -846,7 +897,7 @@ try {
         if (!preg_match('/^[A-Za-z0-9_-]{1,150}$/', $bookingId) || $reason === '') jsonResponse(['ok' => false, 'message' => 'Booking and cancellation reason are required.'], 422);
         $booking = adminWorkflowRead($account, 'bookings', $bookingId);
         if (!$booking) jsonResponse(['ok' => false, 'message' => 'Booking was not found.'], 404);
-        if (strtolower((string) ($booking['status'] ?? '')) === 'confirmed') jsonResponse(['ok' => false, 'message' => 'Confirmed bookings cannot be cancelled.'], 409);
+        if (strtolower((string) ($booking['status'] ?? '')) === 'confirmed' && strtolower((string) ($booking['bookingType'] ?? '')) !== 'walk_in') jsonResponse(['ok' => false, 'message' => 'Confirmed bookings cannot be cancelled.'], 409);
         if (strtolower((string) ($booking['status'] ?? '')) === 'paid') jsonResponse(['ok' => false, 'message' => 'This booking is marked paid. Verify its invoice before cancelling it.'], 409);
         if (strtolower((string) ($booking['status'] ?? '')) === 'cancelled') jsonResponse(['ok' => true, 'alreadyCancelled' => true, 'message' => 'Booking was already cancelled.']);
         $customer = adminWorkflowRead($account, 'users', (string) ($booking['customerId'] ?? ''));
@@ -894,14 +945,35 @@ try {
         }
         $writes[] = adminWorkflowAuditWrite($actor, $actorProfile, 'Booking Cancelled', (string) ($booking['referenceNumber'] ?? $bookingId), $reason, $now);
         adminWorkflowCommit($account, $writes);
-        invalidateSlotAvailabilityCache((string) ($booking['branchId'] ?? $booking['branch'] ?? ''), (string) ($booking['date'] ?? $booking['appointmentDate'] ?? ''));
+        try {
+            invalidateSlotAvailabilityCache((string) ($booking['branchId'] ?? $booking['branch'] ?? ''), (string) ($booking['date'] ?? $booking['appointmentDate'] ?? ''));
+        } catch (Throwable $cacheError) {
+            error_log('Booking cancelled, but slot cache invalidation failed: ' . $cacheError->getMessage());
+        }
         $booking['id'] = $bookingId;
         $details = notificationBookingDetails($account, $booking);
         $details['paymentBalance'] = 0;
         $details['bookingStatus'] = 'cancelled';
         $details['paymentStatus'] = $invoice ? 'cancelled' : 'unbilled';
         $details['message'] = 'Appointment cancellation: Your service appointment has been successfully cancelled!';
-        $emailSent = notifyBookingCancelled($account, $booking, $customer ?? [], $details);
+        $emailSent = false;
+        try {
+            if ($isWalkIn) {
+                $details['emailTemplateId'] = 'appointment_cancellation';
+                $details['bookingId'] = $bookingId;
+                $details['referenceNumber'] = (string) ($booking['referenceNumber'] ?? $booking['invoiceReference'] ?? '');
+                $details['customerName'] = (string) ($booking['customerName'] ?? 'Walk-in customer');
+                $details['customerEmail'] = (string) ($booking['customerEmail'] ?? '');
+                notifyWalkInAdminEvent($account, 'cancelled_' . $bookingId, 'booking_cancelled',
+                    $details['customerName'] . "'s walk-in booking was cancelled.", $details, $now);
+                $emailSent = notificationEmail($details['customerEmail'], 'CoolTime cancellation request update', $details);
+            } else {
+                $emailSent = notifyBookingCancelled($account, $booking, $customer ?? [], $details);
+            }
+        } catch (Throwable $notificationError) {
+            error_log(sprintf('Booking cancelled, but customer notification failed at %s:%d: %s',
+                $notificationError->getFile(), $notificationError->getLine(), $notificationError->getMessage()));
+        }
         jsonResponse(['ok' => true, 'message' => $emailSent ? 'Booking cancelled, checkout closed, and confirmation email sent.' : 'Booking cancelled and its slot released. Checkout closed if active; email delivery was skipped or unavailable.', 'emailSent' => $emailSent]);
     }
     if ($action === 'approve_booking') {
@@ -1044,8 +1116,12 @@ try {
             adminWorkflowAuditWrite($actor, $actorProfile, 'Booking Slot Updated', $reference ?: $bookingId,
                 "Appointment changed from {$oldBranchLabel} {$oldDate} {$oldTime} to {$branchName} {$date} {$timeSlot}.", $now),
         ]);
-        invalidateSlotAvailabilityCache($oldBranchId, $oldDate);
-        invalidateSlotAvailabilityCache($branchId, $date);
+        try {
+            invalidateSlotAvailabilityCache($oldBranchId, $oldDate);
+            invalidateSlotAvailabilityCache($branchId, $date);
+        } catch (Throwable $cacheError) {
+            error_log('Booking rescheduled, but slot cache invalidation failed: ' . $cacheError->getMessage());
+        }
         $booking['id'] = $bookingId;
         $booking['branchId'] = $branchId;
         $booking['branch'] = $branchName;
@@ -1054,10 +1130,34 @@ try {
         $booking['timeSlot'] = $timeSlot;
         $booking['referenceNumber'] = $reference;
         $booking['referenceId'] = $reference;
-        $details = notificationBookingDetails($account, $booking);
-        $customer = adminWorkflowRead($account, 'users', (string) ($booking['customerId'] ?? '')) ?? [];
-        $emailSent = notifyRescheduleSuccess($account, (string) ($booking['customerId'] ?? ''), (string) ($customer['email'] ?? ''), $details);
-        jsonResponse(['ok' => true, 'message' => $emailSent ? 'Booking slot updated and customer notified by email.' : 'Booking slot updated. In-app notification was saved; email delivery was skipped or unavailable.', 'emailSent' => $emailSent]);
+        $emailSent = false;
+        try {
+            $details = notificationBookingDetails($account, $booking);
+            $customerId = trim((string) ($booking['customerId'] ?? ''));
+            $customer = $customerId !== '' ? (adminWorkflowRead($account, 'users', $customerId) ?? []) : [];
+            $customerEmail = (string) ($customer['email'] ?? $booking['customerEmail'] ?? '');
+            if (strtolower((string) ($booking['bookingType'] ?? '')) === 'walk_in') {
+                $details['bookingId'] = $bookingId;
+                $details['referenceNumber'] = $reference;
+                $details['customerName'] = (string) ($booking['customerName'] ?? 'Walk-in customer');
+                $details['customerEmail'] = $customerEmail;
+                $details['emailTemplateId'] = 'booking_reschedule';
+                $details['message'] = 'Reschedule successful: your service appointment is successfully rescheduled!';
+                notifyWalkInAdminEvent($account, 'rescheduled_' . $bookingId . '_' . substr(hash('sha256', $now), 0, 12),
+                    'booking_rescheduled', $details['customerName'] . "'s walk-in appointment was rescheduled to {$date}, {$timeSlot}.", $details, $now);
+                $emailSent = notificationEmail($customerEmail, 'CoolTime appointment rescheduled', $details);
+            } elseif ($customerId !== '') {
+                $emailSent = notifyRescheduleSuccess($account, $customerId, $customerEmail, $details);
+            } elseif (filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
+                $details['emailTemplateId'] = 'booking_reschedule';
+                $details['message'] = 'Reschedule successful: your service appointment is successfully rescheduled!';
+                $emailSent = notificationEmail($customerEmail, 'CoolTime appointment rescheduled', $details);
+            }
+        } catch (Throwable $notificationError) {
+            error_log(sprintf('Booking rescheduled, but customer notification failed at %s:%d: %s',
+                $notificationError->getFile(), $notificationError->getLine(), $notificationError->getMessage()));
+        }
+        jsonResponse(['ok' => true, 'message' => $emailSent ? 'Booking slot updated and customer notified by email.' : 'Booking slot updated. Customer notification was skipped or unavailable.', 'emailSent' => $emailSent]);
     }
     if ($action === 'reject_reschedule_request') {
         $notificationId = trim((string) ($input['notificationId'] ?? ''));

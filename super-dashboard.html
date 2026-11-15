@@ -63,7 +63,7 @@
           <article class="metric-card superadmin-metric-card"><span>Total Accounts</span><strong class="superadmin-metric-value" data-metric="accounts">Loading...</strong><small>Registered users</small></article>
           <article class="metric-card superadmin-metric-card"><span>Vehicles</span><strong class="superadmin-metric-value" data-metric="vehicles">Loading...</strong><small>Customer vehicles</small></article>
           <article class="metric-card superadmin-metric-card"><span>Today's Sales</span><strong class="superadmin-metric-value" data-metric="todaySales">PHP 0.00</strong><small>Payments received today</small></article>
-          <article class="metric-card superadmin-metric-card"><span>Branches</span><strong class="superadmin-metric-value">2</strong><small>Cabuyao and Santa Rosa</small></article>
+          <article class="metric-card superadmin-metric-card"><span>Branches</span><strong class="superadmin-metric-value" data-metric="branches">Loading...</strong><small>Active branches</small></article>
         </div>
         <!-- MASTER DASHBOARD MONITORING OVERVIEW -->
         <section class="master-overview-container" aria-labelledby="masterOverviewTitle">
@@ -171,10 +171,10 @@
                 <h5 id="templateSettingsTitle" class="text-white mb-3">Notification &amp; Email Templates</h5>
                 <form id="form-template-settings" class="settings-form">
                   <div class="settings-template-heading">
-                    <div><label class="form-label" for="template-type-select">Select Template</label><select id="template-type-select" class="form-select"><option value="booking_confirmation">Booking Confirmation (Online / Walk-In)</option><option value="appointment_cancellation">Appointment Cancellation</option><option value="booking_submission">Booking Submission</option><option value="booking_reschedule">Booking Reschedule</option></select></div>
+                    <div><label class="form-label" for="template-type-select">Select Template</label><select id="template-type-select" class="form-select"><option value="booking_confirmation">Booking Confirmation (Online / Walk-In)</option><option value="appointment_cancellation">Appointment Cancellation</option><option value="booking_submission">Booking Submission</option><option value="booking_reschedule">Booking Reschedule</option><option value="payment_notice">Payment Notice</option></select></div>
                     <div><label class="form-label" for="setting-template-subject">Email Subject Line</label><input type="text" id="setting-template-subject" class="form-control" value="CoolTime booking confirmed" required></div>
                   </div>
-                  <div><label class="form-label" for="setting-template-body">Message Template Body</label><textarea id="setting-template-body" class="form-control" rows="4" required>Booking confirmation: Booking confirmed: your service appointment has been approved.</textarea><small class="settings-security-note">Available tags: {{customer_name}}, {{service_name}}, {{scheduled_date}}, {{scheduled_time}}, {{branch_location}}, {{total_price}}</small></div>
+                  <div><label class="form-label" for="setting-template-body">Message Template Body</label><textarea id="setting-template-body" class="form-control" rows="4" required>Booking confirmation: Booking confirmed: your service appointment has been approved.</textarea><small class="settings-security-note">Available tags: {{customer_name}}, {{service_name}}, {{scheduled_date}}, {{scheduled_time}}, {{branch_location}}, {{total_price}}, {{payment_amount}}, {{payment_method}}, {{cashier_name}}, {{reference_number}}</small></div>
                   <div><button type="submit" class="settings-save-button">Save Template</button><output aria-live="polite"></output></div>
                 </form>
               </section>

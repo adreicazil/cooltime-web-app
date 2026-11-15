@@ -112,6 +112,9 @@ try {
     $now=gmdate('Y-m-d\\TH:i:s\\Z');
     // config.php supports OTC and PMO reference sources; OTC is the walk-in counter prefix.
     $reference=cooltimeReferenceNumber('OTC',$branchLabel,$date);
+    $itemFields = ['name'=>['stringValue'=>$serviceName], 'serviceName'=>['stringValue'=>$serviceName],
+        'qty'=>['integerValue'=>'1'], 'unitPrice'=>['doubleValue'=>$price], 'total'=>['doubleValue'=>$price]];
+    $itemsField = ['arrayValue'=>['values'=>[['mapValue'=>['fields'=>$itemFields]]]]];
     $bookingFields=[
       'bookingId'=>['stringValue'=>$bookingId],'customerId'=>['stringValue'=>''],'customerName'=>['stringValue'=>$name],'customerEmail'=>['stringValue'=>$email],
       'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'branchId'=>['stringValue'=>$branchId],'branch'=>['stringValue'=>$branchLabel],
@@ -135,8 +138,8 @@ try {
     firestorePatchDocument($account,'bookings',$bookingId,$bookingFields);
     firestorePatchDocument($account,'invoices',$invoiceId,[
       'invoiceId'=>['stringValue'=>$invoiceId],'bookingId'=>['stringValue'=>$bookingId],'customerId'=>['stringValue'=>''],
-      'customerName'=>['stringValue'=>$name],'customerEmail'=>['stringValue'=>$email],'branchId'=>['stringValue'=>$branchId],'branch'=>['stringValue'=>$branchLabel],
-      'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'source'=>['stringValue'=>'walk_in_pos'],'is_guest'=>['booleanValue'=>true],
+      'customerName'=>['stringValue'=>$name],'customerEmail'=>['stringValue'=>$email],'branchId'=>['stringValue'=>$branchId],'branch'=>['stringValue'=>$branchLabel],'branchLocation'=>['stringValue'=>$branchLabel],
+      'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'items'=>$itemsField,'source'=>['stringValue'=>'walk_in_pos'],'is_guest'=>['booleanValue'=>true],
       'paymentMethod'=>['stringValue'=>$methodName],'paymentStatus'=>['stringValue'=>$paymentStatus],
       'payment_method'=>['stringValue'=>$methodName],'payment_status'=>['stringValue'=>$paymentStatus],
       'bookingType'=>['stringValue'=>'walk_in'],'referenceNumber'=>['stringValue'=>$reference],
@@ -163,9 +166,12 @@ try {
             'serviceName' => $serviceName, 'serviceCost' => $price, 'branchName' => $branchLabel,
             'scheduledDate' => $date, 'scheduledTime' => $time, 'bookingStatus' => 'confirmed',
             'paymentStatus' => 'unpaid', 'paymentBalance' => $price,
+            'bookingId' => $bookingId, 'referenceNumber' => $reference, 'invoiceId' => $invoiceId,
             'templateSuffix' => 'Reference: ' . $reference . '. Please proceed to the service bay. Payment of PHP '
                 . number_format($price, 2) . ' is due after your service is completed.',
         ];
+        notifyWalkInAdminEvent($account, 'confirmed_' . $bookingId, 'booking_confirmed',
+            $name . "'s walk-in booking is confirmed for {$date}, {$time}.", $details, $now);
         notificationEmail($email, 'CoolTime booking confirmed', $details);
     } catch (Throwable $emailError) {
         error_log(sprintf('Walk-in booking saved, but confirmation email failed at %s:%d: %s',

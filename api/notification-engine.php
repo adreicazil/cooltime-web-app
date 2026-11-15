@@ -18,7 +18,7 @@ function notificationCreate(array $account, string $id, array $data): ?bool
         if ($value === null) continue;
         if ($key === 'createdAt') $fields[$key] = ['timestampValue' => (string) $value];
         elseif (is_bool($value)) $fields[$key] = ['booleanValue' => $value];
-        elseif (is_numeric($value) && in_array($key, ['serviceCost', 'amount', 'paymentBalance'], true)) $fields[$key] = ['doubleValue' => (float) $value];
+        elseif (is_numeric($value) && in_array($key, ['serviceCost', 'amount', 'paymentBalance', 'paymentAmount'], true)) $fields[$key] = ['doubleValue' => (float) $value];
         else $fields[$key] = ['stringValue' => substr((string) $value, 0, 2000)];
     }
     $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id'])
@@ -184,6 +184,7 @@ function notificationBookingTemplateDefaults(): array
         'appointment_cancellation' => ['CoolTime cancellation request update', 'Appointment cancellation: Your service appointment has been successfully cancelled!'],
         'booking_submission' => ['CoolTime booking submitted', 'Booking submitted: your service appointment request has been received.'],
         'booking_reschedule' => ['CoolTime appointment rescheduled', 'Reschedule successful: your service appointment is successfully rescheduled!'],
+        'payment_notice' => ['CoolTime payment received', 'Payment notice: payment for your service appointment has been confirmed.'],
     ];
 }
 
@@ -223,6 +224,10 @@ function notificationBookingTemplate(array $account, string $templateId, array $
         'scheduled_time' => (string) ($details['scheduledTime'] ?? ''),
         'branch_location' => (string) ($details['branchName'] ?? $details['branchLocation'] ?? ''),
         'total_price' => number_format((float) ($details['serviceCost'] ?? $details['totalAmount'] ?? 0), 2),
+        'payment_amount' => number_format((float) ($details['paymentAmount'] ?? $details['amount'] ?? 0), 2),
+        'payment_method' => (string) ($details['paymentMethod'] ?? ''),
+        'cashier_name' => (string) ($details['cashierName'] ?? ''),
+        'reference_number' => (string) ($details['referenceNumber'] ?? ''),
     ];
     $replace = static function (string $value) use ($tokens): string {
         foreach ($tokens as $key => $replacement) {
@@ -294,6 +299,8 @@ function notificationHtml(array $details): string
     $labels = [
         'customerName' => 'Customer', 'serviceName' => 'Service', 'serviceCost' => 'Service cost (PHP)',
         'branchName' => 'Branch', 'scheduledDate' => 'Scheduled date', 'scheduledTime' => 'Scheduled time',
+        'referenceNumber' => 'Reference ID', 'paymentAmount' => 'Payment received (PHP)',
+        'paymentMethod' => 'Payment method', 'cashierName' => 'Cashier',
         'vehicleYear' => 'Vehicle year', 'vehicleMake' => 'Vehicle make', 'vehicleModel' => 'Vehicle model',
         'vehiclePlateNumber' => 'Plate number', 'bookingStatus' => 'Booking status', 'paymentStatus' => 'Payment status',
         'paymentBalance' => 'Balance (PHP)',
@@ -301,7 +308,7 @@ function notificationHtml(array $details): string
     $rows = '';
     foreach ($labels as $key => $label) {
         if (!array_key_exists($key, $details) || $details[$key] === '') continue;
-        $value = in_array($key, ['serviceCost', 'paymentBalance'], true) ? number_format((float) $details[$key], 2) : (string) $details[$key];
+        $value = in_array($key, ['serviceCost', 'paymentBalance', 'paymentAmount'], true) ? number_format((float) $details[$key], 2) : (string) $details[$key];
         $rows .= '<tr><th align="left">' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8') . '</th><td>' . htmlspecialchars($value, ENT_QUOTES, 'UTF-8') . '</td></tr>';
     }
     return '<p>' . htmlspecialchars((string) ($details['message'] ?? ''), ENT_QUOTES, 'UTF-8') . '</p><table>' . $rows . '</table>';
@@ -330,6 +337,40 @@ function notifyAdminRecipients(array $account, string $eventId, string $type, st
         'createdAt' => gmdate('Y-m-d\TH:i:s\Z'),
     ]);
     if (notificationCreate($account, 'admin_' . $eventId, $record) !== false) notificationEmail(cooltimeSystemEmail(), $subject, $record);
+}
+
+function notifyWalkInAdminEvent(array $account, string $eventId, string $type, string $message, array $details, string $createdAt): void
+{
+    if (!isset($details['date']) && isset($details['scheduledDate'])) $details['date'] = $details['scheduledDate'];
+    if (!isset($details['time']) && isset($details['scheduledTime'])) $details['time'] = $details['scheduledTime'];
+    $record = array_merge($details, [
+        'type' => $type, 'category' => strtoupper(str_replace('_', ' ', $type)), 'title' => $message,
+        'message' => $message, 'recipientRole' => 'admin', 'seen' => false, 'createdAt' => $createdAt,
+    ]);
+    try {
+        notificationCreate($account, 'admin_walkin_' . preg_replace('/[^A-Za-z0-9_-]/', '_', $eventId), $record);
+    } catch (Throwable $error) {
+        error_log('Walk-in admin notification failed: ' . $error->getMessage());
+    }
+}
+
+function notifyWalkInPaymentNotice(array $account, array $details, string $eventId, string $createdAt): bool
+{
+    $reference = (string) ($details['referenceNumber'] ?? '');
+    $customer = (string) ($details['customerName'] ?? 'Walk-in customer');
+    $message = $customer . ' paid PHP ' . number_format((float) ($details['paymentAmount'] ?? 0), 2)
+        . ' via ' . (string) ($details['paymentMethod'] ?? 'payment') . ' (Ref: ' . $reference . ').';
+    notifyWalkInAdminEvent($account, $eventId, 'payment_success', $message, $details, $createdAt);
+    $email = trim((string) ($details['customerEmail'] ?? ''));
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) return false;
+    try {
+        $details['emailTemplateId'] = 'payment_notice';
+        $details['message'] = 'Payment notice: payment for your service appointment has been confirmed.';
+        return notificationEmail($email, 'CoolTime payment received', $details);
+    } catch (Throwable $error) {
+        error_log(sprintf('Walk-in payment email failed at %s:%d: %s', $error->getFile(), $error->getLine(), $error->getMessage()));
+        return false;
+    }
 }
 
 function notifyCustomerRecipient(array $account, string $eventId, string $customerId, string $email, string $type, string $message, array $details, string $subject): bool

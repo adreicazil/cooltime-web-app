@@ -1069,6 +1069,11 @@ td {
   text-align: right !important;
 }
 
+.admin-dashboard-body .admin-dashboard-view[data-dashboard-view="home"] .admin-metric-value[data-metric="todaySales"] {
+  white-space: nowrap;
+  font-size: clamp(0.9rem, 2.1vw, 1.5rem);
+}
+
 .admin-dashboard-body .admin-dashboard-view[data-dashboard-view="home"] .metric-card span {
   margin-bottom: 8px;
   color: rgba(255, 255, 255, 0.8);
@@ -1137,6 +1142,11 @@ td {
   font-size: 2rem;
   font-weight: 800;
   text-align: right !important;
+}
+
+.super-dashboard-body .super-dashboard-view[data-dashboard-view="home"] .superadmin-metric-value[data-metric="todaySales"] {
+  white-space: nowrap;
+  font-size: clamp(0.9rem, 2.1vw, 1.5rem);
 }
 
 .super-dashboard-body .super-dashboard-view[data-dashboard-view="home"] .superadmin-metric-card small {
