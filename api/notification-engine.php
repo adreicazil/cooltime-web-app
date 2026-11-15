@@ -177,6 +177,66 @@ function notificationReadDocument(array $account, string $collection, string $id
     return $fields;
 }
 
+function notificationBookingTemplateDefaults(): array
+{
+    return [
+        'booking_confirmation' => ['CoolTime booking confirmed', 'Booking confirmation: Booking confirmed: your service appointment has been approved.'],
+        'appointment_cancellation' => ['CoolTime cancellation request update', 'Appointment cancellation: Your service appointment has been successfully cancelled!'],
+        'booking_submission' => ['CoolTime booking submitted', 'Booking submitted: your service appointment request has been received.'],
+        'booking_reschedule' => ['CoolTime appointment rescheduled', 'Reschedule successful: your service appointment is successfully rescheduled!'],
+    ];
+}
+
+function notificationBookingTemplateId(string $eventType): string
+{
+    return match ($eventType) {
+        'booking_confirmed' => 'booking_confirmation',
+        'booking_cancelled' => 'appointment_cancellation',
+        'booking_submitted' => 'booking_submission',
+        'reschedule_success' => 'booking_reschedule',
+        default => '',
+    };
+}
+
+function notificationBookingTemplate(array $account, string $templateId, array $details): array
+{
+    static $cache = [];
+    $defaults = notificationBookingTemplateDefaults();
+    if (!isset($defaults[$templateId])) return ['', (string) ($details['message'] ?? '')];
+    if (!array_key_exists($templateId, $cache)) {
+        [$defaultSubject, $defaultBody] = $defaults[$templateId];
+        $cache[$templateId] = [$defaultSubject, $defaultBody];
+        try {
+            if (!isset($account['project_id'])) throw new RuntimeException('Firestore project is unavailable.');
+            $subjectSetting = notificationReadDocument($account, 'system_settings', 'notifications_template_' . $templateId . '_subject');
+            $bodySetting = notificationReadDocument($account, 'system_settings', 'notifications_template_' . $templateId . '_body');
+            if (trim((string) ($subjectSetting['value'] ?? '')) !== '') $cache[$templateId][0] = trim((string) $subjectSetting['value']);
+            if (trim((string) ($bodySetting['value'] ?? '')) !== '') $cache[$templateId][1] = trim((string) $bodySetting['value']);
+        } catch (Throwable $error) {
+            error_log('Booking email template lookup failed; using defaults: ' . $error->getMessage());
+        }
+    }
+    $tokens = [
+        'customer_name' => (string) ($details['customerName'] ?? 'Customer'),
+        'service_name' => (string) ($details['serviceName'] ?? 'Service'),
+        'scheduled_date' => (string) ($details['scheduledDate'] ?? ''),
+        'scheduled_time' => (string) ($details['scheduledTime'] ?? ''),
+        'branch_location' => (string) ($details['branchName'] ?? $details['branchLocation'] ?? ''),
+        'total_price' => number_format((float) ($details['serviceCost'] ?? $details['totalAmount'] ?? 0), 2),
+    ];
+    $replace = static function (string $value) use ($tokens): string {
+        foreach ($tokens as $key => $replacement) {
+            $camelKey = lcfirst(str_replace(' ', '', ucwords(str_replace('_', ' ', $key))));
+            $value = str_replace(['{{' . $key . '}}', '{{' . $camelKey . '}}'], $replacement, $value);
+        }
+        return $value;
+    };
+    $body = $replace($cache[$templateId][1]);
+    $suffix = trim((string) ($details['templateSuffix'] ?? ''));
+    if ($suffix !== '') $body .= ' ' . $suffix;
+    return [$replace($cache[$templateId][0]), $body];
+}
+
 function notificationBookingDetails(array $account, array $booking, ?array $invoiceOverride = null): array
 {
     $service = notificationReadDocument($account, 'services', (string) ($booking['serviceId'] ?? '')) ?? [];
@@ -251,7 +311,16 @@ function notificationEmail(string $to, string $subject, array $details): bool
 {
     if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
     $message = (string) ($details['message'] ?? 'CoolTime account notification');
-    return trySendConfiguredEmail($to, $subject, notificationHtml($details), $message);
+    $templateId = (string) ($details['emailTemplateId'] ?? '');
+    if ($templateId !== '') {
+        try { $templateAccount = firebaseServiceAccount(); }
+        catch (Throwable $error) { error_log('Booking email template account lookup failed; using defaults: ' . $error->getMessage()); $templateAccount = []; }
+        [$templateSubject, $message] = notificationBookingTemplate($templateAccount, $templateId, $details);
+        if ($templateSubject !== '') $subject = $templateSubject;
+    }
+    $emailDetails = $details;
+    $emailDetails['message'] = $message;
+    return trySendConfiguredEmail($to, $subject, notificationHtml($emailDetails), $message);
 }
 
 function notifyAdminRecipients(array $account, string $eventId, string $type, string $message, array $details, string $subject): void
@@ -265,6 +334,8 @@ function notifyAdminRecipients(array $account, string $eventId, string $type, st
 
 function notifyCustomerRecipient(array $account, string $eventId, string $customerId, string $email, string $type, string $message, array $details, string $subject): bool
 {
+    $emailTemplateId = notificationBookingTemplateId($type);
+    if ($emailTemplateId !== '') $details['emailTemplateId'] = $emailTemplateId;
     $record = array_merge($details, [
         'type' => $type, 'message' => $message, 'recipientRole' => 'customer',
         'userId' => $customerId, 'createdAt' => gmdate('Y-m-d\TH:i:s\Z'),

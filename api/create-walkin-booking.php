@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/notification-engine.php';
 requirePost();
 
 function walkinInput(array $input, string ...$keys): string
@@ -157,11 +158,15 @@ try {
             $cacheError->getFile(), $cacheError->getLine(), $cacheError->getMessage()));
     }
     try {
-        $confirmationText = 'Your CoolTime walk-in booking is confirmed. Reference: ' . $reference
-            . '. Please proceed to the service bay. Payment of PHP ' . number_format($price, 2)
-            . ' is due after your service is completed.';
-        trySendConfiguredEmail($email, 'CoolTime walk-in booking confirmed — ' . $reference,
-            nl2br(htmlspecialchars($confirmationText, ENT_QUOTES, 'UTF-8')), $confirmationText);
+        $details = [
+            'emailTemplateId' => 'booking_confirmation', 'customerName' => $name, 'customerEmail' => $email,
+            'serviceName' => $serviceName, 'serviceCost' => $price, 'branchName' => $branchLabel,
+            'scheduledDate' => $date, 'scheduledTime' => $time, 'bookingStatus' => 'confirmed',
+            'paymentStatus' => 'unpaid', 'paymentBalance' => $price,
+            'templateSuffix' => 'Reference: ' . $reference . '. Please proceed to the service bay. Payment of PHP '
+                . number_format($price, 2) . ' is due after your service is completed.',
+        ];
+        notificationEmail($email, 'CoolTime booking confirmed', $details);
     } catch (Throwable $emailError) {
         error_log(sprintf('Walk-in booking saved, but confirmation email failed at %s:%d: %s',
             $emailError->getFile(), $emailError->getLine(), $emailError->getMessage()));

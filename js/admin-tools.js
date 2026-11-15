@@ -2214,17 +2214,16 @@ async function savePayMongoSettings(event) {
 }
 
 const defaultNotificationTemplates = {
-  confirmation: ['Booking Confirmation - {{customer_name}}', 'Hello {{customer_name}}, your service appointment for {{service_name}} is set on {{scheduled_date}} at {{scheduled_time}}.'],
-  cancellation: ['Appointment Cancellation - {{customer_name}}', 'Hello {{customer_name}}, your appointment for {{service_name}} has been cancelled.'],
-  reschedule: ['Reschedule Successful - {{customer_name}}', 'Hello {{customer_name}}, your service appointment has been successfully rescheduled.'],
-  reminder: ['Appointment Reminder - {{customer_name}}', 'Hello {{customer_name}}, your {{service_name}} appointment is about to start at {{scheduled_time}}.'],
-  overdue: ['Payment Overdue - {{customer_name}}', 'Hello {{customer_name}}, your remaining balance is {{total_price}}. Please settle your bill soon.']
+  booking_confirmation: ['CoolTime booking confirmed', 'Booking confirmation: Booking confirmed: your service appointment has been approved.'],
+  appointment_cancellation: ['CoolTime cancellation request update', 'Appointment cancellation: Your service appointment has been successfully cancelled!'],
+  booking_submission: ['CoolTime booking submitted', 'Booking submitted: your service appointment request has been received.'],
+  booking_reschedule: ['CoolTime appointment rescheduled', 'Reschedule successful: your service appointment is successfully rescheduled!']
 };
 
 function loadNotificationTemplate() {
-  const type = $('#template-type-select')?.value || 'confirmation';
+  const type = $('#template-type-select')?.value || 'booking_confirmation';
   const settings = Object.fromEntries((adminRows.system_settings || []).map((item) => [item.key || item.id, item.value]));
-  const defaults = defaultNotificationTemplates[type] || defaultNotificationTemplates.confirmation;
+  const defaults = defaultNotificationTemplates[type] || defaultNotificationTemplates.booking_confirmation;
   const subject = $('#setting-template-subject');
   const body = $('#setting-template-body');
   if (subject) subject.value = settings[`template_${type}_subject`] ?? defaults[0];
