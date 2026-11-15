@@ -3926,6 +3926,21 @@ body.super-dashboard-body #posMonitoring table {
   color:#fff;
   font:inherit;
 }
+.super-dashboard-body #settings-section .settings-form .form-control,
+.super-dashboard-body #settings-section .settings-form .form-select {
+  border:1px solid #d1d5db;
+  border-radius:8px;
+  background:#fff;
+  color:#374151;
+}
+.super-dashboard-body #settings-section .settings-form .form-control::placeholder { color:#6b7280; opacity:1; }
+.super-dashboard-body #settings-section .settings-form .form-select option { color:#4b5563; background:#fff; }
+.super-dashboard-body #settings-section .settings-form .form-control:disabled {
+  background:#fff;
+  color:#6b7280;
+  -webkit-text-fill-color:#6b7280;
+  opacity:1;
+}
 .super-dashboard-body .settings-form textarea.form-control { min-height:110px; resize:vertical; }
 .super-dashboard-body .settings-form .form-control:focus,
 .super-dashboard-body .settings-form .form-select:focus { outline:2px solid rgba(56,189,248,.5); outline-offset:1px; border-color:#38bdf8; }
