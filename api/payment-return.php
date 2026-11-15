@@ -82,7 +82,7 @@ try {
         notifyInvoicePaymentConfirmed($account, $invoice, $invoiceId, $now);
         returnPage('success', $invoiceId);
     }
-    if (strtolower((string) ($invoice['status'] ?? '')) === 'cancelled') returnPage('cancelled', $invoiceId);
+    if (in_array(strtolower((string) ($invoice['status'] ?? '')), ['cancelled', 'canceled'], true)) returnPage('cancelled', $invoiceId);
     // A cancel redirect can race with a completed payment notification. Verify
     // PayMongo before recording the return as abandoned so a paid session wins.
     $returnSessionId = (string) ($invoice['latestPaymentSessionId'] ?? '');
@@ -116,7 +116,7 @@ try {
     $amount = (float) ($invoice['finalAmount'] ?? $invoice['runningTotal'] ?? 0);
     if (strtolower((string) ($invoice['serviceStatus'] ?? '')) === 'completed') $amount = max(0, $amount - (float) ($invoice['downpaymentAmount'] ?? 0));
     $writes = [
-        ['collection' => 'invoices', 'id' => $invoiceId, 'fields' => ['status' => ['stringValue' => 'payment overdue'], 'paymentFailureReason' => ['stringValue' => 'Customer returned from checkout without confirmed payment.'], 'updatedAt' => ['timestampValue' => $now]]],
+        ['collection' => 'invoices', 'id' => $invoiceId, 'fields' => ['status' => ['stringValue' => 'payment_overdue'], 'paymentStatus' => ['stringValue' => 'pending'], 'paymentFailureReason' => ['stringValue' => 'Customer returned from checkout without confirmed payment.'], 'updatedAt' => ['timestampValue' => $now]]],
         ['collection' => 'payments', 'id' => $attemptId, 'fields' => [
             'invoiceId' => ['stringValue' => $invoiceId], 'customerId' => ['stringValue' => (string) ($invoice['customerId'] ?? '')],
             'branchId' => ['stringValue' => normalizeBranchId((string) ($invoice['branchId'] ?? $invoice['branch'] ?? ''))],
@@ -138,9 +138,10 @@ try {
         ]];
     }
     if (!empty($invoice['bookingId']) && preg_match('/^[A-Za-z0-9_-]{1,150}$/', (string) $invoice['bookingId'])) {
-        $writes[] = ['collection' => 'bookings', 'id' => (string) $invoice['bookingId'], 'fields' => ['status' => ['stringValue' => 'payment overdue'], 'updatedAt' => ['timestampValue' => $now]]];
+        $writes[] = ['collection' => 'bookings', 'id' => (string) $invoice['bookingId'], 'fields' => ['status' => ['stringValue' => 'payment_overdue'], 'paymentStatus' => ['stringValue' => 'pending'], 'updatedAt' => ['timestampValue' => $now]]];
     }
     returnCommit($account, $writes);
+    writeSystemLog('Payment Failed', 'Customer returned from checkout without confirmed payment. Invoice ' . $invoiceId . ', session ' . $returnSessionId, '/api/payment-return.php', 200, (string) ($invoice['customerEmail'] ?? ''));
     $customer = !empty($invoice['customerId']) ? returnReadDocument($account, 'users', (string) $invoice['customerId']) : null;
     if (!empty($customer['email']) && filter_var($customer['email'], FILTER_VALIDATE_EMAIL) && !empty($invoice['bookingId'])) {
         $booking = returnReadDocument($account, 'bookings', (string) $invoice['bookingId']);
@@ -152,7 +153,7 @@ try {
             notifyPaymentOverdue($account, (string) ($invoice['customerId'] ?? ''), (string) $customer['email'], $details);
         }
     }
-    returnPage('overdue', $invoiceId);
+    returnPage('failed', $invoiceId);
 } catch (Throwable $error) {
     error_log('Payment return handler failed: ' . $error->getMessage());
     returnPage('unavailable', $invoiceId);

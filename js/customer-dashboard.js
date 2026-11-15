@@ -60,6 +60,9 @@ const notificationFields = [
   ['Payment Balance (PHP)', 'paymentBalance'], ['Reference Number', 'referenceNumber'],
   ['Booking ID', 'bookingId'], ['Invoice ID', 'invoiceId']
 ];
+const paymentFailureDialog = document.getElementById('paymentFailureDialog');
+const paymentFailureError = document.getElementById('paymentFailureError');
+let paymentFailurePromptInvoice = '';
 
 function formatNotificationAmount(value) {
   return value === undefined || value === null || value === '' ? ''
@@ -327,6 +330,63 @@ async function verifySuccessfulPaymentReturn(user) {
   }
 }
 
+async function handleFailedPaymentReturn(user) {
+  const url = new URL(window.location.href);
+  const invoiceId = url.searchParams.get('invoice') || '';
+  if (url.searchParams.get('payment') !== 'failed' || !invoiceId || paymentFailurePromptInvoice === invoiceId || !paymentFailureDialog) return;
+  paymentFailurePromptInvoice = invoiceId;
+  paymentFailureError.hidden = true;
+  paymentFailureDialog.showModal();
+  const retry = document.getElementById('paymentFailureRetry');
+  const no = document.getElementById('paymentFailureNo');
+  const setBusy = (busy) => { retry.disabled = busy; no.disabled = busy; };
+  const clearReturn = () => {
+    url.searchParams.delete('payment');
+    url.searchParams.delete('invoice');
+    history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  };
+  retry.onclick = async () => {
+    setBusy(true);
+    try {
+      const response = await fetch('/api/create-checkout-session.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+        body: JSON.stringify({ invoiceId, forceRefresh: true })
+      });
+      const raw = await response.text();
+      let result;
+      try { result = JSON.parse(raw); } catch { throw new Error('Payment service is temporarily busy. Please try again shortly.'); }
+      if (!response.ok || !result.ok || !result.checkoutUrl) throw new Error(result.message || 'Unable to restart checkout.');
+      window.location.assign(result.checkoutUrl);
+    } catch (error) {
+      paymentFailureError.textContent = error.message || 'Unable to restart checkout.';
+      paymentFailureError.hidden = false;
+      setBusy(false);
+    }
+  };
+  no.onclick = async () => {
+    setBusy(true);
+    try {
+      const response = await fetch('/api/verify-checkout-session.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+        body: JSON.stringify({ invoiceId, action: 'payment_failed' })
+      });
+      const raw = await response.text();
+      let result;
+      try { result = JSON.parse(raw); } catch { throw new Error('Payment status could not be saved. Please try again.'); }
+      if (!response.ok || !result.ok) throw new Error(result.message || 'Payment status could not be saved.');
+      paymentFailureDialog.close();
+      clearReturn();
+      window.dispatchEvent(new CustomEvent('customer:payment-overdue', { detail: { invoiceId } }));
+    } catch (error) {
+      paymentFailureError.textContent = error.message || 'Payment status could not be saved.';
+      paymentFailureError.hidden = false;
+      setBusy(false);
+    }
+  };
+}
+
 authReady.then(() => onAuthStateChanged(auth, (user) => {
   if (!notificationList) return;
   stopCustomerNotificationListener?.();
@@ -358,6 +418,7 @@ authReady.then(() => onAuthStateChanged(auth, (user) => {
     return;
   }
   void verifySuccessfulPaymentReturn(user);
+  void handleFailedPaymentReturn(user);
   if (notificationBell) notificationBell.hidden = false;
   try {
     const storedIds = JSON.parse(localStorage.getItem(notificationStorageKey()) || '[]');

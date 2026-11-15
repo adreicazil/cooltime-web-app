@@ -34,6 +34,38 @@ try {
     $invoiceCustomerId = trim((string) ($invoice['customerId'] ?? ''));
     if ($invoiceCustomerId === '') $invoiceCustomerId = trim((string) ($invoice['userId'] ?? ''));
     if (!$invoice || $invoiceCustomerId !== (string) $user['uid']) jsonResponse(['ok' => false, 'message' => 'Invoice not found.'], 404);
+    $bookingId = trim((string) ($invoice['bookingId'] ?? ''));
+    if ($bookingId === '' && str_starts_with($invoiceId, 'web_')) $bookingId = substr($invoiceId, 4);
+    $booking = $bookingId !== '' ? checkoutRead($account, 'bookings', $bookingId) : null;
+    $action = strtolower(trim((string) ($input['action'] ?? 'verify')));
+    $bookingStatus = strtolower(str_replace(' ', '_', (string) ($booking['status'] ?? '')));
+    if ($action === 'payment_failed') {
+        if (strtolower((string) ($invoice['status'] ?? '')) === 'paid') jsonResponse(['ok' => false, 'message' => 'This invoice has already been paid.'], 409);
+        if (!$booking || !in_array($bookingStatus, ['completed', 'payment_overdue'], true)) {
+            jsonResponse(['ok' => false, 'message' => 'Payment is only available after the service has been marked completed.'], 403);
+        }
+        $now = gmdate('Y-m-d\\TH:i:s\\Z');
+        $sessionId = (string) ($invoice['latestPaymentSessionId'] ?? $invoice['checkoutSessionId'] ?? '');
+        $reason = 'Customer chose not to retry the failed checkout.';
+        firestorePatchDocument($account, 'invoices', $invoiceId, [
+            'status' => ['stringValue' => 'payment_overdue'], 'paymentStatus' => ['stringValue' => 'pending'],
+            'paymentFailureReason' => ['stringValue' => $reason], 'updatedAt' => ['timestampValue' => $now],
+        ]);
+        firestorePatchDocument($account, 'bookings', $bookingId, [
+            'status' => ['stringValue' => 'payment_overdue'], 'paymentStatus' => ['stringValue' => 'pending'], 'updatedAt' => ['timestampValue' => $now],
+        ]);
+        $failureKey = substr(hash('sha256', $invoiceId . '|' . $sessionId), 0, 32);
+        firestorePatchDocument($account, 'activity_logs', 'payment_failed_' . $failureKey, [
+            'type' => ['stringValue' => 'payment_checkout_failed'], 'invoiceId' => ['stringValue' => $invoiceId],
+            'bookingId' => ['stringValue' => $bookingId], 'customerId' => ['stringValue' => $user['uid']],
+            'sessionId' => ['stringValue' => $sessionId], 'details' => ['stringValue' => $reason], 'createdAt' => ['timestampValue' => $now],
+        ]);
+        writeSystemLog('Payment Failed', $reason . ' Invoice ' . $invoiceId . ($sessionId !== '' ? ', session ' . $sessionId : ''), '/api/verify-checkout-session.php', 200, (string) ($user['email'] ?? ''));
+        jsonResponse(['ok' => true, 'checkoutStatus' => 'payment_overdue']);
+    }
+    if (!in_array($bookingStatus, ['completed', 'payment_overdue'], true) && $bookingId !== '') {
+        jsonResponse(['ok' => false, 'message' => 'Payment is only available after the service has been marked completed.'], 403);
+    }
     if (strtolower((string) ($invoice['status'] ?? $invoice['paymentStatus'] ?? '')) === 'paid') {
         $now = (string) ($invoice['paidAt'] ?? gmdate('Y-m-d\\TH:i:s\\Z'));
         notifyInvoicePaymentConfirmed($account, $invoice, $invoiceId, $now);

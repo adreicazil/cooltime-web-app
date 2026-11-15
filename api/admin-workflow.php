@@ -917,7 +917,7 @@ try {
             ]],
             ['collection' => 'invoices', 'id' => $invoiceId, 'fields' => [
                 'serviceStatus' => ['stringValue' => 'completed'], 'downpaymentAmount' => ['doubleValue' => $invoiceDownpayment],
-                'serviceCompletedAt' => ['timestampValue' => $now], 'status' => ['stringValue' => $balance <= 0 ? 'paid' : (string) ($invoice['status'] ?? 'pending')],
+                'serviceCompletedAt' => ['timestampValue' => $now], 'status' => ['stringValue' => $balance <= 0 ? 'paid' : 'pending'],
                 'paymentStatus' => ['stringValue' => $balance <= 0 ? 'paid' : 'pending'], 'balanceDue' => ['doubleValue' => $balance], 'balance_due' => ['doubleValue' => $balance],
                 'branchId' => ['stringValue' => $bookingBranchId], 'branch' => ['stringValue' => $bookingBranchLabel],
                 'updatedAt' => ['timestampValue' => $now],
@@ -995,8 +995,10 @@ try {
         $details = notificationBookingDetails($account, $booking);
         $details['bookingStatus'] = 'completed';
         $details['paymentBalance'] = $balance;
-        $details['paymentStatus'] = $balance <= 0 ? 'paid' : (string) ($invoice['status'] ?? 'pending');
-        $details['message'] = 'Service completed: your appointment is complete. Remaining balance: PHP ' . number_format($balance, 2) . '.';
+        $details['paymentStatus'] = $balance <= 0 ? 'paid' : 'pending';
+        $details['message'] = $balance > 0
+            ? 'Service completed: your appointment is complete. Remaining balance: PHP ' . number_format($balance, 2) . ' is ready for payment in Running Bills.'
+            : 'Service completed: your appointment is complete.';
         $customerEmail = (string) ($customer['email'] ?? $booking['customerEmail'] ?? '');
         notifyCustomerRecipient($account, 'service_completed_' . $bookingId, (string) ($booking['customerId'] ?? ''), $customerEmail, 'service_completed', $details['message'], $details, 'CoolTime service completed — invoice ' . $invoiceId);
         jsonResponse(['ok' => true, 'invoiceId' => $invoiceId, 'runningTotal' => $total, 'downpaymentAmount' => $downpayment, 'balanceDue' => $balance]);

@@ -129,6 +129,12 @@
     <h2 id="notificationDetailTitle">Notification details</h2>
     <div class="notification-detail-content"></div>
   </dialog>
+  <dialog id="paymentFailureDialog" class="notification-detail-modal" aria-labelledby="paymentFailureTitle">
+    <h2 id="paymentFailureTitle">Payment failed. Retry?</h2>
+    <p>Your bill is still unpaid. You can retry checkout now or choose No to leave it marked payment overdue and pay later.</p>
+    <p id="paymentFailureError" role="alert" hidden></p>
+    <div class="reschedule-modal-actions"><button id="paymentFailureNo" type="button" class="btn">No</button><button id="paymentFailureRetry" type="button" class="btn btn-primary">Retry</button></div>
+  </dialog>
   <script src="js/copy-reference.js" defer></script><script type="module" src="js/booking.js"></script>
   <script type="module" src="js/customer-dashboard.js"></script>
   <script type="module" src="js/auth-nav.js"></script>

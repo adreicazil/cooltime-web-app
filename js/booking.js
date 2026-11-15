@@ -154,6 +154,7 @@ let runningBillsHasInitialSnapshot = false;
 let runningBillsKnownIds = new Set();
 let invoiceVerificationUser = null;
 const checkoutVerificationAttempts = new Set();
+let customerBookingStatuses = new Map();
 const billMoney = (amount) => `PHP ${Number(amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 function formatManilaDate(date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -177,6 +178,9 @@ async function refreshPendingCheckoutStatuses(invoiceRecords) {
   const user = invoiceVerificationUser;
   if (!user) return;
   for (const { id, data } of invoiceRecords) {
+    const bookingId = String(data.bookingId || (id.startsWith('web_') ? id.slice(4) : ''));
+    const bookingStatus = String(customerBookingStatuses.get(bookingId) || '').toLowerCase().replaceAll(' ', '_');
+    if (bookingId && !['completed', 'payment_overdue'].includes(bookingStatus)) continue;
     const attemptKey = `${id}:${data.latestPaymentSessionId || ''}`;
     if (String(data.status || '').toLowerCase() === 'paid' || !data.latestPaymentSessionId || checkoutVerificationAttempts.has(attemptKey)) continue;
     checkoutVerificationAttempts.add(attemptKey);
@@ -245,6 +249,14 @@ function renderInvoices(snapshot) {
     const status = cancelled ? 'Cancelled' : paid ? 'Paid' : rawStatus;
     const statusKey = cancelled ? 'cancelled' : paid ? 'paid' : rawStatus.toLowerCase();
     const closed = paid || cancelled;
+    const bookingId = String(invoice.bookingId || (id.startsWith('web_') ? id.slice(4) : ''));
+    const bookingStatus = String(customerBookingStatuses.get(bookingId) || '').trim().toLowerCase().replaceAll(' ', '_');
+    const terminalBooking = ['rejected', 'cancelled', 'canceled'].includes(bookingStatus);
+    const canPay = ['completed', 'payment_overdue'].includes(bookingStatus) && balanceDue > 0 && !closed;
+    const payLabel = bookingStatus === 'pending' ? 'Awaiting admin confirmation'
+      : bookingStatus === 'confirmed' ? 'Available after service completion'
+        : bookingStatus === 'completed' || bookingStatus === 'payment_overdue' ? 'Pay balance'
+          : 'Payment unavailable until service completion';
     const balance = paid || cancelled ? 0 : Math.max(0, balanceDue);
     const lines = Array.isArray(invoice.serviceDetails) ? invoice.serviceDetails : [];
     const referenceNumber = invoice.referenceNumber || invoice.invoiceNumber || id;
@@ -253,9 +265,16 @@ function renderInvoices(snapshot) {
     const created = invoiceCreatedAtDate(invoice);
     const date = created && !Number.isNaN(created.getTime()) ? formatManilaDate(created) : (invoice.date || 'Date unavailable');
     const detailId = `invoice-details-${escapeHtml(id)}`;
-    return `<article class="invoice-row running-bill" data-invoice-id="${escapeHtml(id)}" data-booking-id="${escapeHtml(invoice.bookingId || '')}" data-reference-id="${escapeHtml(referenceNumber)}"><div class="bill-summary"><span class="bill-index">${firstIndex + index + 1}</span><button class="bill-invoice-toggle" type="button" aria-expanded="false" aria-controls="${detailId}" aria-label="Show details for invoice ${escapeHtml(referenceNumber)}"><span class="invoice-meta-col"><span class="invoice-id-text">${escapeHtml(referenceNumber)}</span><span class="invoice-date-text">${escapeHtml(date)}</span></span></button><strong class="bill-amount">${billMoney(amount)}</strong><span class="bill-status ${escapeHtml(statusKey)}">${escapeHtml(status)}</span>${!closed ? `<button class="btn btn-primary invoice-pay bill-summary-pay" type="button" data-invoice-id="${escapeHtml(id)}">Pay balance</button>` : '<span class="bill-summary-pay-placeholder" aria-hidden="true"></span>'}</div><div class="bill-breakdown-panel" id="${detailId}" aria-hidden="true" inert><p><strong>Reference ID:</strong> ${escapeHtml(referenceNumber)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${escapeHtml(referenceNumber)}">Copy</button></p><ul class="bill-lines">${lineHtml || '<li>No services added.</li>'}</ul><div class="bill-totals"><span>Running total</span><strong>${billMoney(amount)}</strong>${downpayment > 0 ? `<span>Downpayment credited</span><strong>- ${billMoney(downpayment)}</strong>` : ''}<span>Balance due</span><strong>${billMoney(balance)}</strong></div>${addControl}</div></article>`;
+    const payAction = terminalBooking || closed ? '<span class="bill-summary-pay-placeholder" aria-hidden="true"></span>'
+      : `<button class="btn btn-primary invoice-pay bill-summary-pay" type="button" data-invoice-id="${escapeHtml(id)}" ${canPay ? '' : 'disabled'} title="${escapeHtml(payLabel)}" aria-label="${escapeHtml(payLabel)}" style="${canPay ? '' : 'opacity:.45;cursor:not-allowed;'}">${canPay ? 'Pay balance' : escapeHtml(payLabel)}</button>`;
+    return `<article class="invoice-row running-bill" data-invoice-id="${escapeHtml(id)}" data-booking-id="${escapeHtml(bookingId)}" data-reference-id="${escapeHtml(referenceNumber)}"><div class="bill-summary"><span class="bill-index">${firstIndex + index + 1}</span><button class="bill-invoice-toggle" type="button" aria-expanded="false" aria-controls="${detailId}" aria-label="Show details for invoice ${escapeHtml(referenceNumber)}"><span class="invoice-meta-col"><span class="invoice-id-text">${escapeHtml(referenceNumber)}</span><span class="invoice-date-text">${escapeHtml(date)}</span></span></button><strong class="bill-amount">${billMoney(amount)}</strong><span class="bill-status ${escapeHtml(statusKey)}">${escapeHtml(status)}</span>${payAction}</div><div class="bill-breakdown-panel" id="${detailId}" aria-hidden="true" inert><p><strong>Reference ID:</strong> ${escapeHtml(referenceNumber)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${escapeHtml(referenceNumber)}">Copy</button></p><ul class="bill-lines">${lineHtml || '<li>No services added.</li>'}</ul><div class="bill-totals"><span>Running total</span><strong>${billMoney(amount)}</strong>${downpayment > 0 ? `<span>Downpayment credited</span><strong>- ${billMoney(downpayment)}</strong>` : ''}<span>Balance due</span><strong>${billMoney(balance)}</strong></div>${addControl}</div></article>`;
   }).join('');
 }
+
+window.addEventListener('customer:bookings', (event) => {
+  customerBookingStatuses = new Map((event.detail || []).map((booking) => [String(booking.id || ''), String(booking.status || '').toLowerCase()]));
+  if (latestInvoiceSnapshot) renderInvoices(latestInvoiceSnapshot);
+});
 
 document.getElementById('customerInvoices')?.addEventListener('click', async (event) => {
   const toggle = event.target.closest('.bill-invoice-toggle');

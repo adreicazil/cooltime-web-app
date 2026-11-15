@@ -108,11 +108,15 @@ try {
         if (($invoice['customerId'] ?? '') !== $user['uid'] && !$isAdmin) jsonResponse(['ok' => false, 'message' => 'Invoice not found.'], 404);
     }
     $bookingId = (string) ($invoice['bookingId'] ?? '');
+    if ($bookingId === '' && str_starts_with($invoiceId, 'web_')) $bookingId = substr($invoiceId, 4);
     if ($requestedBookingId !== '' && $bookingId !== '' && !hash_equals($bookingId, $requestedBookingId)) {
         jsonResponse(['ok' => false, 'message' => 'Invoice and booking do not match.'], 404);
     }
     $booking = null;
     if ($bookingId !== '' && preg_match('/^[A-Za-z0-9_-]{1,150}$/', $bookingId)) $booking = firestoreReadDocument($account, 'bookings', $bookingId);
+    if ($bookingId !== '' && (!$booking || !in_array(strtolower(str_replace(' ', '_', (string) ($booking['status'] ?? ''))), ['completed', 'payment_overdue'], true))) {
+        jsonResponse(['ok' => false, 'message' => 'Payment is only available after the service has been marked completed.'], 403);
+    }
     if (strtolower((string) ($invoice['status'] ?? 'open')) === 'paid') {
         $now = gmdate('Y-m-d\\TH:i:s\\Z');
         firestorePatchDocument($account, 'invoices', $invoiceId, ['paymentStatus' => ['stringValue' => 'paid'], 'balanceDue' => ['doubleValue' => 0], 'balance_due' => ['doubleValue' => 0], 'checkoutSessionId' => ['nullValue' => null], 'checkoutUrl' => ['nullValue' => null], 'latestPaymentSessionId' => ['nullValue' => null], 'updatedAt' => ['timestampValue' => $now]]);
