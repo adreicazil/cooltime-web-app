@@ -53,7 +53,10 @@ try {
     $invoice = returnReadDocument($account, 'invoices', $invoiceId);
     if (!$invoice) { http_response_code(404); exit('Invoice not found.'); }
     if (!hash_equals((string) ($invoice['latestCancelNonce'] ?? ''), $nonce)) returnPage('superseded', $invoiceId);
-    if (strtolower((string) ($invoice['status'] ?? '')) === 'paid') returnPage('success', $invoiceId);
+    if (strtolower((string) ($invoice['status'] ?? '')) === 'paid') {
+        notifyInvoicePaymentConfirmed($account, $invoice, $invoiceId, gmdate('Y-m-d\\TH:i:s\\Z'));
+        returnPage('success', $invoiceId);
+    }
     if ($returnStatus === 'success') {
         $sessionId = (string) ($invoice['latestPaymentSessionId'] ?? '');
         if ($sessionId === '' || !preg_match('/^[A-Za-z0-9_-]{1,150}$/', $sessionId)) returnPage('pending', $invoiceId);
@@ -76,6 +79,7 @@ try {
             $paidWrites[] = ['collection' => 'bookings', 'id' => (string) $invoice['bookingId'], 'fields' => ['paymentStatus' => ['stringValue' => 'paid'], 'updatedAt' => ['timestampValue' => $now]]];
         }
         returnCommit($account, $paidWrites);
+        notifyInvoicePaymentConfirmed($account, $invoice, $invoiceId, $now);
         returnPage('success', $invoiceId);
     }
     if (strtolower((string) ($invoice['status'] ?? '')) === 'cancelled') returnPage('cancelled', $invoiceId);
@@ -99,6 +103,7 @@ try {
                     $paidWrites[] = ['collection' => 'bookings', 'id' => (string) $invoice['bookingId'], 'fields' => ['paymentStatus' => ['stringValue' => 'paid'], 'updatedAt' => ['timestampValue' => $now]]];
                 }
                 returnCommit($account, $paidWrites);
+                notifyInvoicePaymentConfirmed($account, $invoice, $invoiceId, $now);
                 returnPage('success', $invoiceId);
             }
         } else {

@@ -320,19 +320,17 @@ try {
     }
     webhookFirestoreCommit($account, $paidUpdates);
 
-    $customerId = (string) ($invoice['customerId'] ?? '');
-    $customer = $customerId !== '' ? webhookReadDocument($account, 'users', $customerId) : null;
-    $booking = $bookingId !== '' ? webhookReadDocument($account, 'bookings', $bookingId) : null;
-    if ($customer && $booking) {
-        $customerEmail = strtolower(trim((string) ($customer['email'] ?? $booking['customerEmail'] ?? '')));
+    $customerId = trim((string) ($invoice['customerId'] ?? ''));
+    if ($customerId === '') $customerId = trim((string) ($invoice['userId'] ?? ''));
+    $referenceNumber = (string) ($invoice['referenceNumber'] ?? $invoice['referenceNo'] ?? $invoice['invoiceNumber'] ?? $reference);
+    $paidAmount = (float) ($invoice['totalAmount'] ?? $invoice['runningTotal'] ?? $invoice['finalAmount'] ?? 0);
+    $notificationCreated = notifyInvoicePaymentConfirmed($account, $invoice, $reference, gmdate('Y-m-d\\TH:i:s\\Z'));
+    if ($notificationCreated === true) {
+        $customer = $customerId !== '' ? webhookReadDocument($account, 'users', $customerId) : null;
+        $customerEmail = strtolower(trim((string) ($customer['email'] ?? '')));
         if (filter_var($customerEmail, FILTER_VALIDATE_EMAIL)) {
-            $booking['id'] = $bookingId;
-            $details = notificationBookingDetails($account, $booking);
-            $details['invoiceId'] = $reference;
-            $details['paymentStatus'] = 'paid';
-            $details['paymentBalance'] = 0;
-            $details['message'] = 'Payment confirmed: your payment for invoice ' . (string) ($invoice['referenceNumber'] ?? $invoice['invoiceNumber'] ?? $reference) . ' was received.';
-            notifyCustomerRecipient($account, 'payment_received_' . $reference, $customerId, $customerEmail, 'payment_received', $details['message'], $details, 'CoolTime payment confirmed');
+            $message = 'Payment confirmed: your bill (Ref: ' . $referenceNumber . ') of PHP ' . number_format($paidAmount, 2) . ' has been paid.';
+            notificationEmail($customerEmail, 'CoolTime payment confirmed', ['message' => $message, 'paymentStatus' => 'paid']);
         }
     }
 

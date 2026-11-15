@@ -978,6 +978,17 @@ try {
             . ', remaining balance PHP ' . number_format($balance, 2) . '.';
         $writes[] = adminWorkflowAuditWrite($actor, $actorProfile, 'Booking Service Completed', (string) ($booking['referenceNumber'] ?? $bookingId), $settlementDetails, $now);
         adminWorkflowCommit($account, $writes);
+        if ($balance <= 0) {
+            $paymentInvoice = $invoice;
+            if (trim((string) ($paymentInvoice['customerId'] ?? '')) === '') {
+                $paymentInvoice['customerId'] = $paymentInvoice['userId'] ?? $booking['customerId'] ?? $booking['userId'] ?? '';
+            }
+            if (trim((string) ($paymentInvoice['referenceNumber'] ?? $paymentInvoice['referenceNo'] ?? $paymentInvoice['invoiceNumber'] ?? '')) === '') {
+                $paymentInvoice['referenceNumber'] = $booking['referenceNumber'] ?? $invoiceId;
+            }
+            $paymentInvoice['totalAmount'] = $total;
+            notifyInvoicePaymentConfirmed($account, $paymentInvoice, $invoiceId, $now);
+        }
         $customer = adminWorkflowRead($account, 'users', (string) ($booking['customerId'] ?? ''));
         $booking['id'] = $bookingId;
         $booking['status'] = 'completed';

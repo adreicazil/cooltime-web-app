@@ -3,6 +3,7 @@ declare(strict_types=1);
 ini_set('display_errors', '0');
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/notification-engine.php';
 requirePost();
 
 function checkoutRead(array $account, string $collection, string $id): ?array
@@ -30,7 +31,14 @@ try {
     requireOtpSession($user);
     $account = firebaseServiceAccount();
     $invoice = checkoutRead($account, 'invoices', $invoiceId);
-    if (!$invoice || (string) ($invoice['customerId'] ?? '') !== (string) $user['uid']) jsonResponse(['ok' => false, 'message' => 'Invoice not found.'], 404);
+    $invoiceCustomerId = trim((string) ($invoice['customerId'] ?? ''));
+    if ($invoiceCustomerId === '') $invoiceCustomerId = trim((string) ($invoice['userId'] ?? ''));
+    if (!$invoice || $invoiceCustomerId !== (string) $user['uid']) jsonResponse(['ok' => false, 'message' => 'Invoice not found.'], 404);
+    if (strtolower((string) ($invoice['status'] ?? $invoice['paymentStatus'] ?? '')) === 'paid') {
+        $now = (string) ($invoice['paidAt'] ?? gmdate('Y-m-d\\TH:i:s\\Z'));
+        notifyInvoicePaymentConfirmed($account, $invoice, $invoiceId, $now);
+        jsonResponse(['ok' => true, 'checkoutStatus' => 'paid', 'alreadyPaid' => true]);
+    }
     $sessionId = (string) ($invoice['checkoutSessionId'] ?? $invoice['latestPaymentSessionId'] ?? '');
     if ($sessionId === '' || !preg_match('/^[A-Za-z0-9_-]{1,150}$/', $sessionId)) jsonResponse(['ok' => true, 'checkoutStatus' => 'none']);
     $secret = environment('PAYMONGO_SECRET_KEY', false);
@@ -68,6 +76,7 @@ try {
         ]);
         $bookingId = (string) ($invoice['bookingId'] ?? '');
         if ($bookingId !== '') firestorePatchDocument($account, 'bookings', $bookingId, ['paymentStatus' => ['stringValue' => 'paid'], 'latestPaymentSessionId' => ['nullValue' => null], 'checkoutSessionId' => ['nullValue' => null], 'checkoutUrl' => ['nullValue' => null], 'updatedAt' => ['timestampValue' => $now]]);
+        notifyInvoicePaymentConfirmed($account, $invoice, $invoiceId, $now);
     } else {
         if ($status === 'expired') {
             firestorePatchDocument($account, 'payments', 'paymongo_' . $sessionId, [

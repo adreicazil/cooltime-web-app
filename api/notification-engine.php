@@ -17,6 +17,7 @@ function notificationCreate(array $account, string $id, array $data): ?bool
     foreach ($data as $key => $value) {
         if ($value === null) continue;
         if ($key === 'createdAt') $fields[$key] = ['timestampValue' => (string) $value];
+        elseif (is_bool($value)) $fields[$key] = ['booleanValue' => $value];
         elseif (is_numeric($value) && in_array($key, ['serviceCost', 'paymentBalance'], true)) $fields[$key] = ['doubleValue' => (float) $value];
         else $fields[$key] = ['stringValue' => substr((string) $value, 0, 2000)];
     }
@@ -32,6 +33,42 @@ function notificationCreate(array $account, string $id, array $data): ?bool
         $response['status'], $response['error'] ?: 'none',
         substr(preg_replace('/\s+/', ' ', $response['body']) ?? '', 0, 500) ?: '[empty]'));
     return null;
+}
+
+function notifyPaymentConfirmed(array $account, string $customerId, string $invoiceId, string $referenceNumber, float $amount, string $createdAt): ?bool
+{
+    $customerId = trim($customerId);
+    if ($customerId === '' || $invoiceId === '') return null;
+    $referenceNumber = trim($referenceNumber) !== '' ? trim($referenceNumber) : $invoiceId;
+    $amount = max(0, $amount);
+    $message = 'Payment confirmed: your bill (Ref: ' . $referenceNumber . ') of PHP ' . number_format($amount, 2) . ' has been paid.';
+    $record = [
+        'userId' => $customerId,
+        'type' => 'PAYMENT CONFIRMED',
+        'category' => 'PAYMENT CONFIRMED',
+        'title' => 'Payment confirmed',
+        'message' => $message,
+        'seen' => false,
+        'invoiceId' => $invoiceId,
+        'paymentBalance' => 0,
+        'recipientRole' => 'customer',
+        'createdAt' => $createdAt,
+    ];
+    try {
+        return notificationCreate($account, 'pay_notif_' . hash('sha256', $invoiceId), $record);
+    } catch (Throwable $error) {
+        error_log('CoolTime payment notification persistence failed: ' . $error->getMessage());
+        return null;
+    }
+}
+
+function notifyInvoicePaymentConfirmed(array $account, array $invoice, string $invoiceId, string $createdAt): ?bool
+{
+    $customerId = trim((string) ($invoice['customerId'] ?? ''));
+    if ($customerId === '') $customerId = trim((string) ($invoice['userId'] ?? ''));
+    $referenceNumber = (string) ($invoice['referenceNumber'] ?? $invoice['referenceNo'] ?? $invoice['invoiceNumber'] ?? $invoiceId);
+    $amount = (float) ($invoice['totalAmount'] ?? $invoice['runningTotal'] ?? $invoice['finalAmount'] ?? 0);
+    return notifyPaymentConfirmed($account, $customerId, $invoiceId, $referenceNumber, $amount, $createdAt);
 }
 
 function notificationReadDocument(array $account, string $collection, string $id): ?array

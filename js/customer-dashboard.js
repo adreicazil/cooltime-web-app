@@ -250,6 +250,27 @@ function showNotificationLoadError(error) {
   notificationList.textContent = message;
 }
 
+async function verifySuccessfulPaymentReturn(user) {
+  const url = new URL(window.location.href);
+  const invoiceId = url.searchParams.get('invoice') || '';
+  if (url.searchParams.get('payment') !== 'success' || !invoiceId) return;
+  try {
+    const response = await fetch('/api/verify-checkout-session.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
+      body: JSON.stringify({ invoiceId }),
+    });
+    const raw = await response.text();
+    const result = JSON.parse(raw);
+    if (!response.ok || !result.ok) throw new Error(result.message || 'Payment verification could not be completed.');
+    url.searchParams.delete('payment');
+    url.searchParams.delete('invoice');
+    history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  } catch (error) {
+    console.error('Payment return verification failed:', error);
+  }
+}
+
 authReady.then(() => onAuthStateChanged(auth, (user) => {
   if (!notificationList) return;
   stopCustomerNotificationListener?.();
@@ -280,6 +301,7 @@ authReady.then(() => onAuthStateChanged(auth, (user) => {
     notificationList.textContent = 'Complete email verification to view your notifications.';
     return;
   }
+  void verifySuccessfulPaymentReturn(user);
   if (notificationBell) notificationBell.hidden = false;
   try {
     const storedIds = JSON.parse(localStorage.getItem(notificationStorageKey()) || '[]');
