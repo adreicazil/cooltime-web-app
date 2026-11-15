@@ -140,9 +140,7 @@ onSnapshot(collection(db, 'services'), (snapshot) => {
     const selectedId = serviceTypeSelect.value;
     const options = activeServices.map((service) => {
       const price = Number(service.price) || 0;
-      const duration = String(service.duration || '').trim();
-      const label = `${service.name.trim()} — PHP ${price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${duration ? ` · ${duration}` : ''}`;
-      const option = new Option(label, service.id);
+      const option = new Option(service.name.trim(), service.id);
       option.dataset.serviceId = service.id;
       option.dataset.serviceName = service.name.trim();
       option.dataset.price = String(price);

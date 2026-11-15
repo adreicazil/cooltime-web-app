@@ -34,9 +34,7 @@ function populateBookableServiceSelects(services) {
     const options = [new Option('Select a Service', '')];
     bookableServices.forEach((service) => {
       const price = Number(service.price) || 0;
-      const duration = String(service.duration || '').trim();
-      const label = `${service.name.trim()} — PHP ${new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)}${duration ? ` · ${duration}` : ''}`;
-      const option = new Option(label, service.id);
+      const option = new Option(service.name.trim(), service.id);
       option.dataset.serviceId = service.id;
       option.dataset.serviceName = service.name.trim();
       option.dataset.price = String(price);
@@ -49,45 +47,13 @@ function populateBookableServiceSelects(services) {
   });
 }
 
-function renderPublicServiceCards(services) {
-  const target = document.getElementById('publicServiceCatalog');
-  if (!target) return;
-  const bookable = services
-    .filter((service) => ['active', 'available'].includes(String(service.status || '').trim().toLowerCase()))
-    .filter((service) => typeof service.name === 'string' && service.name.trim() !== '')
-    .sort((a, b) => a.name.localeCompare(b.name));
-  if (!bookable.length) {
-    target.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'No services are currently available.' }));
-    return;
-  }
-  target.replaceChildren(...bookable.map((service) => {
-    const card = document.createElement('article');
-    card.className = 'service-card package-card package-card-bg';
-    card.tabIndex = 0;
-    card.setAttribute('role', 'button');
-    card.dataset.serviceId = service.id;
-    card.dataset.serviceName = service.name.trim();
-    card.dataset.price = String(Number(service.price) || 0);
-    card.setAttribute('aria-label', `Book ${service.name.trim()}`);
-    const overlay = document.createElement('div'); overlay.className = 'package-overlay';
-    const title = document.createElement('h3'); title.textContent = service.name.trim();
-    const description = document.createElement('p'); description.textContent = service.description || '';
-    const duration = document.createElement('p'); duration.textContent = service.duration ? `Duration: ${service.duration}` : '';
-    const price = document.createElement('strong'); price.className = 'package-price';
-    price.textContent = `PHP ${new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(service.price) || 0)}`;
-    overlay.append(title, description, duration, price); card.append(overlay); return card;
-  }));
-}
-
 if (serviceSelects.length) {
   onSnapshot(collection(db, 'services'), (snapshot) => {
     const services = snapshot.docs.map((serviceDoc) => ({ id: serviceDoc.id, ...serviceDoc.data() }));
     populateBookableServiceSelects(services);
-    renderPublicServiceCards(services);
   }, (error) => {
     console.error('CoolTime service catalog could not be loaded:', error);
     populateBookableServiceSelects([]);
-    renderPublicServiceCards([]);
   });
 }
 
@@ -120,17 +86,20 @@ if (bookingModalElement && bookingForm) {
 
     const openForCard = (card) => {
       const selectedId = card.dataset.serviceId;
-      if (selectedId && [...serviceSelect.options].some((option) => option.value === selectedId)) serviceSelect.value = selectedId;
+      const serviceName = card.dataset.serviceName || card.dataset.bookableService || '';
+      const option = [...serviceSelect.options].find((item) => (selectedId && item.value === selectedId)
+        || (serviceName && item.dataset.serviceName === serviceName));
+      if (option) serviceSelect.value = option.value;
       document.getElementById('guest-booking-notice').textContent = '';
       bookingModal.show();
     };
 
-    document.getElementById('publicServiceCatalog')?.addEventListener('click', (event) => {
-      const card = event.target.closest('.service-card[data-service-id]');
+    document.querySelector('.services-grid-container')?.addEventListener('click', (event) => {
+      const card = event.target.closest('.service-card[data-bookable-service], .service-card[data-service-id]');
       if (card) openForCard(card);
     });
-    document.getElementById('publicServiceCatalog')?.addEventListener('keydown', (event) => {
-      const card = event.target.closest('.service-card[data-service-id]');
+    document.querySelector('.services-grid-container')?.addEventListener('keydown', (event) => {
+      const card = event.target.closest('.service-card[data-bookable-service], .service-card[data-service-id]');
       if (!card || !['Enter', ' '].includes(event.key)) return;
       event.preventDefault(); openForCard(card);
     });
