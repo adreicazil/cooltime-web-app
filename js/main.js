@@ -200,7 +200,11 @@ if (bookingModalElement && paymentModalElement && bookingForm) {
               forceRefresh: true
             }),
           });
-          const checkout = await checkoutResponse.json();
+          const rawText = await checkoutResponse.text();
+          let checkout;
+          try { checkout = JSON.parse(rawText); }
+          catch { throw new Error('Payment service is temporarily busy. Please try again shortly.'); }
+          if (!checkoutResponse.ok) throw new Error(checkout.message || 'Payment service is temporarily busy. Please try again shortly.');
           if (!checkoutResponse.ok || !checkout.ok || (!checkout.checkoutUrl && !checkout.alreadyPaid)) throw new Error(checkout.message || 'Payment checkout could not be started.');
           if (checkout.alreadyPaid) {
             notice.textContent = 'This invoice is already paid.';

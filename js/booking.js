@@ -169,7 +169,10 @@ async function refreshPendingCheckoutStatuses(invoiceRecords) {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
         body: JSON.stringify({ invoiceId: id })
       });
-      const result = await response.json();
+      const rawText = await response.text();
+      let result;
+      try { result = JSON.parse(rawText); }
+      catch { throw new Error('Payment service is temporarily busy. Please try again shortly.'); }
       if (!response.ok || !result.ok) throw new Error(result.message || 'Payment status refresh failed.');
       if (result.checkoutStatus === 'paid' || result.checkoutStatus === 'expired') {
         try { await refreshInvoicesFromServer(user); } catch (error) { console.warn('Running bills refresh after checkout reconciliation failed:', error); }
@@ -272,7 +275,10 @@ document.getElementById('customerInvoices')?.addEventListener('click', async (ev
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await access.user.getIdToken()}` },
         body: JSON.stringify({ invoiceId: payButton.dataset.invoiceId })
       });
-      const verification = await verifyResponse.json();
+      const verificationText = await verifyResponse.text();
+      let verification;
+      try { verification = JSON.parse(verificationText); }
+      catch { throw new Error('Payment service is temporarily busy. Please try again shortly.'); }
       if (!verifyResponse.ok || !verification.ok) throw new Error(verification.message || 'Unable to verify the current checkout.');
       if (verification.alreadyPaid || verification.checkoutStatus === 'paid') {
         try { await refreshInvoicesFromServer(access.user); }
@@ -290,7 +296,11 @@ document.getElementById('customerInvoices')?.addEventListener('click', async (ev
           forceRefresh: true
         })
       });
-      const result = await response.json();
+      const rawText = await response.text();
+      let result;
+      try { result = JSON.parse(rawText); }
+      catch { throw new Error('Payment service is temporarily busy. Please try again shortly.'); }
+      if (!response.ok) throw new Error(result.message || 'Payment service is temporarily busy. Please try again shortly.');
       if (!response.ok || (!result.checkoutUrl && !result.alreadyPaid)) throw new Error(result.message || 'Unable to start payment.');
       if (result.alreadyPaid) {
         try { await refreshInvoicesFromServer(access.user); }

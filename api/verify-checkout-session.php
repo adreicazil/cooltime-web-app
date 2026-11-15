@@ -1,5 +1,7 @@
 <?php
 declare(strict_types=1);
+ini_set('display_errors', '0');
+header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/config.php';
 requirePost();
 
@@ -81,6 +83,10 @@ try {
     jsonResponse(['ok' => true, 'checkoutStatus' => $status, 'alreadyPaid' => $status === 'paid']);
 } catch (Throwable $error) {
     error_log('Customer PayMongo status verification failed: ' . $error->getMessage());
-    writeSystemLog('API Failure', 'Checkout status verification error: ' . $error->getMessage(), '/api/verify-checkout-session.php', 502);
-    jsonResponse(['ok' => false, 'message' => 'Payment status could not be refreshed right now.'], 502);
+    try {
+        writeSystemLog('API Failure', 'Checkout status verification error: ' . $error->getMessage(), '/api/verify-checkout-session.php', 502);
+    } catch (Throwable $loggingError) {
+        error_log('Could not write checkout verification system log: ' . $loggingError->getMessage());
+    }
+    jsonResponse(['ok' => false, 'message' => 'Payment service is temporarily busy. Please try again shortly.'], 502);
 }
