@@ -14,6 +14,7 @@ function walkinInput(array $input, string ...$keys): string
 
 function walkinFirestoreFields(array $account, string $collection, string $id): ?array
 {
+    if (trim($id) === '') return null;
     $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id'])
         . '/databases/(default)/documents/' . rawurlencode($collection) . '/' . rawurlencode($id);
     $response = secureHttpRequest($url, 'GET', ['Authorization: Bearer ' . firebaseAdminAccessToken()], null, 15);
