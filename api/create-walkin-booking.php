@@ -15,11 +15,13 @@ function walkinFirestoreFields(array $account, string $collection, string $id): 
 {
     $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id'])
         . '/databases/(default)/documents/' . rawurlencode($collection) . '/' . rawurlencode($id);
-    $ctx = stream_context_create(['http' => ['method'=>'GET','header'=>'Authorization: Bearer '.firebaseAdminAccessToken(),'timeout'=>15,'ignore_errors'=>true]]);
-    $raw = @file_get_contents($url, false, $ctx);
-    if (str_contains($http_response_header[0] ?? '', ' 404 ')) return null;
-    if (!is_string($raw)) return null;
-    $document = json_decode($raw, true);
+    $response = secureHttpRequest($url, 'GET', ['Authorization: Bearer ' . firebaseAdminAccessToken()], null, 15);
+    if ($response['status'] === 404) return null;
+    if ($response['status'] < 200 || $response['status'] >= 300) {
+        throw new RuntimeException('Firestore service lookup failed (HTTP ' . $response['status'] . ').');
+    }
+    $document = json_decode($response['body'], true);
+    if (!is_array($document)) throw new RuntimeException('Firestore service lookup returned invalid JSON.');
     $fields = $document['fields'] ?? null;
     if (!is_array($fields)) return null;
     $values = [];
@@ -78,8 +80,14 @@ try {
         // Accept a service name as well as a Firestore document ID.
         $queryUrl = 'https://firestore.googleapis.com/v1/projects/'.rawurlencode($account['project_id']).'/databases/(default)/documents:runQuery';
         $query = ['structuredQuery'=>['from'=>[['collectionId'=>'services']],'where'=>['fieldFilter'=>['field'=>['fieldPath'=>'name'],'op'=>'EQUAL','value'=>['stringValue'=>$serviceKey]]],'limit'=>1]];
-        $ctx=stream_context_create(['http'=>['method'=>'POST','header'=>"Authorization: Bearer ".firebaseAdminAccessToken()."\r\nContent-Type: application/json",'content'=>json_encode($query,JSON_THROW_ON_ERROR),'timeout'=>15,'ignore_errors'=>true]]);
-        $raw=@file_get_contents($queryUrl,false,$ctx); $rows=is_string($raw)?json_decode($raw,true):null;
+        $queryResponse = secureHttpRequest($queryUrl, 'POST', [
+            'Authorization: Bearer ' . firebaseAdminAccessToken(), 'Content-Type: application/json',
+        ], json_encode($query, JSON_THROW_ON_ERROR), 15);
+        if ($queryResponse['status'] < 200 || $queryResponse['status'] >= 300) {
+            throw new RuntimeException('Firestore service query failed (HTTP ' . $queryResponse['status'] . ').');
+        }
+        $rows = json_decode($queryResponse['body'], true);
+        if (!is_array($rows)) throw new RuntimeException('Firestore service query returned invalid JSON.');
         $doc=$rows[0]['document']??null;
         if (is_array($doc)) {
             $service=[];
@@ -104,7 +112,8 @@ try {
     $paymentStatus='unpaid';
     $bookingId='walkin_'.bin2hex(random_bytes(12)); $invoiceId='walkin_inv_'.bin2hex(random_bytes(12));
     $now=gmdate('Y-m-d\\TH:i:s\\Z');
-    $reference=cooltimeReferenceNumber('WLK',$branchLabel,$date);
+    // config.php supports OTC and PMO reference sources; OTC is the walk-in counter prefix.
+    $reference=cooltimeReferenceNumber('OTC',$branchLabel,$date);
     $bookingFields=[
       'bookingId'=>['stringValue'=>$bookingId],'customerId'=>['stringValue'=>''],'customerName'=>['stringValue'=>$name],'customerEmail'=>['stringValue'=>$email],
       'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'branchId'=>['stringValue'=>$branchId],'branch'=>['stringValue'=>$branchLabel],
@@ -138,8 +147,26 @@ try {
       'paymentBalance'=>['doubleValue'=>$price],'serviceStatus'=>['stringValue'=>'pending'],'status'=>['stringValue'=>'unpaid'],
       'createdAt'=>['timestampValue'=>$now],'updatedAt'=>['timestampValue'=>$now],
     ]);
+
+    // Side effects happen only after both Firestore records have been saved.
+    try {
+        invalidateSlotAvailabilityCache($branchId, $date);
+    } catch (Throwable $cacheError) {
+        error_log(sprintf('Walk-in booking saved, but slot cache invalidation failed at %s:%d: %s',
+            $cacheError->getFile(), $cacheError->getLine(), $cacheError->getMessage()));
+    }
+    try {
+        $confirmationText = 'Your CoolTime walk-in booking is confirmed. Reference: ' . $reference
+            . '. Please proceed to the service bay. Payment of PHP ' . number_format($price, 2)
+            . ' is due after your service is completed.';
+        trySendConfiguredEmail($email, 'CoolTime walk-in booking confirmed — ' . $reference,
+            nl2br(htmlspecialchars($confirmationText, ENT_QUOTES, 'UTF-8')), $confirmationText);
+    } catch (Throwable $emailError) {
+        error_log(sprintf('Walk-in booking saved, but confirmation email failed at %s:%d: %s',
+            $emailError->getFile(), $emailError->getLine(), $emailError->getMessage()));
+    }
     jsonResponse(['ok'=>true,'bookingId'=>$bookingId,'invoiceId'=>$invoiceId,'amount'=>$price,'referenceNumber'=>$reference,'customerName'=>$name,'branch'=>$branchLabel,'serviceName'=>$serviceName]);
 } catch(Throwable $error) {
-    error_log('Walk-in booking creation failed: '.$error->getMessage());
+    error_log(sprintf('Walk-in booking creation failed at %s:%d: %s', $error->getFile(), $error->getLine(), $error->getMessage()));
     jsonResponse(['ok'=>false,'message'=>'Unable to save this booking. Please retry shortly.'],500);
 }
