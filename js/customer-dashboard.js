@@ -36,12 +36,15 @@ const summaryBookings = document.getElementById('customerBookingSummary');
 let invoices = [];
 let bookings = [];
 let customerNotifications = [];
+let currentNotificationsPage = 1;
+const NOTIFICATIONS_PER_PAGE = 15;
 let stopCustomerNotificationListener = null;
 let currentNotificationUserId = '';
 let seenNotificationIds = new Set();
 let notificationFallbackTimes = new Map();
 
 const notificationList = document.getElementById('customerNotifications');
+const notificationPagination = document.getElementById('customerNotificationsPagination');
 const notificationDialog = document.getElementById('notificationDetailModal');
 const notificationBellWrap = document.getElementById('customerNotificationBellWrap');
 const notificationBell = document.getElementById('customerNotificationBell');
@@ -130,16 +133,36 @@ function renderNotificationPreview() {
 
 function renderCustomerNotifications() {
   if (!notificationList) return;
+  const totalPages = Math.max(1, Math.ceil(customerNotifications.length / NOTIFICATIONS_PER_PAGE));
+  currentNotificationsPage = Math.min(Math.max(1, currentNotificationsPage), totalPages);
+  const startIndex = (currentNotificationsPage - 1) * NOTIFICATIONS_PER_PAGE;
+  const pageNotifications = customerNotifications.slice(startIndex, startIndex + NOTIFICATIONS_PER_PAGE);
   notificationList.innerHTML = customerNotifications.length
-    ? customerNotifications.map((item, index) => {
+    ? pageNotifications.map((item, index) => {
       const stamp = notificationTimeLabel(item);
       const category = String(item.type || 'notification').replaceAll('_', ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
-      return `<button type="button" class="customer-notification-row" data-notification-index="${index}"><span class="customer-notification-full-message"><span class="customer-notification-full-meta"><span class="customer-notification-category">${escapeHtml(category)}</span><time>${escapeHtml(stamp)}</time></span><span class="customer-notification-full-text">${escapeHtml(normalizeBranchText(item.message || item.title || 'Notification'))}</span></span></button>`;
+      return `<button type="button" class="customer-notification-row" data-notification-index="${startIndex + index}"><span class="customer-notification-full-message"><span class="customer-notification-full-meta"><span class="customer-notification-category">${escapeHtml(category)}</span><time>${escapeHtml(stamp)}</time></span><span class="customer-notification-full-text">${escapeHtml(normalizeBranchText(item.message || item.title || 'Notification'))}</span></span></button>`;
     }).join('')
     : '<p class="customer-notification-empty">No notifications yet.</p>';
+  if (notificationPagination) {
+    notificationPagination.hidden = totalPages <= 1;
+    notificationPagination.innerHTML = totalPages > 1 ? renderNotificationPagination(currentNotificationsPage, totalPages) : '';
+  }
   renderNotificationPreview();
   updateNotificationBell();
 }
+
+function renderNotificationPagination(page, total) {
+  const buttonStyle = (disabled) => `width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important;border-radius:50%!important;border:1px solid rgba(255,255,255,.25)!important;background:transparent!important;color:#8da4c4!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:0!important;line-height:1!important;${disabled ? 'opacity:.3!important;cursor:not-allowed!important;' : 'cursor:pointer!important;'}`;
+  return `<div class="pagination-bottom-right-wrapper" style="display:flex!important;justify-content:flex-end!important;align-items:center!important;width:100%!important;margin-top:auto!important;padding-top:20px!important;text-align:right!important"><div style="display:inline-flex!important;align-items:center!important;gap:10px!important;margin-left:auto!important"><button type="button" class="pagination-circle-btn notification-prev-page" style="${buttonStyle(page === 1)}" ${page === 1 ? 'disabled' : ''} aria-label="Previous page"><span style="font-size:.85rem!important;line-height:1!important;font-weight:600!important">&lt;</span></button><span style="color:#fff!important;font-weight:700!important;font-size:.95rem!important;letter-spacing:.3px!important;white-space:nowrap!important;margin:0 4px!important">Page <span class="active-page" style="color:#38bdf8!important;text-decoration:underline!important;text-underline-offset:3px!important;font-weight:700!important">${page}</span> of ${total}</span><button type="button" class="pagination-circle-btn notification-next-page" style="${buttonStyle(page === total)}" ${page === total ? 'disabled' : ''} aria-label="Next page"><span style="font-size:.85rem!important;line-height:1!important;font-weight:600!important">&gt;</span></button></div></div>`;
+}
+
+notificationPagination?.addEventListener('click', (event) => {
+  if (event.target.closest('.notification-prev-page')) currentNotificationsPage -= 1;
+  else if (event.target.closest('.notification-next-page')) currentNotificationsPage += 1;
+  else return;
+  renderCustomerNotifications();
+});
 
 function showCustomerNotification(item) {
   if (!notificationDialog || !item) return;
@@ -217,6 +240,10 @@ function showNotificationLoadError(error) {
     message: error?.message || String(error)
   });
   if (!notificationList) return;
+  if (notificationPagination) {
+    notificationPagination.hidden = true;
+    notificationPagination.replaceChildren();
+  }
   const message = error?.code === 'permission-denied'
     ? 'Your secure sign-in session has expired. Please log out and sign in again to view notifications.'
     : 'Notifications are temporarily unavailable. Please try again later.';
@@ -228,6 +255,11 @@ authReady.then(() => onAuthStateChanged(auth, (user) => {
   stopCustomerNotificationListener?.();
   stopCustomerNotificationListener = null;
   customerNotifications = [];
+  currentNotificationsPage = 1;
+  if (notificationPagination) {
+    notificationPagination.hidden = true;
+    notificationPagination.replaceChildren();
+  }
   notificationFallbackTimes = new Map();
   closeNotificationDropdown();
   currentNotificationUserId = user?.uid || '';
@@ -260,7 +292,7 @@ authReady.then(() => onAuthStateChanged(auth, (user) => {
       if (!notificationFallbackTimes.has(item.id)) notificationFallbackTimes.set(item.id, Date.now());
       return { id: item.id, ...item.data(), _receivedAtFallbackMs: notificationFallbackTimes.get(item.id) };
     })
-      .sort((a, b) => notificationTimeMs(a) - notificationTimeMs(b));
+      .sort((a, b) => notificationTimeMs(b) - notificationTimeMs(a));
     renderCustomerNotifications();
     if (notificationDropdown && !notificationDropdown.hidden) markCustomerNotificationsSeen();
   }, (error) => {

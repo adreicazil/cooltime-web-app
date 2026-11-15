@@ -332,6 +332,7 @@ body.customer-dashboard-page .main-nav a:hover {
 .customer-bookings-list { display: grid; gap: 0; margin-top: 24px; }
 .customer-bookings-pagination { display: block; width: 100%; margin: 20px 0 4px; color: #dbeafe; }
 .customer-pagination-footer { display: block; width: 100%; margin: 20px 0 4px; color: #dbeafe; }
+.customer-pagination-footer[hidden] { display: none !important; }
 .customer-bookings-empty { padding: 12px 0; color: rgba(255,255,255,.75); }
 .customer-booking-row { padding: 0; border-top: 1px solid rgba(255,255,255,.2); cursor: pointer; }
 .booking-row-main { display: grid; grid-template-columns: minmax(0,1fr) 112px 104px; align-items: center; gap: 12px; min-height: 96px; }
