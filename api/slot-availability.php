@@ -4,7 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/config.php';
 requirePost();
 
-function availabilityFirestoreQuery(array $account, string $fieldName, string $branchValue): array
+function availabilityFirestoreQuery(array $account, string $fieldName, array $branchValues, string $dateField, string $date): array
 {
     $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id'])
         . '/databases/(default)/documents:runQuery';
@@ -12,14 +12,15 @@ function availabilityFirestoreQuery(array $account, string $fieldName, string $b
         'structuredQuery' => [
             'select' => ['fields' => [
                 ['fieldPath' => 'branchId'], ['fieldPath' => 'date'], ['fieldPath' => 'appointmentDate'],
-                ['fieldPath' => 'branch'], ['fieldPath' => 'timeSlot'], ['fieldPath' => 'preferredTimeSlot'], ['fieldPath' => 'status'],
+                ['fieldPath' => 'branch'], ['fieldPath' => 'timeSlot'], ['fieldPath' => 'preferredTimeSlot'], ['fieldPath' => 'preferredDate'], ['fieldPath' => 'status'],
             ]],
             'from' => [['collectionId' => 'bookings']],
-            'where' => ['fieldFilter' => [
-                'field' => ['fieldPath' => $fieldName],
-                'op' => 'EQUAL',
-                'value' => ['stringValue' => $branchValue],
-            ]],
+            'where' => ['compositeFilter' => ['op' => 'AND', 'filters' => [
+                ['fieldFilter' => ['field' => ['fieldPath' => $fieldName], 'op' => count($branchValues) === 1 ? 'EQUAL' : 'IN', 'value' => count($branchValues) === 1
+                    ? ['stringValue' => $branchValues[0]]
+                    : ['arrayValue' => ['values' => array_map(static fn(string $value): array => ['stringValue' => $value], $branchValues)]]]],
+                ['fieldFilter' => ['field' => ['fieldPath' => $dateField], 'op' => 'EQUAL', 'value' => ['stringValue' => $date]]],
+            ]]],
         ],
     ];
     $response = secureHttpRequest($url, 'POST', [
@@ -95,6 +96,18 @@ try {
         $user = firebaseUserFromToken($matches[1]);
         requireOtpSession($user);
     }
+    $cacheFile = slotAvailabilityCacheFile($branch, $date);
+    if (($data['action'] ?? '') === 'invalidate') {
+        @unlink($cacheFile);
+        jsonResponse(['ok' => true]);
+    }
+    $cached = @file_get_contents($cacheFile);
+    if (is_string($cached)) {
+        $cacheEntry = json_decode($cached, true);
+        if (is_array($cacheEntry) && (int) ($cacheEntry['expiresAt'] ?? 0) > time() && is_array($cacheEntry['response'] ?? null)) {
+            jsonResponse($cacheEntry['response']);
+        }
+    }
     $account = firebaseServiceAccount();
     $aliases = $branch === 'santa_rosa'
         ? ['santarosa', 'santa_rosa', 'santa_rosa_branch', 'santarosa_branch', 'Santa Rosa', 'Santa Rosa Branch', 'Santa Rosa branch', 'santa rosa branch']
@@ -103,18 +116,21 @@ try {
         ? ['Santa Rosa', 'Santa Rosa Branch', 'Santa Rosa branch', 'santa rosa branch', 'santarosa', 'santa_rosa']
         : ['Cabuyao', 'Cabuyao Branch', 'Cabuyao branch', 'Cabuyao Main Branch', 'Cabuyao main branch', 'cabuyao branch', 'cabuyao', 'cabuyao_main'];
     $occupied = [];
-    foreach ([...array_map(static fn(string $value): array => ['branchId', $value], $aliases),
-        ...array_map(static fn(string $value): array => ['branch', $value], $branchFieldValues)] as [$fieldName, $branchValue]) {
-        foreach (availabilityFirestoreQuery($account, $fieldName, $branchValue) as $row) {
+    foreach ([['branchId', $aliases], ['branch', $branchFieldValues]] as [$fieldName, $branchValues]) {
+      foreach (['date', 'appointmentDate', 'preferredDate'] as $dateField) {
+        foreach (availabilityFirestoreQuery($account, $fieldName, $branchValues, $dateField, $date) as $row) {
             $fields = $row['document']['fields'] ?? null;
-            if (!is_array($fields) || availabilityDateKey($fields['date'] ?? $fields['appointmentDate'] ?? []) !== $date) continue;
+            if (!is_array($fields) || availabilityDateKey($fields[$dateField] ?? []) !== $date) continue;
             $status = strtolower(trim((string) ($fields['status']['stringValue'] ?? 'pending')));
             if (in_array($status, ['cancelled', 'canceled', 'archived', 'completed', 'expired', 'payment overdue'], true)) continue;
             $timeSlot = trim((string) ($fields['timeSlot']['stringValue'] ?? $fields['preferredTimeSlot']['stringValue'] ?? ''));
             if ($timeSlot !== '') $occupied[$timeSlot] = true;
         }
+      }
     }
-    jsonResponse(['ok' => true, 'branchId' => $branch, 'date' => $date, 'occupiedSlots' => array_keys($occupied)]);
+    $response = ['ok' => true, 'branchId' => $branch, 'date' => $date, 'occupiedSlots' => array_keys($occupied)];
+    @file_put_contents($cacheFile, json_encode(['expiresAt' => time() + 15, 'response' => $response], JSON_THROW_ON_ERROR), LOCK_EX);
+    jsonResponse($response);
 } catch (Throwable $error) {
     error_log('Slot availability lookup failed: ' . $error->getMessage());
     writeSystemLog('API Failure', 'Slot availability lookup failed: ' . $error->getMessage(), '/api/slot-availability.php', 503);

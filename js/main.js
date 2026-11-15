@@ -1,4 +1,4 @@
-import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { auth, authReady, db } from './firebase-config.js';
 import { updateAvailableSlots } from './slot-availability.js';
 import { normalizeBranchLabel } from './branch-utils.js';
@@ -45,13 +45,26 @@ function populateBookableServiceSelects(services) {
   });
 }
 
-function renderBookableServices(snapshot) {
-  populateBookableServiceSelects(snapshot.docs
-    .map((serviceDoc) => ({ id: serviceDoc.id, ...serviceDoc.data() })));
+const SERVICE_CATALOG_CACHE_KEY = 'cooltime.services.catalog.v1';
+const SERVICE_CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
+
+async function loadServiceCatalog() {
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(SERVICE_CATALOG_CACHE_KEY) || 'null');
+    if (Array.isArray(cached?.services) && Date.now() - Number(cached.savedAt) < SERVICE_CATALOG_CACHE_TTL_MS) {
+      return cached.services;
+    }
+  } catch { /* Ignore unavailable or malformed session cache. */ }
+
+  const snapshot = await getDocs(collection(db, 'services'));
+  const services = snapshot.docs.map((serviceDoc) => ({ id: serviceDoc.id, ...serviceDoc.data() }));
+  try { sessionStorage.setItem(SERVICE_CATALOG_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), services })); }
+  catch { /* The catalog still works when session storage is unavailable. */ }
+  return services;
 }
 
 if (serviceSelects.length) {
-  onSnapshot(collection(db, 'services'), renderBookableServices, (error) => {
+  loadServiceCatalog().then(populateBookableServiceSelects).catch((error) => {
     console.error('CoolTime service catalog could not be loaded:', error);
     populateBookableServiceSelects(fallbackBookableServices.map((service) => ({ ...service, status: 'active' })));
   });

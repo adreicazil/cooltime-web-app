@@ -639,6 +639,7 @@ try {
         }
         $writes[] = adminWorkflowAuditWrite($actor, $actorProfile, 'Booking Cancelled', (string) ($booking['referenceNumber'] ?? $bookingId), $reason, $now);
         adminWorkflowCommit($account, $writes);
+        invalidateSlotAvailabilityCache((string) ($booking['branchId'] ?? $booking['branch'] ?? ''), (string) ($booking['date'] ?? $booking['appointmentDate'] ?? ''));
         $booking['id'] = $bookingId;
         $details = notificationBookingDetails($account, $booking);
         $details['paymentBalance'] = 0;
@@ -788,6 +789,8 @@ try {
             adminWorkflowAuditWrite($actor, $actorProfile, 'Booking Slot Updated', $reference ?: $bookingId,
                 "Appointment changed from {$oldBranchLabel} {$oldDate} {$oldTime} to {$branchName} {$date} {$timeSlot}.", $now),
         ]);
+        invalidateSlotAvailabilityCache($oldBranchId, $oldDate);
+        invalidateSlotAvailabilityCache($branchId, $date);
         $booking['id'] = $bookingId;
         $booking['branchId'] = $branchId;
         $booking['branch'] = $branchName;

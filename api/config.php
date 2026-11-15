@@ -703,11 +703,22 @@ function firebaseAdminAccessToken(): string
 {
     static $token = null;
     static $expiresAt = 0;
+    $account = firebaseServiceAccount();
+    $tokenCacheFile = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR
+        . 'cooltime-firebase-admin-token-' . hash('sha256', (string) $account['project_id']) . '.json';
     if (is_string($token) && time() < $expiresAt - 60) {
         return $token;
     }
+    $cached = @file_get_contents($tokenCacheFile);
+    if (is_string($cached)) {
+        $cachedToken = json_decode($cached, true);
+        if (is_array($cachedToken) && !empty($cachedToken['token']) && (int) ($cachedToken['expiresAt'] ?? 0) > time() + 60) {
+            $token = (string) $cachedToken['token'];
+            $expiresAt = (int) $cachedToken['expiresAt'];
+            return $token;
+        }
+    }
 
-    $account = firebaseServiceAccount();
     $now = time();
     $header = base64UrlEncode(json_encode(['alg' => 'RS256', 'typ' => 'JWT'], JSON_THROW_ON_ERROR));
     $claims = base64UrlEncode(json_encode([
@@ -755,7 +766,19 @@ function firebaseAdminAccessToken(): string
     }
     $token = (string) $response['body']['access_token'];
     $expiresAt = $now + (int) ($response['body']['expires_in'] ?? 3600);
+    @file_put_contents($tokenCacheFile, json_encode(['token' => $token, 'expiresAt' => $expiresAt], JSON_THROW_ON_ERROR), LOCK_EX);
     return $token;
+}
+
+function slotAvailabilityCacheFile(string $branch, string $date): string
+{
+    return rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR
+        . 'cooltime-slot-availability-' . hash('sha256', $branch . '|' . $date) . '.json';
+}
+
+function invalidateSlotAvailabilityCache(string $branch, string $date): void
+{
+    if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) @unlink(slotAvailabilityCacheFile(normalizeBranchId($branch), $date));
 }
 
 function isLocalDevelopmentRequest(): bool

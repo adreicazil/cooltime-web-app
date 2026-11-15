@@ -107,6 +107,10 @@ export async function createBooking({ customerId, userId = customerId, email, cu
     status: 'pending', createdAt: serverTimestamp(), updatedAt: serverTimestamp()
   });
   await batch.commit();
+  await fetch('/api/slot-availability.php', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'invalidate', branchId: normalizedBranchId, date }),
+  }).catch(() => {});
   return {
     bookingId: bookingRef.id, vehicleId: vehicleRef.id,
     booking: {

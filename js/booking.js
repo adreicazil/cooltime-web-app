@@ -16,11 +16,27 @@ let customerProfile = null;
 let savedVehiclesById = {};
 
 const serviceTypeSelect = document.getElementById('serviceType');
+const SERVICE_CATALOG_CACHE_KEY = 'cooltime.services.catalog.v1';
+const SERVICE_CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
+
+async function loadServiceCatalog() {
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(SERVICE_CATALOG_CACHE_KEY) || 'null');
+    if (Array.isArray(cached?.services) && Date.now() - Number(cached.savedAt) < SERVICE_CATALOG_CACHE_TTL_MS) {
+      return cached.services;
+    }
+  } catch { /* Ignore unavailable or malformed session cache. */ }
+  const snapshot = await getDocs(collection(db, 'services'));
+  const services = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+  try { sessionStorage.setItem(SERVICE_CATALOG_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), services })); }
+  catch { /* The catalog still works when session storage is unavailable. */ }
+  return services;
+}
+
 if (serviceTypeSelect) {
-  onSnapshot(collection(db, 'services'), (snapshot) => {
+  loadServiceCatalog().then((catalog) => {
     const selectedId = serviceTypeSelect.value;
-    const services = snapshot.docs
-      .map((serviceDoc) => ({ id: serviceDoc.id, ...serviceDoc.data() }))
+    const services = catalog
       .filter((service) => ['active', 'available'].includes(String(service.status || '').trim().toLowerCase()))
       .filter((service) => typeof service.name === 'string' && service.name.trim() !== '')
       .sort((a, b) => a.name.localeCompare(b.name));
@@ -30,7 +46,7 @@ if (serviceTypeSelect) {
     );
     serviceTypeSelect.disabled = services.length === 0;
     if (services.some((service) => service.id === selectedId)) serviceTypeSelect.value = selectedId;
-  }, (error) => {
+  }).catch((error) => {
     console.error('CoolTime service catalog could not be loaded:', error);
     serviceTypeSelect.replaceChildren(new Option('Select a Service', ''));
     serviceTypeSelect.disabled = true;
@@ -327,8 +343,8 @@ function loadInvoices(user) {
   const target = document.getElementById('customerInvoices');
   if (!target) return;
   invoiceVerificationUser = user;
-  getDocs(collection(db, 'services')).then((snapshot) => {
-    billServices = snapshot.docs.map((item) => ({ id: item.id, ...item.data() })).filter((service) => Number(service.price) > 0 && String(service.status || 'active').toLowerCase() === 'active');
+  loadServiceCatalog().then((catalog) => {
+    billServices = catalog.filter((service) => Number(service.price) > 0 && String(service.status || 'active').toLowerCase() === 'active');
     if (latestInvoiceSnapshot) renderInvoices(latestInvoiceSnapshot);
   }).catch((error) => console.error('Service catalog for bills failed:', error));
   stopInvoiceListener?.();
@@ -345,7 +361,6 @@ async function refreshInvoicesFromServer(user) {
   renderInvoices(snapshot);
 }
 
-let stopCustomerServiceCatalog = null;
 let stopCustomerBookingListeners = [];
 let bookingsCurrentPage = 1;
 const PAGE_SIZE = 15;
@@ -484,11 +499,10 @@ async function loadCustomerBookings(user, profile) {
     let records = [];
     let serviceCatalog = {};
     const render = () => renderCustomerBookings(records, serviceCatalog, vehicleData, branchCatalog, user, profile, target);
-    stopCustomerServiceCatalog?.();
-    stopCustomerServiceCatalog = onSnapshot(collection(db, 'services'), (snapshot) => {
-      serviceCatalog = Object.fromEntries(snapshot.docs.map((item) => [item.id, { ...item.data() }]));
+    loadServiceCatalog().then((catalog) => {
+      serviceCatalog = Object.fromEntries(catalog.map((item) => [item.id, item]));
       render();
-    }, (error) => {
+    }).catch((error) => {
       console.error('Service names for customer bookings could not be refreshed:', error);
       serviceCatalog = {};
       render();

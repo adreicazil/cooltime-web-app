@@ -8,7 +8,7 @@ const STANDARD_SLOTS = [
   '03:00 PM - 05:00 PM',
 ];
 const runBySelect = new WeakMap();
-const refreshBySelect = new WeakMap();
+const controllerBySelect = new WeakMap();
 const boundSelects = new WeakSet();
 
 function normalizeBranch(value) {
@@ -45,8 +45,7 @@ export async function updateAvailableSlots(dateInput, branchInput, slotSelectEle
   if (!dateInput || !branchInput || !slotSelectElement) return;
   const run = (runBySelect.get(slotSelectElement) || 0) + 1;
   runBySelect.set(slotSelectElement, run);
-  clearInterval(refreshBySelect.get(slotSelectElement));
-  refreshBySelect.delete(slotSelectElement);
+  controllerBySelect.get(slotSelectElement)?.abort();
 
   if (!boundSelects.has(slotSelectElement)) {
     slotSelectElement.addEventListener('change', () => syncSubmitButton(slotSelectElement));
@@ -66,18 +65,12 @@ export async function updateAvailableSlots(dateInput, branchInput, slotSelectEle
   slotSelectElement.disabled = true;
   syncSubmitButton(slotSelectElement);
 
-  const refresh = async () => {
-    // The initial call and every polling tick must require a complete
-    // selection. Keep the placeholder instead of sending an invalid request.
-    const currentDate = String(dateInput.value || '').trim();
-    const currentBranchId = normalizeBranch(branchInput.value);
-    if (!currentDate || !currentBranchId) {
-      slotSelectElement.replaceChildren(new Option('Select branch and date first', ''));
-      slotSelectElement.disabled = true;
-      syncSubmitButton(slotSelectElement);
-      return;
-    }
-    try {
+  const currentDate = String(dateInput.value || '').trim();
+  const currentBranchId = normalizeBranch(branchInput.value);
+  if (!currentDate || !currentBranchId) return;
+  const controller = new AbortController();
+  controllerBySelect.set(slotSelectElement, controller);
+  try {
       const headers = { 'Content-Type': 'application/json' };
       if (requireAuthentication) {
         await authReady;
@@ -87,8 +80,12 @@ export async function updateAvailableSlots(dateInput, branchInput, slotSelectEle
       const response = await fetch('/api/slot-availability.php', {
         method: 'POST', headers,
         body: JSON.stringify({ branchId: currentBranchId, date: currentDate }),
+        signal: controller.signal,
       });
-      const result = await response.json();
+      const raw = await response.text();
+      let result;
+      try { result = JSON.parse(raw); }
+      catch { throw new Error(`Availability response was not valid JSON (HTTP ${response.status}).`); }
       if (!response.ok || !result.ok) throw new Error(result.message || 'Availability could not be loaded.');
       if (runBySelect.get(slotSelectElement) !== run) return;
 
@@ -123,19 +120,12 @@ export async function updateAvailableSlots(dateInput, branchInput, slotSelectEle
         const notice = slotSelectElement.form?.querySelector('[role="status"].availability-notice, #guest-booking-notice');
         if (notice) notice.textContent = '';
       }
-    } catch (error) {
+  } catch (error) {
+      if (error.name === 'AbortError') return;
       if (runBySelect.get(slotSelectElement) !== run) return;
       console.error('Slot availability lookup failed:', error);
       slotSelectElement.replaceChildren(new Option('Availability unavailable', ''));
       slotSelectElement.disabled = true;
       syncSubmitButton(slotSelectElement);
-    }
-  };
-
-  await refresh();
-  if (runBySelect.get(slotSelectElement) === run) {
-    // Keep already-open booking forms in sync shortly after an administrator
-    // moves a confirmed appointment to another branch/date/time.
-    refreshBySelect.set(slotSelectElement, setInterval(refresh, 5000));
   }
 }
