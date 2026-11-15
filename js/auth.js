@@ -95,8 +95,8 @@ if (loginForm) {
 }
 
 if (registerForm) {
-  registerForm.addEventListener('submit', async (event) => {
-    event.preventDefault();
+  const registerButton = registerForm.querySelector('[type="submit"]');
+  const registrationDetails = () => {
     const firstName = getInputValue(registerForm, '#firstName');
     const lastName = getInputValue(registerForm, '#lastName');
     const name = `${firstName} ${lastName}`.trim();
@@ -106,34 +106,33 @@ if (registerForm) {
     const password = getPasswordValue(registerForm, '#password').trim();
     const confirmPassword = getPasswordValue(registerForm, '#confirm-password').trim();
     if (!confirmPassword) {
-      event.preventDefault();
-      event.stopPropagation();
       showMessage('Please confirm your password.');
       registerForm.querySelector('#confirm-password')?.focus();
-      return;
+      return null;
     }
     if (password !== confirmPassword) {
-      event.preventDefault();
-      event.stopPropagation();
       showMessage('Passwords do not match.');
       registerForm.querySelector('#confirm-password')?.focus();
-      return;
+      return null;
     }
     const security = window.SecurityValidator;
     if (security?.isDisposableEmail(email)) {
       showMessage('Please use a permanent email address to create your account.');
-      return;
+      return null;
     }
     if (security?.containsInappropriateContent(name)) {
       showMessage('Please enter a name without inappropriate language.');
-      return;
+      return null;
     }
     if (security && !security.isValidPHMobileNumber(contactNumber)) {
       showMessage('Enter a valid Philippine mobile number.');
       registerForm.querySelector('#contactNumber')?.focus();
-      return;
+      return null;
     }
-    const registerButton = registerForm.querySelector('[type="submit"]');
+    return { firstName, lastName, name, username, contactNumber, email, password };
+  };
+
+  const createCustomerAccount = async ({ firstName, lastName, name, username, contactNumber, email, password }) => {
     if (registerButton) registerButton.disabled = true;
     try {
       await authReady;
@@ -171,8 +170,19 @@ if (registerForm) {
       }
       showMessage(authMessage(error, 'create your account'));
     } finally {
+      // A failed signup must never leave approval state that can skip the TOC.
+      window.CooltimeToc?.reset();
       if (registerButton) registerButton.disabled = false;
     }
+  };
+
+  registerForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (!registerForm.reportValidity()) return;
+    const details = registrationDetails();
+    if (!details) return;
+    // Account creation is only reachable through the modal's Agree button.
+    window.CooltimeToc?.open(() => { void createCustomerAccount(details); });
   });
 }
 
