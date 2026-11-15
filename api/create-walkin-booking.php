@@ -44,12 +44,6 @@ try {
     $model = walkinInput($input, 'vehicleModel', 'vehicle_model', 'model');
     $year = walkinInput($input, 'vehicleYear', 'vehicle_year', 'year');
     $phone = walkinInput($input, 'phone', 'contact', 'contactNumber', 'contact_number');
-    $method = strtolower(str_replace(['-', ' '], '_', walkinInput($input, 'paymentMethod', 'payment_method')));
-    $method = match ($method) {
-        'cash', 'cash_otc', 'otc' => 'cash_otc',
-        'e_wallet', 'ewallet', 'paymongo', 'gcash' => 'paymongo_checkout',
-        default => '',
-    };
 
     $invalid = [];
     if ($name === '' || strlen($name)>120) $invalid[]='name';
@@ -64,7 +58,6 @@ try {
     if ($make === '') $invalid[]='vehicleMake';
     if ($model === '') $invalid[]='vehicleModel';
     if (!preg_match('/^\d{4}$/',$year) || (int)$year<1950 || (int)$year>2100) $invalid[]='vehicleYear';
-    if ($method === '') $invalid[]='paymentMethod (use cash/cash_otc or e_wallet/ewallet)';
     if ($phone !== '' && !preg_match('/^[+0-9() .-]{7,25}$/',$phone)) $invalid[]='phone';
     if ($invalid) jsonResponse(['ok'=>false,'message'=>'Invalid or missing field(s): '.implode(', ',$invalid).'.'],422);
 
@@ -107,11 +100,11 @@ try {
     if (!is_finite($price) || $price<=0) jsonResponse(['ok'=>false,'message'=>'Invalid field: service price is not configured.'],422);
 
     $branch = $branchLabel;
-    $methodName=$method==='cash_otc'?'cash_otc':'paymongo_checkout';
-    $paymentStatus=$method==='cash_otc'?'unpaid':'pending';
+    $methodName='unpaid_at_intake';
+    $paymentStatus='unpaid';
     $bookingId='walkin_'.bin2hex(random_bytes(12)); $invoiceId='walkin_inv_'.bin2hex(random_bytes(12));
     $now=gmdate('Y-m-d\\TH:i:s\\Z');
-    $reference=cooltimeReferenceNumber($method==='cash_otc'?'OTC':'PMO',$branchLabel,$date);
+    $reference=cooltimeReferenceNumber('WLK',$branchLabel,$date);
     $bookingFields=[
       'bookingId'=>['stringValue'=>$bookingId],'customerId'=>['stringValue'=>''],'customerName'=>['stringValue'=>$name],'customerEmail'=>['stringValue'=>$email],
       'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'branchId'=>['stringValue'=>$branchId],'branch'=>['stringValue'=>$branchLabel],
@@ -123,8 +116,9 @@ try {
         'plateNumber'=>['stringValue'=>$plate],'plate'=>['stringValue'=>$plate],'make'=>['stringValue'=>$make],
         'model'=>['stringValue'=>$model],'year'=>['integerValue'=>$year],
       ]]],
-      'source'=>['stringValue'=>'walk_in_pos'],'is_guest'=>['booleanValue'=>true],'status'=>['stringValue'=>'pending'],
+      'source'=>['stringValue'=>'walk_in_pos'],'bookingType'=>['stringValue'=>'walk_in'],'is_guest'=>['booleanValue'=>true],'status'=>['stringValue'=>'confirmed'],
       'paymentStatus'=>['stringValue'=>$paymentStatus],'paymentMethod'=>['stringValue'=>$methodName],
+      'paymentBalance'=>['doubleValue'=>$price],
       'payment_status'=>['stringValue'=>$paymentStatus],'payment_method'=>['stringValue'=>$methodName],
       'referenceNumber'=>['stringValue'=>$reference],'invoiceNumber'=>['stringValue'=>$reference],
       'invoiceId'=>['stringValue'=>$invoiceId],'createdAt'=>['timestampValue'=>$now],'updatedAt'=>['timestampValue'=>$now],
@@ -140,7 +134,8 @@ try {
       'referenceNumber'=>['stringValue'=>$reference],'invoiceNumber'=>['stringValue'=>$reference],'servicesAdded'=>['arrayValue'=>['values'=>[['stringValue'=>$serviceId]]]],
       'serviceDetails'=>['arrayValue'=>['values'=>[['mapValue'=>['fields'=>['id'=>['stringValue'=>$serviceId],'name'=>['stringValue'=>$serviceName],'price'=>['doubleValue'=>$price],'quantity'=>['integerValue'=>'1'],'lineTotal'=>['doubleValue'=>$price]]]]]]],
       'runningTotal'=>['doubleValue'=>$price],'finalAmount'=>['doubleValue'=>$price],'totalAmount'=>['doubleValue'=>$price],
-      'downpaymentAmount'=>['doubleValue'=>0],'serviceStatus'=>['stringValue'=>'pending'],'status'=>['stringValue'=>$paymentStatus],
+      'downpaymentAmount'=>['doubleValue'=>0],'balanceDue'=>['doubleValue'=>$price],'balance_due'=>['doubleValue'=>$price],
+      'paymentBalance'=>['doubleValue'=>$price],'serviceStatus'=>['stringValue'=>'pending'],'status'=>['stringValue'=>'unpaid'],
       'createdAt'=>['timestampValue'=>$now],'updatedAt'=>['timestampValue'=>$now],
     ]);
     jsonResponse(['ok'=>true,'bookingId'=>$bookingId,'invoiceId'=>$invoiceId,'amount'=>$price,'referenceNumber'=>$reference,'customerName'=>$name,'branch'=>$branchLabel,'serviceName'=>$serviceName]);

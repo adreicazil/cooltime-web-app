@@ -305,7 +305,7 @@ try {
     $paidUpdates = [
         'invoices' => [$reference => [
             'status' => ['stringValue' => 'paid'],
-            'paymentStatus' => ['stringValue' => 'paid'], 'balanceDue' => ['doubleValue' => 0], 'balance_due' => ['doubleValue' => 0],
+            'paymentStatus' => ['stringValue' => 'paid'], 'balanceDue' => ['doubleValue' => 0], 'balance_due' => ['doubleValue' => 0], 'paymentBalance' => ['doubleValue' => 0],
             'latestPaymentSessionId' => ['nullValue' => null],
             'paymentId' => ['stringValue' => $paymentDocId],
             'paymentReference' => ['stringValue' => $paymongoPaymentId],
@@ -316,7 +316,18 @@ try {
         'payments' => $paymentUpdates,
     ];
     if ($bookingId !== '' && preg_match('/^[A-Za-z0-9_-]{1,150}$/', $bookingId)) {
-        $paidUpdates['bookings'] = [$bookingId => ['paymentStatus' => ['stringValue' => 'paid'], 'updatedAt' => ['timestampValue' => gmdate('Y-m-d\TH:i:s\Z')]]];
+        $paidUpdates['bookings'] = [$bookingId => ['paymentStatus' => ['stringValue' => 'paid'], 'paymentBalance' => ['doubleValue' => 0], 'updatedAt' => ['timestampValue' => gmdate('Y-m-d\TH:i:s\Z')]]];
+    }
+    if (strtolower((string) ($invoice['source'] ?? '')) === 'walk_in_pos' && $bookingId !== '') {
+        $paidUpdates['pos_transactions'] = ['walkin_pos_' . $bookingId => [
+            'invoiceId' => ['stringValue' => $reference], 'bookingId' => ['stringValue' => $bookingId], 'paymentId' => ['stringValue' => $paymentDocId],
+            'source' => ['stringValue' => 'walk_in_pos'], 'status' => ['stringValue' => 'paid'], 'paymentMethod' => ['stringValue' => $paymentMethod],
+            'method' => ['stringValue' => $paymentMethod], 'referenceNumber' => ['stringValue' => (string) ($invoice['referenceNumber'] ?? $reference)],
+            'customerName' => ['stringValue' => (string) ($invoice['customerName'] ?? '')], 'customerEmail' => ['stringValue' => (string) ($invoice['customerEmail'] ?? '')],
+            'totalAmount' => ['doubleValue' => (float) ($invoice['totalAmount'] ?? $invoice['runningTotal'] ?? $invoice['finalAmount'] ?? 0)],
+            'amount' => ['integerValue' => (string) (int) ($paymentAttributes['amount'] ?? 0)], 'currency' => ['stringValue' => 'PHP'],
+            'createdAt' => ['timestampValue' => $paidAt],
+        ]];
     }
     webhookFirestoreCommit($account, $paidUpdates);
 
@@ -325,6 +336,14 @@ try {
     $referenceNumber = (string) ($invoice['referenceNumber'] ?? $invoice['referenceNo'] ?? $invoice['invoiceNumber'] ?? $reference);
     $paidAmount = (float) ($invoice['totalAmount'] ?? $invoice['runningTotal'] ?? $invoice['finalAmount'] ?? 0);
     $notificationCreated = notifyInvoicePaymentConfirmed($account, $invoice, $reference, gmdate('Y-m-d\\TH:i:s\\Z'));
+    if ($customerId === '') {
+        $receiptEmail = filter_var((string) ($invoice['customerEmail'] ?? ''), FILTER_VALIDATE_EMAIL);
+        if ($receiptEmail) {
+            $receiptText = 'Payment received for CoolTime walk-in service. Reference: ' . $referenceNumber . '. Amount paid: PHP ' . number_format($paidAmount, 2) . '. Method: PayMongo E-Wallet / GCash QR.';
+            trySendConfiguredEmail($receiptEmail, 'CoolTime walk-in payment receipt — ' . $referenceNumber,
+                nl2br(htmlspecialchars($receiptText, ENT_QUOTES, 'UTF-8')), $receiptText);
+        }
+    }
     if ($notificationCreated === true) {
         $customer = $customerId !== '' ? webhookReadDocument($account, 'users', $customerId) : null;
         $customerEmail = strtolower(trim((string) ($customer['email'] ?? '')));

@@ -275,7 +275,8 @@ try {
         if (!preg_match('/^[A-Za-z0-9_-]{1,150}$/', $bookingId)) jsonResponse(['ok' => false, 'message' => 'A valid booking is required.'], 422);
         $booking = adminWorkflowRead($account, 'bookings', $bookingId);
         if (!$booking) jsonResponse(['ok' => false, 'message' => 'Booking was not found.'], 404);
-        $invoiceId = 'web_' . $bookingId;
+        $isWalkIn = strtolower((string) ($booking['bookingType'] ?? '')) === 'walk_in';
+        $invoiceId = $isWalkIn ? (string) ($booking['invoiceId'] ?? '') : 'web_' . $bookingId;
         $invoice = adminWorkflowRead($account, 'invoices', $invoiceId);
         if (!$invoice) jsonResponse(['ok' => true, 'checkoutStatus' => 'none']);
         if (strtolower((string) ($invoice['status'] ?? '')) === 'paid') jsonResponse(['ok' => true, 'checkoutStatus' => 'paid']);
@@ -348,6 +349,57 @@ try {
         if (!$email || $subject === '' || $message === '') jsonResponse(['ok' => false, 'message' => 'Recipient, subject, and message are required.'], 422);
         $emailSent = trySendConfiguredEmail($email, $subject, nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8')), $message);
         jsonResponse(['ok' => true, 'message' => $emailSent ? 'Email sent.' : 'Email delivery was skipped or unavailable.', 'emailSent' => $emailSent]);
+    }
+    if ($action === 'settle_walkin_payment') {
+        $bookingId = trim((string) ($input['bookingId'] ?? ''));
+        $method = strtolower(trim((string) ($input['paymentMethod'] ?? '')));
+        if (!preg_match('/^[A-Za-z0-9_-]{1,150}$/', $bookingId) || $method !== 'cash') {
+            jsonResponse(['ok' => false, 'message' => 'Choose a valid walk-in booking and payment method.'], 422);
+        }
+        $booking = adminWorkflowRead($account, 'bookings', $bookingId);
+        if (!$booking || strtolower((string) ($booking['bookingType'] ?? '')) !== 'walk_in') jsonResponse(['ok' => false, 'message' => 'Walk-in booking was not found.'], 404);
+        if (strtolower((string) ($booking['status'] ?? '')) !== 'completed') jsonResponse(['ok' => false, 'message' => 'Complete the walk-in service before collecting payment.'], 409);
+        if (strtolower((string) ($booking['paymentStatus'] ?? '')) === 'paid') jsonResponse(['ok' => false, 'message' => 'This walk-in booking is already paid.'], 409);
+        $invoiceId = (string) ($booking['invoiceId'] ?? '');
+        $invoice = $invoiceId !== '' ? adminWorkflowRead($account, 'invoices', $invoiceId) : null;
+        if (!$invoice) jsonResponse(['ok' => false, 'message' => 'Walk-in invoice was not found.'], 404);
+        $amount = (float) ($invoice['runningTotal'] ?? $invoice['totalAmount'] ?? $invoice['finalAmount'] ?? $booking['paymentBalance'] ?? 0);
+        if (!is_finite($amount) || $amount <= 0) jsonResponse(['ok' => false, 'message' => 'Walk-in balance is invalid.'], 409);
+        $now = gmdate('Y-m-d\\TH:i:s\\Z');
+        $paymentId = 'walkin_payment_' . $bookingId;
+        $posId = 'walkin_pos_' . $bookingId;
+        $reference = (string) ($booking['referenceNumber'] ?? $invoice['referenceNumber'] ?? $bookingId);
+        $cashierName = trim((string) ($actorProfile['name'] ?? $actorProfile['displayName'] ?? $actorProfile['username'] ?? $actor['email']));
+        $paymentFields = ['invoiceId' => ['stringValue' => $invoiceId], 'bookingId' => ['stringValue' => $bookingId], 'customerId' => ['stringValue' => ''],
+            'amount' => ['integerValue' => (string) (int) round($amount * 100)], 'amountUnit' => ['stringValue' => 'centavos'], 'currency' => ['stringValue' => 'PHP'],
+            'method' => ['stringValue' => $method], 'status' => ['stringValue' => 'paid'], 'referenceNumber' => ['stringValue' => $reference],
+            'providerReference' => ['stringValue' => $paymentId], 'paidAt' => ['timestampValue' => $now], 'source' => ['stringValue' => 'walk_in_pos'],
+            'cashierId' => ['stringValue' => $actor['uid']], 'cashierName' => ['stringValue' => $cashierName]];
+        $posFields = ['invoiceId' => ['stringValue' => $invoiceId], 'bookingId' => ['stringValue' => $bookingId], 'paymentId' => ['stringValue' => $paymentId],
+            'source' => ['stringValue' => 'walk_in_pos'], 'status' => ['stringValue' => 'paid'], 'paymentMethod' => ['stringValue' => $method],
+            'method' => ['stringValue' => $method], 'referenceNumber' => ['stringValue' => $reference], 'customerName' => ['stringValue' => (string) ($booking['customerName'] ?? '')],
+            'customerEmail' => ['stringValue' => (string) ($booking['customerEmail'] ?? '')], 'totalAmount' => ['doubleValue' => $amount], 'amount' => ['integerValue' => (string) (int) round($amount * 100)],
+            'currency' => ['stringValue' => 'PHP'], 'cashierId' => ['stringValue' => $actor['uid']], 'cashierName' => ['stringValue' => $cashierName], 'createdAt' => ['timestampValue' => $now]];
+        adminWorkflowCommit($account, [
+            ['collection' => 'payments', 'id' => $paymentId, 'fields' => $paymentFields],
+            ['collection' => 'pos_transactions', 'id' => $posId, 'fields' => $posFields],
+            ['collection' => 'invoices', 'id' => $invoiceId, 'fields' => ['status' => ['stringValue' => 'paid'], 'paymentStatus' => ['stringValue' => 'paid'], 'paymentMethod' => ['stringValue' => $method], 'paymentId' => ['stringValue' => $paymentId], 'downpaymentAmount' => ['doubleValue' => $amount], 'balanceDue' => ['doubleValue' => 0], 'balance_due' => ['doubleValue' => 0], 'paymentBalance' => ['doubleValue' => 0], 'paidAt' => ['timestampValue' => $now], 'updatedAt' => ['timestampValue' => $now]]],
+            ['collection' => 'bookings', 'id' => $bookingId, 'fields' => ['paymentStatus' => ['stringValue' => 'paid'], 'paymentBalance' => ['doubleValue' => 0], 'paymentMethod' => ['stringValue' => $method], 'updatedAt' => ['timestampValue' => $now]]],
+            adminWorkflowAuditWrite($actor, $actorProfile, 'Walk-In Payment Settled', $reference, 'Walk-in payment settled by ' . $method . '; PHP ' . number_format($amount, 2) . '.', $now),
+        ]);
+        $invoice['customerEmail'] = (string) ($booking['customerEmail'] ?? $invoice['customerEmail'] ?? '');
+        $invoice['customerName'] = (string) ($booking['customerName'] ?? $invoice['customerName'] ?? '');
+        $invoice['referenceNumber'] = $reference;
+        $invoice['customerId'] = '';
+        $invoice['totalAmount'] = $amount;
+        notifyInvoicePaymentConfirmed($account, $invoice, $invoiceId, $now);
+        $receiptEmail = filter_var((string) ($booking['customerEmail'] ?? $invoice['customerEmail'] ?? ''), FILTER_VALIDATE_EMAIL);
+        if ($receiptEmail) {
+            $receiptText = 'Payment received for CoolTime walk-in service. Reference: ' . $reference . '. Amount paid: PHP ' . number_format($amount, 2) . '. Method: Cash / OTC.';
+            trySendConfiguredEmail($receiptEmail, 'CoolTime walk-in payment receipt — ' . $reference,
+                nl2br(htmlspecialchars($receiptText, ENT_QUOTES, 'UTF-8')), $receiptText);
+        }
+        jsonResponse(['ok' => true, 'paymentId' => $paymentId, 'message' => 'Walk-in payment recorded and receipt email sent.']);
     }
     if ($action === 'save_service') {
         $serviceId = trim((string) ($input['serviceId'] ?? ''));
@@ -637,7 +689,8 @@ try {
                 'reason' => ['stringValue' => substr($reason, 0, 1000)], 'createdAt' => ['timestampValue' => $now],
             ]],
         ];
-        $invoiceId = 'web_' . $bookingId;
+        $isWalkIn = strtolower((string) ($booking['bookingType'] ?? '')) === 'walk_in';
+        $invoiceId = $isWalkIn ? (string) ($booking['invoiceId'] ?? '') : 'web_' . $bookingId;
         $invoice = adminWorkflowRead($account, 'invoices', $invoiceId);
         if ($invoice && strtolower((string) ($invoice['status'] ?? '')) === 'paid') {
             jsonResponse(['ok' => false, 'message' => 'This invoice is already paid. Resolve the payment before cancelling the booking.'], 409);
@@ -874,7 +927,8 @@ try {
             && ($input['earlyCompletionConfirmed'] ?? false) !== true) {
             jsonResponse(['ok' => false, 'message' => 'This appointment schedule has not passed yet. Confirm early service completion?'], 409);
         }
-        $invoiceId = 'web_' . $bookingId;
+        $isWalkIn = strtolower((string) ($booking['bookingType'] ?? '')) === 'walk_in';
+        $invoiceId = $isWalkIn ? (string) ($booking['invoiceId'] ?? '') : 'web_' . $bookingId;
         $invoice = adminWorkflowRead($account, 'invoices', $invoiceId);
         if (!$invoice) jsonResponse(['ok' => false, 'message' => 'The booking has no invoice to complete.'], 404);
         $sessionId = (string) ($invoice['latestPaymentSessionId'] ?? '');
@@ -938,7 +992,8 @@ try {
         $writes = [
             ['collection' => 'bookings', 'id' => $bookingId, 'fields' => [
                 'status' => ['stringValue' => 'completed'], 'serviceCompletedAt' => ['timestampValue' => $now], 'updatedAt' => ['timestampValue' => $now],
-                'paymentStatus' => ['stringValue' => ($checkoutPaid || $cashSettlementAmount > 0 || $balance <= 0) ? 'paid' : 'pending'],
+                'paymentStatus' => ['stringValue' => $isWalkIn ? 'unpaid' : (($checkoutPaid || $cashSettlementAmount > 0 || $balance <= 0) ? 'paid' : 'pending')],
+                'paymentBalance' => ['doubleValue' => $isWalkIn ? $total : $balance],
                 'branchId' => ['stringValue' => $bookingBranchId], 'branch' => ['stringValue' => $bookingBranchLabel],
             ]],
             ['collection' => 'invoices', 'id' => $invoiceId, 'fields' => [
@@ -1023,7 +1078,9 @@ try {
         $details['paymentBalance'] = $balance;
         $details['paymentStatus'] = $balance <= 0 ? 'paid' : 'pending';
         $details['message'] = $balance > 0
-            ? 'Service completed: your appointment is complete. Remaining balance: PHP ' . number_format($balance, 2) . ' is ready for payment in Running Bills.'
+            ? ($isWalkIn
+                ? 'Service completed: your walk-in service is complete. Please settle PHP ' . number_format($balance, 2) . ' at the CoolTime counter.'
+                : 'Service completed: your appointment is complete. Remaining balance: PHP ' . number_format($balance, 2) . ' is ready for payment in Running Bills.')
             : 'Service completed: your appointment is complete.';
         $customerEmail = (string) ($customer['email'] ?? $booking['customerEmail'] ?? '');
         notifyCustomerRecipient($account, 'service_completed_' . $bookingId, (string) ($booking['customerId'] ?? ''), $customerEmail, 'service_completed', $details['message'], $details, 'CoolTime service completed — invoice ' . $invoiceId);

@@ -849,6 +849,7 @@ function renderBookings() {
         bookingStatus === 'confirmed' ? `<button type="button" class="reschedule-booking" data-id="${esc(booking.id)}">Update appointment slot</button>` : '',
         !isClosed && bookingStatus !== 'confirmed' ? `<button type="button" class="cancel-booking" data-id="${esc(booking.id)}">Expire checkout &amp; release slot</button>` : '',
         canComplete ? `<button type="button" class="complete-booking" data-id="${esc(booking.id)}">Complete service</button>` : '',
+        booking.bookingType === 'walk_in' && bookingStatus === 'completed' && String(booking.paymentStatus || '').toLowerCase() !== 'paid' ? `<button type="button" class="settle-walkin-payment" data-id="${esc(booking.id)}">Settle Walk-In Payment</button>` : '',
         canApprove ? `<button type="button" class="approve-booking" data-id="${esc(booking.id)}">Approve booking</button>` : ''
       ].filter(Boolean).join('');
       const actionColumnHtml = isCancelled
@@ -882,7 +883,7 @@ function renderBookings() {
       </article>`;
     }
 
-    return `<tr><td>${esc(user.name || user.username || booking.customerId)}</td><td>${esc(user.email)}</td><td>${esc(booking.date)} ${esc(booking.timeSlot)}</td><td>${esc(service)}</td><td>${esc(normalizeBranchLabel(branchesById[booking.branchId]?.name || booking.branchName || booking.branch || booking.branchId))}</td><td>${state}</td><td><button class="action-btn booking-details" data-id="${esc(booking.id)}">View</button>${canApprove ? ` <button class="action-btn approve-booking" data-id="${esc(booking.id)}">Approve booking</button>` : ''}${!isClosed ? `${bookingStatus !== 'confirmed' ? ` <button class="action-btn cancel-booking" data-id="${esc(booking.id)}">${activeCheckout ? 'Expire checkout & release slot' : 'Cancel booking / release slot'}</button>` : ''}` : ''}${bookingStatus === 'confirmed' ? ` <button class="action-btn reschedule-booking" data-id="${esc(booking.id)}">Update appointment slot</button>` : ''}${canComplete ? ` <button class="action-btn complete-booking" data-id="${esc(booking.id)}">Complete service</button>` : ''}</td></tr>`;
+    return `<tr><td>${esc(user.name || user.username || booking.customerId)}</td><td>${esc(user.email)}</td><td>${esc(booking.date)} ${esc(booking.timeSlot)}</td><td>${esc(service)}</td><td>${esc(normalizeBranchLabel(branchesById[booking.branchId]?.name || booking.branchName || booking.branch || booking.branchId))}</td><td>${state}</td><td><button class="action-btn booking-details" data-id="${esc(booking.id)}">View</button>${canApprove ? ` <button class="action-btn approve-booking" data-id="${esc(booking.id)}">Approve booking</button>` : ''}${!isClosed ? `${bookingStatus !== 'confirmed' ? ` <button class="action-btn cancel-booking" data-id="${esc(booking.id)}">${activeCheckout ? 'Expire checkout & release slot' : 'Cancel booking / release slot'}</button>` : ''}` : ''}${bookingStatus === 'confirmed' ? ` <button class="action-btn reschedule-booking" data-id="${esc(booking.id)}">Update appointment slot</button>` : ''}${canComplete ? ` <button class="action-btn complete-booking" data-id="${esc(booking.id)}">Complete service</button>` : ''}${booking.bookingType === 'walk_in' && bookingStatus === 'completed' && String(booking.paymentStatus || '').toLowerCase() !== 'paid' ? ` <button class="action-btn settle-walkin-payment" data-id="${esc(booking.id)}">Settle Walk-In Payment</button>` : ''}</td></tr>`;
   });
   if (isDashboardPage && modulePaginators.bookings) {
     modulePaginators.bookings.setItems(renderedRows);
@@ -930,6 +931,25 @@ async function bookingAction(event) {
     catch (error) { alert(readableError(error)); button.disabled = false; }
     return;
   }
+  if (button.classList.contains('settle-walkin-payment')) {
+    const method = await prompt('Select settlement method:', 'cash', { choices: ['cash / OTC', 'PayMongo E-Wallet / GCash QR'] });
+    if (!method) return;
+    button.disabled = true;
+    try {
+      if (method !== 'cash / OTC') {
+        const invoice = invoiceForBooking(booking);
+        const response = await fetch('api/create-checkout-session.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ invoiceId: invoice?.id || booking.invoiceId, bookingId: booking.id, referenceId: booking.referenceNumber, forceRefresh: true }) });
+        const checkout = await response.json();
+        if (!response.ok || !checkout.ok || !checkout.checkoutUrl) throw new Error(checkout.message || 'PayMongo checkout could not be started.');
+        window.location.assign(checkout.checkoutUrl);
+        return;
+      }
+      await api('api/admin-workflow.php', { action: 'settle_walkin_payment', bookingId: booking.id, paymentMethod: 'cash' });
+      alert('Walk-in payment recorded and receipt email sent.');
+      await loadCoreData();
+    } catch (error) { alert(readableError(error)); button.disabled = false; }
+    return;
+  }
   if (button.classList.contains('complete-booking')) {
     if (String(booking.status).toLowerCase() !== 'confirmed') return;
     const appointmentDate = booking.date || booking.appointmentDate || '';
@@ -946,6 +966,14 @@ async function bookingAction(event) {
       ? false
       : await showAdminConfirm('This appointment schedule has not passed yet. Confirm early service completion?');
     if (scheduledAt > new Date() && !earlyCompletionConfirmed) return;
+    if (booking.bookingType === 'walk_in') {
+      button.disabled = true;
+      try {
+        await api('api/admin-workflow.php', { action: 'complete_booking', bookingId: booking.id, downpaymentAmount: 0, paymentMethod: '', earlyCompletionConfirmed });
+        await loadCoreData();
+      } catch (error) { alert(readableError(error)); button.disabled = false; }
+      return;
+    }
     let checkoutStatus = 'none';
     try {
       const verification = await api('api/admin-workflow.php', { action: 'verify_booking_checkout', bookingId: booking.id });

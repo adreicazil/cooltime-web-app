@@ -4,7 +4,6 @@ import { updateAvailableSlots } from './slot-availability.js';
 import { normalizeBranchLabel } from './branch-utils.js';
 
 const bookingModalElement = document.getElementById('guest-booking-modal');
-const paymentModalElement = document.getElementById('guest-payment-modal');
 const bookingForm = document.getElementById('guest-booking-form');
 const inquiryModalElement = document.getElementById('inquiry-form-modal');
 const registeredAccountLink = document.getElementById('noticeRegisteredAccountLink');
@@ -84,17 +83,14 @@ if (inquiryModalElement) {
   }
 }
 
-if (bookingModalElement && paymentModalElement && bookingForm) {
+if (bookingModalElement && bookingForm) {
   const bookingModal = window.bootstrap?.Modal.getOrCreateInstance(bookingModalElement);
-  const paymentModal = window.bootstrap?.Modal.getOrCreateInstance(paymentModalElement);
-  const otcModalElement = document.getElementById('otc-receipt-modal');
-  const otcModal = otcModalElement ? window.bootstrap?.Modal.getOrCreateInstance(otcModalElement) : null;
   const serviceSelect = document.getElementById('guest-service-select');
   const dateInput = document.getElementById('guest-date');
   const branchInput = document.getElementById('guest-branch-select');
   const slotSelect = document.getElementById('guest-time-slot');
 
-  if (bookingModal && paymentModal) {
+  if (bookingModal) {
     dateInput.min = new Date().toLocaleDateString('en-CA');
     updateAvailableSlots(dateInput, branchInput, slotSelect);
     dateInput.addEventListener('change', () => updateAvailableSlots(dateInput, branchInput, slotSelect));
@@ -120,116 +116,33 @@ if (bookingModalElement && paymentModalElement && bookingForm) {
       });
     });
 
-    bookingForm.addEventListener('submit', (event) => {
+    bookingForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const notice = document.getElementById('guest-booking-notice');
-      if (!slotSelect?.value || slotSelect.disabled || slotSelect.selectedOptions[0]?.disabled) {
-        notice.textContent = 'Please select an available time slot before continuing.';
-        slotSelect?.focus();
-        return;
-      }
-      if (!bookingForm.checkValidity()) {
-        notice.textContent = 'Please complete all required booking details before continuing.';
-        bookingForm.reportValidity();
-        return;
-      }
+      if (!slotSelect?.value || slotSelect.disabled || slotSelect.selectedOptions[0]?.disabled) { notice.textContent = 'Please select an available time slot before continuing.'; slotSelect?.focus(); return; }
+      if (!bookingForm.checkValidity()) { notice.textContent = 'Please complete all required booking details before continuing.'; bookingForm.reportValidity(); return; }
       const security = window.SecurityValidator;
       const email = bookingForm.elements.namedItem('email')?.value?.trim() || '';
       const name = bookingForm.elements.namedItem('name')?.value?.trim() || '';
-      if (security?.isDisposableEmail(email)) {
-        notice.textContent = 'Please use a permanent email address.';
-        bookingForm.elements.namedItem('email')?.focus();
-        return;
-      }
-      if (security?.containsInappropriateContent(name)) {
-        notice.textContent = 'Please enter a name without inappropriate language.';
-        bookingForm.elements.namedItem('name')?.focus();
-        return;
-      }
-      document.getElementById('guest-payment-notice').textContent = '';
-      bookingModal.hide();
-      paymentModal.show();
-    });
-
-    document.querySelectorAll('[data-payment-method]').forEach((button) => {
-      button.addEventListener('click', async () => {
-        const notice = document.getElementById('guest-payment-notice');
-        const buttons = [...paymentModalElement.querySelectorAll('[data-payment-method]')];
-        const selectedMethod = String(button.dataset.paymentMethod || '').toLowerCase().replaceAll('-', '_');
-        const isCash = ['cash', 'cash_otc', 'otc'].includes(selectedMethod);
-        buttons.forEach((item) => { item.disabled = true; });
-        notice.textContent = 'Saving your booking…';
-        try {
-          if (!bookingForm.checkValidity() || !slotSelect?.value || slotSelect.disabled || slotSelect.selectedOptions[0]?.disabled) {
-            buttons.forEach((item) => { item.disabled = false; });
-            paymentModal.hide(); bookingModal.show();
-            const bookingNotice = document.getElementById('guest-booking-notice');
-            if (!slotSelect?.value || slotSelect.disabled || slotSelect.selectedOptions[0]?.disabled) {
-              bookingNotice.textContent = 'Please select an available time slot before continuing.';
-              slotSelect?.focus();
-            } else {
-              bookingNotice.textContent = 'Please complete all required booking details before continuing.';
-              bookingForm.reportValidity();
-            }
-            return;
-          }
-          const form = new FormData(bookingForm);
-          const bookingPayload = {
-            name: form.get('name'), email: form.get('email'), service: form.get('service'), branch: normalizeBranchLabel(form.get('branch'), ''),
-            date: form.get('date'), timeSlot: slotSelect.value, plateNumber: form.get('plateNumber'),
-            vehicleMake: form.get('vehicleMake'), vehicleModel: form.get('vehicleModel'), vehicleYear: form.get('vehicleYear'),
-            paymentMethod: isCash ? 'cash_otc' : 'e_wallet',
-          };
-          const phoneInput = bookingForm.elements.namedItem('phone');
-          if (phoneInput?.value?.trim()) bookingPayload.phone = phoneInput.value.trim();
-          const response = await fetch('api/create-walkin-booking.php', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(bookingPayload),
-          });
-          const booking = await response.json();
-          if (!response.ok || !booking.ok) throw new Error(booking.message || 'Booking could not be saved.');
-          if (isCash) {
-            document.getElementById('otc-reference').textContent = booking.referenceNumber;
-            document.getElementById('otc-copy-reference')?.setAttribute('data-copy-reference', booking.referenceNumber);
-            document.getElementById('otc-customer').textContent = booking.customerName;
-            document.getElementById('otc-branch').textContent = booking.branch;
-            document.getElementById('otc-service').textContent = booking.serviceName;
-            document.getElementById('otc-amount').textContent = new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(booking.amount);
-            const qr = document.getElementById('otc-qrcode');
-            qr.replaceChildren();
-            if (!window.QRCode) throw new Error('The receipt QR code could not be loaded. Please keep your reference: ' + booking.referenceNumber);
-            new window.QRCode(qr, { text: booking.referenceNumber, width: 200, height: 200, correctLevel: window.QRCode.CorrectLevel.M });
-            paymentModal.hide(); otcModal?.show();
-            return;
-          }
-          notice.textContent = 'Opening secure PayMongo checkout…';
-          const checkoutResponse = await fetch('api/create-checkout-session.php', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              invoiceId: booking.invoiceId,
-              billId: booking.invoiceId,
-              bookingId: booking.bookingId,
-              referenceId: booking.referenceNumber,
-              forceRefresh: true
-            }),
-          });
-          const rawText = await checkoutResponse.text();
-          let checkout;
-          try { checkout = JSON.parse(rawText); }
-          catch { throw new Error('Payment service is temporarily busy. Please try again shortly.'); }
-          if (!checkoutResponse.ok) throw new Error(checkout.message || 'Payment service is temporarily busy. Please try again shortly.');
-          if (!checkoutResponse.ok || !checkout.ok || (!checkout.checkoutUrl && !checkout.alreadyPaid)) throw new Error(checkout.message || 'Payment checkout could not be started.');
-          if (checkout.alreadyPaid) {
-            notice.textContent = 'This invoice is already paid.';
-            paymentModal.hide();
-            return;
-          }
-          window.location.href = checkout.checkoutUrl;
-        } catch (error) {
-          notice.textContent = error instanceof Error ? error.message : 'Payment could not be started. Please try again.';
-          buttons.forEach((item) => { item.disabled = false; });
-        }
-      });
+      if (security?.isDisposableEmail(email)) { notice.textContent = 'Please use a permanent email address.'; bookingForm.elements.namedItem('email')?.focus(); return; }
+      if (security?.containsInappropriateContent(name)) { notice.textContent = 'Please enter a name without inappropriate language.'; bookingForm.elements.namedItem('name')?.focus(); return; }
+      const submitButton = bookingForm.querySelector('[type="submit"]');
+      const form = new FormData(bookingForm);
+      const payload = { name: form.get('name'), email: form.get('email'), service: form.get('service'), branch: normalizeBranchLabel(form.get('branch'), ''), date: form.get('date'), timeSlot: slotSelect.value, plateNumber: form.get('plateNumber'), vehicleMake: form.get('vehicleMake'), vehicleModel: form.get('vehicleModel'), vehicleYear: form.get('vehicleYear') };
+      const phone = bookingForm.elements.namedItem('phone');
+      if (phone?.value?.trim()) payload.phone = phone.value.trim();
+      if (submitButton) submitButton.disabled = true;
+      notice.textContent = 'Submitting your walk-in booking...';
+      try {
+        const response = await fetch('api/create-walkin-booking.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.message || 'Booking could not be saved.');
+        bookingModal.hide();
+        window.alert(`Walk-In Booking Confirmed\n\nWalk-In Reference ID: ${result.referenceNumber}\n\nPlease proceed to the service bay. Payment is due after the service is marked completed.`);
+        bookingForm.reset(); notice.textContent = '';
+        await updateAvailableSlots(dateInput, branchInput, slotSelect);
+      } catch (error) { notice.textContent = error instanceof Error ? error.message : 'Booking could not be submitted. Please try again.'; }
+      finally { if (submitButton) submitButton.disabled = false; }
     });
   }
 }
