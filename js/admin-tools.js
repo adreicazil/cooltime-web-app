@@ -357,7 +357,9 @@ async function initialize() {
   if (!hasOtpVerification(actor)) { window.location.replace('otp.html'); return; }
   const access = await api('api/admin-workflow.php', { action: 'verify_session' });
   role = normalizeRole(access.role);
-  adminDisplayName = String(access.profile?.name || access.profile?.displayName || actor.displayName || actor.email || '').trim() || String(actor.email || 'Administrator');
+  const profile = access.profile || {};
+  const profileFullName = `${String(profile.firstName || '').trim()} ${String(profile.lastName || '').trim()}`.trim();
+  adminDisplayName = String(profile.fullName || profileFullName || profile.name || profile.displayName || profile.username || actor.displayName || actor.email || '').trim() || String(actor.email || 'Administrator');
   if (!['admin', 'super_admin'].includes(role)) {
     alert('Your account does not have administrator access.');
     return;
@@ -1180,6 +1182,8 @@ function enterServiceInlineEdit(serviceId) {
   const item = services.find((entry) => entry.id === serviceId);
   if (!card || !item) return;
   if (card.dataset.editing === 'true') return;
+  const serviceIdInput = $('#serviceForm')?.elements.namedItem('id');
+  if (serviceIdInput) serviceIdInput.value = serviceId;
   const originalData = {
     name: String(item.name || item.id || '').trim(),
     price: String(Number(item.price || 0)),
@@ -1233,6 +1237,8 @@ async function exitServiceInlineEdit(serviceId, shouldSave) {
   if (!card || !item) return;
   if (!shouldSave) {
     card.outerHTML = renderServiceCard(item);
+    const serviceIdInput = $('#serviceForm')?.elements.namedItem('id');
+    if (serviceIdInput) serviceIdInput.value = '';
     return;
   }
   const name = card.querySelector('.service-input-name')?.value.trim() || '';
@@ -1252,6 +1258,8 @@ async function exitServiceInlineEdit(serviceId, shouldSave) {
     servicesById[serviceId] = item;
     const updatedCard = document.getElementById(`service-card-${serviceId}`);
     if (updatedCard) updatedCard.outerHTML = renderServiceCard(item);
+    const serviceIdInput = $('#serviceForm')?.elements.namedItem('id');
+    if (serviceIdInput) serviceIdInput.value = '';
   } catch (error) {
     alert(readableError(error));
     if (buttonEl) buttonEl.disabled = false;
@@ -2039,11 +2047,15 @@ function renderAccounts() {
   });
   setHTML(target, administrativeAccounts.map((item, index) => {
     const detailsId = `account-edit-${index}`;
-    const name = item.name || item.username || '';
+    const fullName = String(item.fullName || `${item.firstName || ''} ${item.lastName || ''}`.trim() || item.displayName || item.name || '').trim();
+    const username = String(item.username || item.name || '').trim();
+    const nameParts = fullName.split(/\s+/).filter(Boolean);
+    const firstName = item.firstName || nameParts.shift() || '';
+    const lastName = item.lastName || nameParts.join(' ');
     const role = String(item.role || '').toLowerCase();
     const status = item.status || 'active';
     const roleOptions = [['admin', 'Admin'], ['super_admin', 'Super Admin']];
-    return `<tr class="account-summary-row account-row-item" data-account-row data-role="${esc(role.replaceAll('_', ' '))}" tabindex="0" aria-expanded="false" aria-controls="${detailsId}"><td>${esc(name)}</td><td>${esc(item.email)}</td><td>${esc(roleLabels[role] || role)}</td><td>${esc(status)}</td></tr><tr class="account-edit-row"><td colspan="4"><div class="account-edit-accordion" id="${detailsId}" inert><form class="account-edit-form" data-id="${esc(item.id)}"><div class="account-edit-fields"><input name="name" value="${esc(name)}" placeholder="Username" aria-label="Username" required><input name="email" type="email" value="${esc(item.email)}" placeholder="Email" aria-label="Email" required><input name="password" type="password" placeholder="Password (leave blank to keep current)" aria-label="Password (leave blank to keep current)"><select name="role" aria-label="Role">${roleOptions.map(([value, label]) => `<option value="${value}"${role === value ? ' selected' : ''}>${label}</option>`).join('')}</select><select name="status" aria-label="Status"><option value="active"${status === 'active' ? ' selected' : ''}>Active</option><option value="disabled"${status === 'disabled' ? ' selected' : ''}>Disabled</option></select></div><div class="account-form-actions"><button class="btn-save-account" type="submit">Save changes</button><button class="btn-cancel-account-action btn-cancel-account-edit" type="button">Cancel</button><button class="account-delete btn-delete-account" type="button" data-id="${esc(item.id)}">Delete</button></div><output></output></form></div></td></tr>`;
+    return `<tr class="account-summary-row account-row-item" data-account-row data-role="${esc(role.replaceAll('_', ' '))}" tabindex="0" aria-expanded="false" aria-controls="${detailsId}"><td><strong>${esc(fullName || username)}</strong><br><small>Username: ${esc(username)}</small></td><td>${esc(item.email)}</td><td>${esc(roleLabels[role] || role)}</td><td>${esc(status)}</td></tr><tr class="account-edit-row"><td colspan="4"><div class="account-edit-accordion" id="${detailsId}" inert><form class="account-edit-form" data-id="${esc(item.id)}"><div class="account-edit-fields"><input name="firstName" value="${esc(firstName)}" placeholder="First name" aria-label="First name" required><input name="lastName" value="${esc(lastName)}" placeholder="Last name" aria-label="Last name" required><input name="name" value="${esc(username)}" placeholder="Username" aria-label="Username" required><input name="email" type="email" value="${esc(item.email)}" placeholder="Email" aria-label="Email" required><input name="password" type="password" placeholder="Password (leave blank to keep current)" aria-label="Password (leave blank to keep current)"><select name="role" aria-label="Role">${roleOptions.map(([value, label]) => `<option value="${value}"${role === value ? ' selected' : ''}>${label}</option>`).join('')}</select><select name="status" aria-label="Status"><option value="active"${status === 'active' ? ' selected' : ''}>Active</option><option value="disabled"${status === 'disabled' ? ' selected' : ''}>Disabled</option></select></div><div class="account-form-actions"><button class="btn-save-account" type="submit">Save changes</button><button class="btn-cancel-account-action btn-cancel-account-edit" type="button">Cancel</button><button class="account-delete btn-delete-account" type="button" data-id="${esc(item.id)}">Delete</button></div><output></output></form></div></td></tr>`;
   }).join('') || '<tr><td colspan="4">No accounts found.</td></tr>');
   filterAccountRows();
 }
@@ -2074,6 +2086,8 @@ async function saveAccount(event) {
   event.preventDefault(); const form = event.currentTarget; const data = Object.fromEntries(new FormData(form));
   const action = data.uid ? 'update' : 'create';
   if (action === 'create' && data.password.length < 6) return showMessage(form, 'New account password must be at least six characters.');
+  data.fullName = `${String(data.firstName || '').trim()} ${String(data.lastName || '').trim()}`.trim();
+  data.displayName = data.fullName;
   try { const result = await api('api/admin-accounts.php', { action, status: 'active', ...data }); form.reset(); showMessage(form, `Account saved (${result.uid}).`); $('#accountCreateAccordion').classList.remove('expanded'); $('#accountCreateAccordion').inert = true; $('#createAccountToggle').setAttribute('aria-expanded', 'false'); await loadCoreData(); }
   catch (error) { showMessage(form, error.message); }
 }
@@ -2115,6 +2129,8 @@ async function saveAccountEdit(event) {
   if (!form) return;
   event.preventDefault();
   const data = Object.fromEntries(new FormData(form));
+  data.fullName = `${String(data.firstName || '').trim()} ${String(data.lastName || '').trim()}`.trim();
+  data.displayName = data.fullName;
   if (data.password && data.password.length < 6) return showMessage(form, 'Password must be at least six characters, or leave it blank to keep the current password.');
   try {
     await api('api/admin-accounts.php', { action: 'update', uid: form.dataset.id, ...data });

@@ -469,7 +469,10 @@ try {
             jsonResponse(['ok' => false, 'message' => 'Administrator access is required.'], 403);
         }
         $now = gmdate('Y-m-d\TH:i:s\Z');
-        $cashierName = trim((string) ($actorProfile['name'] ?? $actorProfile['displayName'] ?? $actorProfile['username'] ?? ''));
+        $cashierName = trim((string) ($actorProfile['fullName'] ?? ''));
+        if ($cashierName === '') $cashierName = trim((string) ($actorProfile['firstName'] ?? '') . ' ' . (string) ($actorProfile['lastName'] ?? ''));
+        if ($cashierName === '') $cashierName = trim((string) ($actorProfile['username'] ?? ''));
+        if ($cashierName === '') $cashierName = trim((string) ($actorProfile['displayName'] ?? ''));
         if ($cashierName === '') $cashierName = (string) ($actor['email'] ?? 'Administrator');
         $recordMethod = strtolower((string) ($record['paymentMethod'] ?? $record['payment_method'] ?? $record['method'] ?? $invoice['paymentMethod'] ?? $invoice['payment_method'] ?? ''));
         $isCounterCash = preg_match('/^OTC-/i', $reference) === 1 || str_contains($recordMethod, 'cash');
@@ -531,8 +534,9 @@ try {
         $paymentId = 'walkin_payment_' . $bookingId;
         $posId = 'walkin_pos_' . $bookingId;
         $reference = (string) ($booking['referenceNumber'] ?? $invoice['referenceNumber'] ?? $bookingId);
-        $cashierName = trim((string) ($actorProfile['name'] ?? ''));
-        if ($cashierName === '') $cashierName = trim((string) ($actorProfile['displayName'] ?? ''));
+        $cashierName = trim((string) ($actorProfile['fullName'] ?? ''));
+        if ($cashierName === '') $cashierName = trim((string) ($actorProfile['firstName'] ?? '') . ' ' . (string) ($actorProfile['lastName'] ?? ''));
+        if ($cashierName === '') $cashierName = trim((string) ($actorProfile['username'] ?? ''));
         if ($cashierName === '') $cashierName = trim((string) ($actor['email'] ?? 'Administrator'));
         $paymentFields = ['invoiceId' => ['stringValue' => $invoiceId], 'bookingId' => ['stringValue' => $bookingId], 'customerId' => ['stringValue' => ''],
             'amount' => ['integerValue' => (string) (int) round($amount * 100)], 'amountUnit' => ['stringValue' => 'centavos'], 'currency' => ['stringValue' => 'PHP'],
@@ -1152,7 +1156,9 @@ try {
         if ($downpayment > 0 && strtolower((string) ($invoice['status'] ?? '')) === 'paid') jsonResponse(['ok' => false, 'message' => 'This invoice is already paid; do not record another downpayment.'], 409);
         if ($downpayment > 0 && (float) ($invoice['downpaymentAmount'] ?? 0) > 0) jsonResponse(['ok' => false, 'message' => 'A downpayment is already recorded for this invoice.'], 409);
         $now = gmdate('Y-m-d\TH:i:s\Z');
-        $cashierName = trim((string) ($actorProfile['name'] ?? $actorProfile['displayName'] ?? $actorProfile['username'] ?? ''));
+        $cashierName = trim((string) ($actorProfile['fullName'] ?? ''));
+        if ($cashierName === '') $cashierName = trim((string) ($actorProfile['firstName'] ?? '') . ' ' . (string) ($actorProfile['lastName'] ?? ''));
+        if ($cashierName === '') $cashierName = trim((string) ($actorProfile['username'] ?? ''));
         if ($cashierName === '') $cashierName = (string) ($actor['email'] ?? 'Administrator');
         $recordedAtCounter = $cashSettlementAmount > 0 || ($downpayment > 0 && $method === 'cash');
         $invoiceDownpayment = ($checkoutPaid || $cashSettlementAmount > 0) ? (float) ($invoice['downpaymentAmount'] ?? 0) : $downpayment;

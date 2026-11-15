@@ -64,13 +64,17 @@ try {
     $action = (string) ($data['action'] ?? '');
     $uid = trim((string) ($data['uid'] ?? ''));
     $name = trim((string) ($data['name'] ?? ''));
+    $firstName = trim((string) ($data['firstName'] ?? ''));
+    $lastName = trim((string) ($data['lastName'] ?? ''));
+    $fullName = trim($firstName . ' ' . $lastName);
     $email = strtolower(trim((string) ($data['email'] ?? '')));
     $role = strtolower(trim((string) ($data['role'] ?? 'admin')));
     $status = strtolower(trim((string) ($data['status'] ?? 'active')));
     if ($role === 'customer') jsonResponse(['ok' => false, 'message' => 'Customer accounts cannot be managed here.'], 403);
     if (!in_array($role, ['admin', 'super_admin'], true)) jsonResponse(['ok' => false, 'message' => 'Only admin accounts can be managed here.'], 403);
     if (!in_array($status, ['active', 'disabled'], true)) jsonResponse(['ok' => false, 'message' => 'Role or status is invalid.'], 422);
-    if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) jsonResponse(['ok' => false, 'message' => 'Name and valid email are required.'], 422);
+    if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) jsonResponse(['ok' => false, 'message' => 'Username and valid email are required.'], 422);
+    if ($action !== 'delete' && ($firstName === '' || $lastName === '' || $fullName === '')) jsonResponse(['ok' => false, 'message' => 'First name and last name are required.'], 422);
 
     if ($action === 'create') {
         $password = (string) ($data['password'] ?? '');
@@ -91,7 +95,7 @@ try {
     }
 
     if ($action === 'update' || $action === 'create') {
-        $authPayload = ['localId' => $uid, 'email' => $email, 'displayName' => $name, 'disableUser' => $status !== 'active'];
+        $authPayload = ['localId' => $uid, 'email' => $email, 'displayName' => $fullName, 'disableUser' => $status !== 'active'];
         if ((string) ($data['password'] ?? '') !== '') {
             if (strlen((string) $data['password']) < 6) jsonResponse(['ok' => false, 'message' => 'Password must be at least 6 characters.'], 422);
             $authPayload['password'] = (string) $data['password'];
@@ -99,7 +103,9 @@ try {
         $authResult = accountEndpointRequest('https://identitytoolkit.googleapis.com/v1/projects/' . rawurlencode($account['project_id']) . '/accounts:update', $authPayload, firebaseAdminAccessToken());
         if ($authResult['status'] < 200 || $authResult['status'] >= 300) throw new RuntimeException('Firebase Auth account update failed.');
         $profileFields = [
-            'uid' => ['stringValue' => $uid], 'name' => ['stringValue' => $name], 'username' => ['stringValue' => $name],
+            'uid' => ['stringValue' => $uid], 'firstName' => ['stringValue' => $firstName], 'lastName' => ['stringValue' => $lastName],
+            'fullName' => ['stringValue' => $fullName], 'displayName' => ['stringValue' => $fullName],
+            'name' => ['stringValue' => $name], 'username' => ['stringValue' => $name],
             'email' => ['stringValue' => $email], 'role' => ['stringValue' => $role], 'status' => ['stringValue' => $status],
             'updatedAt' => ['timestampValue' => gmdate('Y-m-d\TH:i:s\Z')],
         ];
@@ -111,8 +117,8 @@ try {
         $emailSent = trySendConfiguredEmail(
             $email,
             'CoolTime account ' . $accountAction,
-            '<p>Hello ' . htmlspecialchars($name, ENT_QUOTES, 'UTF-8') . ',</p><p>Your CoolTime account has been ' . $accountAction . ' by an administrator.</p><p>Account role: ' . htmlspecialchars($role, ENT_QUOTES, 'UTF-8') . '<br>Account status: ' . $statusLabel . '</p>',
-            "Hello {$name}, your CoolTime account has been {$accountAction} by an administrator. Account role: {$role}. Account status: {$statusLabel}."
+            '<p>Hello ' . htmlspecialchars($fullName, ENT_QUOTES, 'UTF-8') . ',</p><p>Your CoolTime account has been ' . $accountAction . ' by an administrator.</p><p>Account role: ' . htmlspecialchars($role, ENT_QUOTES, 'UTF-8') . '<br>Account status: ' . $statusLabel . '</p>',
+            "Hello {$fullName}, your CoolTime account has been {$accountAction} by an administrator. Account role: {$role}. Account status: {$statusLabel}."
         );
         jsonResponse(['ok' => true, 'success' => true, 'uid' => $uid, 'emailSent' => $emailSent, 'message' => 'Admin account created successfully']);
     }
