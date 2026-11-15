@@ -97,14 +97,11 @@ try {
     }
     $serviceName=(string)($service['name']??$input['serviceName']??$serviceKey);
     $serviceId=(string)($service['_id']??$serviceKey);
+    if (!$service) jsonResponse(['ok'=>false,'message'=>'Selected service was not found. Refresh the service list and try again.'],404);
     if (isset($service['status']) && !in_array(strtolower((string)$service['status']),['active','available'],true)) {
         jsonResponse(['ok'=>false,'message'=>'Invalid field: service is currently unavailable.'],422);
     }
     $price=(float)($service['price']??0);
-    // Keep legacy/custom walk-in entries billable when a price was not added to
-    // their Firestore record. Configure WALKIN_DEFAULT_SERVICE_PRICE to override.
-    if ($price<=0) $price=(float)environment('WALKIN_DEFAULT_SERVICE_PRICE',false);
-    if ($price<=0) $price=4000.00;
     if (!is_finite($price) || $price<=0) jsonResponse(['ok'=>false,'message'=>'Invalid field: service price is not configured.'],422);
 
     $branch = $branchLabel;

@@ -52,17 +52,8 @@
 
   <section class="public-hero services-hero"><h1>Services</h1></section>
   <main class="content-page services-page services-container-wrapper">
-    <section class="service-grid services-grid-container service-section-bg" aria-label="Service list">
-      <article class="service-card package-card package-card-bg" data-bookable-service="Basic Package (Single Aircon)" tabindex="0" role="button" aria-label="Book Basic Package (Single Aircon)">
-        <div class="package-overlay"><h3>Basic Package (Single Aircon)</h3>
-        <ul><li>General Service</li><li>Pull down evaporator</li><li>Pull down condenser</li><li>For cleaning and leak testing</li><li>Vacuum &amp; Flushing of system</li><li>Full charge refrigerant</li><li>Replace Rubber O-rings</li><li>Replace Cabin filter</li></ul>
-        <strong class="package-price">Starting price:<br>PHP4,000.00 no baklas dashboard<br>PHP6,000.00 baklas dashboard</strong></div>
-      </article>
-      <article class="service-card package-card package-card-bg double-aircon" data-bookable-service="Basic Package (Dual Aircon)" tabindex="0" role="button" aria-label="Book Basic Package (Dual Aircon)">
-        <div class="package-overlay"><h3>Basic Package (Dual Aircon)</h3>
-        <ul><li>General Service</li><li>Pull down evaporator</li><li>Pull down condenser</li><li>For cleaning and leak testing</li><li>Vacuum &amp; Flushing of system</li><li>Full charge refrigerant</li><li>Replace Rubber O-rings</li><li>Replace Cabin filter</li></ul>
-        <strong class="package-price">Starting price:<br>PHP5,000.00 no baklas dashboard<br>PHP7,000.00 baklas dashboard</strong></div>
-      </article>
+    <section class="service-grid services-grid-container service-section-bg" aria-label="Service list" id="publicServiceCatalog" aria-live="polite">
+      <p class="service-catalog-loading">Loading services…</p>
     </section>
   </main>
   <div id="guest-booking-modal" class="modal fade" tabindex="-1" aria-hidden="true" aria-labelledby="guest-booking-title" data-bs-backdrop="true">

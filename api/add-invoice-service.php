@@ -98,8 +98,10 @@ try {
     $found = false;
     foreach ($lines as &$line) {
         if (($line['id'] ?? '') !== $serviceId) continue;
+        $line['name'] = (string) ($service['name'] ?? $serviceId);
+        $line['price'] = $price;
         $line['quantity'] = (int) ($line['quantity'] ?? 1) + 1;
-        $line['lineTotal'] = round((float) ($line['price'] ?? $price) * $line['quantity'], 2);
+        $line['lineTotal'] = round($price * $line['quantity'], 2);
         $found = true;
         break;
     }

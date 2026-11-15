@@ -21,11 +21,6 @@ export const BRANCHES = Object.freeze({
   }
 });
 
-export const SERVICES = Object.freeze({
-  svc_cleaning: { name: 'General AC Cleaning', price: 1500, duration: '2 hours' },
-  svc_freon: { name: 'Freon Charging', price: 800, duration: '1 hour' }
-});
-
 const required = (value, label) => {
   const result = String(value || '').trim();
   if (!result) throw new Error(`${label} is required.`);
@@ -75,7 +70,7 @@ export async function getCustomerInvoices(customerId) {
   });
 }
 
-export async function createBooking({ customerId, userId = customerId, email, customerEmail, branchId, serviceId, date, timeSlot, vehicle }) {
+export async function createBooking({ customerId, userId = customerId, email, customerEmail, branchId, serviceId, serviceName = '', servicePrice = 0, date, timeSlot, vehicle }) {
   const normalizedBranchId = normalizeBranchId(branchId);
   if (!normalizedBranchId) throw new Error('A valid branch is required.');
   const branchLabel = normalizeBranchLabel(branchId);
@@ -97,6 +92,7 @@ export async function createBooking({ customerId, userId = customerId, email, cu
   batch.set(bookingRef, {
     customerId, userId: userId || customerId, email: normalizedEmail, customerEmail: normalizedEmail,
     branchId: normalizedBranchId, branch: branchLabel, serviceId: required(serviceId, 'Service'),
+    serviceName: String(serviceName || ''), servicePrice: Number(servicePrice) || 0,
     vehicleId: vehicleRef.id, date: required(date, 'Appointment date'), timeSlot: required(timeSlot, 'Time slot'),
     plateNumber: vehicleData.plateNumber, vehiclePlate: vehicleData.plateNumber, plate_number: vehicleData.plateNumber,
     vehicleMake: vehicleData.make, vehicle_make: vehicleData.make,
@@ -115,7 +111,7 @@ export async function createBooking({ customerId, userId = customerId, email, cu
     bookingId: bookingRef.id, vehicleId: vehicleRef.id,
     booking: {
       id: bookingRef.id, customerId, userId: userId || customerId, email: normalizedEmail, customerEmail: normalizedEmail,
-      branchId: normalizedBranchId, branch: branchLabel, serviceId, date, timeSlot, vehicleId: vehicleRef.id, vehicle,
+      branchId: normalizedBranchId, branch: branchLabel, serviceId, serviceName, servicePrice: Number(servicePrice) || 0, date, timeSlot, vehicleId: vehicleRef.id, vehicle,
       plateNumber: vehicleData.plateNumber, vehiclePlate: vehicleData.plateNumber, plate_number: vehicleData.plateNumber,
       vehicleMake: vehicleData.make, vehicle_make: vehicleData.make,
       vehicleModel: vehicleData.model, vehicle_model: vehicleData.model,
@@ -159,13 +155,6 @@ export async function seedCoreCatalog() {
     if (Object.keys(missingSettings).length) {
       batch.update(reference, { ...missingSettings, updatedAt: serverTimestamp() });
       updated += 1;
-      hasWrites = true;
-    }
-  }));
-  await Promise.all(Object.entries(SERVICES).map(async ([id, value]) => {
-    const reference = doc(db, 'services', id);
-    if (!(await getDoc(reference)).exists()) {
-      batch.set(reference, { serviceId: id, ...value, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       hasWrites = true;
     }
   }));

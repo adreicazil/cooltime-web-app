@@ -16,41 +16,9 @@ let customerProfile = null;
 let savedVehiclesById = {};
 
 const serviceTypeSelect = document.getElementById('serviceType');
-const SERVICE_CATALOG_CACHE_KEY = 'cooltime.services.catalog.v1';
-const SERVICE_CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
-
 async function loadServiceCatalog() {
-  try {
-    const cached = JSON.parse(sessionStorage.getItem(SERVICE_CATALOG_CACHE_KEY) || 'null');
-    if (Array.isArray(cached?.services) && Date.now() - Number(cached.savedAt) < SERVICE_CATALOG_CACHE_TTL_MS) {
-      return cached.services;
-    }
-  } catch { /* Ignore unavailable or malformed session cache. */ }
-  const snapshot = await getDocs(collection(db, 'services'));
-  const services = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
-  try { sessionStorage.setItem(SERVICE_CATALOG_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), services })); }
-  catch { /* The catalog still works when session storage is unavailable. */ }
-  return services;
-}
-
-if (serviceTypeSelect) {
-  loadServiceCatalog().then((catalog) => {
-    const selectedId = serviceTypeSelect.value;
-    const services = catalog
-      .filter((service) => ['active', 'available'].includes(String(service.status || '').trim().toLowerCase()))
-      .filter((service) => typeof service.name === 'string' && service.name.trim() !== '')
-      .sort((a, b) => a.name.localeCompare(b.name));
-    serviceTypeSelect.replaceChildren(
-      new Option('Select a Service', ''),
-      ...services.map((service) => new Option(service.name.trim(), service.id))
-    );
-    serviceTypeSelect.disabled = services.length === 0;
-    if (services.some((service) => service.id === selectedId)) serviceTypeSelect.value = selectedId;
-  }).catch((error) => {
-    console.error('CoolTime service catalog could not be loaded:', error);
-    serviceTypeSelect.replaceChildren(new Option('Select a Service', ''));
-    serviceTypeSelect.disabled = true;
-  });
+  const snapshot = await getDocsFromServer(collection(db, 'services'));
+  return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
 }
 
 function resetSlots(message = 'Select branch and date first') {
@@ -153,9 +121,45 @@ let runningBillsCurrentPage = 1;
 let runningBillsHasInitialSnapshot = false;
 let runningBillsKnownIds = new Set();
 let invoiceVerificationUser = null;
+let liveServiceCatalog = [];
+const liveServiceCatalogById = {};
 const checkoutVerificationAttempts = new Set();
 let customerBookingStatuses = new Map();
 const billMoney = (amount) => `PHP ${Number(amount || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+onSnapshot(collection(db, 'services'), (snapshot) => {
+  liveServiceCatalog = snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
+  Object.keys(liveServiceCatalogById).forEach((id) => delete liveServiceCatalogById[id]);
+  liveServiceCatalog.forEach((service) => { liveServiceCatalogById[service.id] = service; });
+  const activeServices = liveServiceCatalog
+    .filter((service) => ['active', 'available'].includes(String(service.status || '').trim().toLowerCase()))
+    .filter((service) => typeof service.name === 'string' && service.name.trim() !== '')
+    .sort((a, b) => a.name.localeCompare(b.name));
+  billServices = activeServices.filter((service) => Number(service.price) > 0);
+  if (serviceTypeSelect) {
+    const selectedId = serviceTypeSelect.value;
+    const options = activeServices.map((service) => {
+      const price = Number(service.price) || 0;
+      const duration = String(service.duration || '').trim();
+      const label = `${service.name.trim()} — PHP ${price.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${duration ? ` · ${duration}` : ''}`;
+      const option = new Option(label, service.id);
+      option.dataset.serviceId = service.id;
+      option.dataset.serviceName = service.name.trim();
+      option.dataset.price = String(price);
+      option.title = String(service.description || '');
+      return option;
+    });
+    serviceTypeSelect.replaceChildren(new Option('Select a Service', ''), ...options);
+    serviceTypeSelect.disabled = activeServices.length === 0;
+    if (activeServices.some((service) => service.id === selectedId)) serviceTypeSelect.value = selectedId;
+  }
+  if (latestInvoiceSnapshot) renderInvoices(latestInvoiceSnapshot);
+  rerenderCustomerBookings?.();
+}, (error) => {
+  console.error('CoolTime service catalog could not be loaded:', error);
+  billServices = [];
+  if (serviceTypeSelect) { serviceTypeSelect.replaceChildren(new Option('Select a Service', '')); serviceTypeSelect.disabled = true; }
+});
 function formatManilaDate(date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit'
@@ -261,7 +265,7 @@ function renderInvoices(snapshot) {
     const lines = Array.isArray(invoice.serviceDetails) ? invoice.serviceDetails : [];
     const referenceNumber = invoice.referenceNumber || invoice.invoiceNumber || id;
     const lineHtml = lines.map((line) => `<li>${escapeHtml(line.name || line.id)} <span>x ${Number(line.quantity || 1)} · ${billMoney(line.lineTotal ?? Number(line.price || 0) * Number(line.quantity || 1))}</span></li>`).join('');
-    const addControl = closed ? '' : `<div class="bill-add-service"><label for="add-service-${escapeHtml(id)}">Add a service</label><div class="bill-add-controls" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;"><select id="add-service-${escapeHtml(id)}" class="bill-service-select"><option value="">Choose service</option>${billServices.map((service) => `<option value="${escapeHtml(service.id)}">${escapeHtml(service.name)} - ${billMoney(service.price)}</option>`).join('')}</select><button class="btn btn-secondary bill-add" data-invoice-id="${escapeHtml(id)}" type="button">Add to bill</button></div></div>`;
+    const addControl = closed ? '' : `<div class="bill-add-service"><label for="add-service-${escapeHtml(id)}">Add a service</label><div class="bill-add-controls" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;"><select id="add-service-${escapeHtml(id)}" class="bill-service-select"><option value="">Choose service</option>${billServices.map((service) => `<option value="${escapeHtml(service.id)}" data-service-id="${escapeHtml(service.id)}" data-service-name="${escapeHtml(service.name)}" data-price="${Number(service.price) || 0}">${escapeHtml(service.name)} - ${billMoney(service.price)}</option>`).join('')}</select><button class="btn btn-secondary bill-add" data-invoice-id="${escapeHtml(id)}" type="button">Add to bill</button></div></div>`;
     const created = invoiceCreatedAtDate(invoice);
     const date = created && !Number.isNaN(created.getTime()) ? formatManilaDate(created) : (invoice.date || 'Date unavailable');
     const detailId = `invoice-details-${escapeHtml(id)}`;
@@ -362,10 +366,6 @@ function loadInvoices(user) {
   const target = document.getElementById('customerInvoices');
   if (!target) return;
   invoiceVerificationUser = user;
-  loadServiceCatalog().then((catalog) => {
-    billServices = catalog.filter((service) => Number(service.price) > 0 && String(service.status || 'active').toLowerCase() === 'active');
-    if (latestInvoiceSnapshot) renderInvoices(latestInvoiceSnapshot);
-  }).catch((error) => console.error('Service catalog for bills failed:', error));
   stopInvoiceListener?.();
   const invoiceQuery = query(collection(db, 'invoices'), where('customerId', '==', user.uid));
   stopInvoiceListener = onSnapshot(invoiceQuery, renderInvoices, (error) => {
@@ -516,14 +516,14 @@ async function loadCustomerBookings(user, profile) {
     }
     const branchCatalog = Object.fromEntries(branches.docs.map((item) => [item.id.toLowerCase().replace(/[- ]/g, '_'), { id: item.id, ...item.data() }]));
     let records = [];
-    let serviceCatalog = {};
+    const serviceCatalog = liveServiceCatalogById;
     const render = () => renderCustomerBookings(records, serviceCatalog, vehicleData, branchCatalog, user, profile, target);
     loadServiceCatalog().then((catalog) => {
-      serviceCatalog = Object.fromEntries(catalog.map((item) => [item.id, item]));
+      Object.keys(serviceCatalog).forEach((id) => delete serviceCatalog[id]);
+      catalog.forEach((item) => { serviceCatalog[item.id] = item; });
       render();
     }).catch((error) => {
       console.error('Service names for customer bookings could not be refreshed:', error);
-      serviceCatalog = {};
       render();
     });
     stopCustomerBookingListeners.forEach((stop) => stop());
@@ -845,7 +845,8 @@ if (form) {
     try {
       const data = new FormData(form);
       const bookingEmail = String(access.user.email || '').trim().toLowerCase();
-      const result = await createBooking({ customerId: access.user.uid, userId: access.user.uid, email: bookingEmail, customerEmail: bookingEmail, branchId: normalizeBranchId(data.get('branchId')), serviceId: data.get('serviceType'), date: data.get('appointmentDate'), timeSlot: data.get('timeSlot'), vehicle: { plateNumber: data.get('plateNumber'), make: data.get('vehicleMake'), model: data.get('vehicleModel'), year: data.get('vehicleYear') } });
+      const selectedService = serviceTypeSelect.selectedOptions[0];
+      const result = await createBooking({ customerId: access.user.uid, userId: access.user.uid, email: bookingEmail, customerEmail: bookingEmail, branchId: normalizeBranchId(data.get('branchId')), serviceId: selectedService?.dataset.serviceId || data.get('serviceType'), serviceName: selectedService?.dataset.serviceName || selectedService?.textContent.trim(), servicePrice: Number(selectedService?.dataset.price || 0), date: data.get('appointmentDate'), timeSlot: data.get('timeSlot'), vehicle: { plateNumber: data.get('plateNumber'), make: data.get('vehicleMake'), model: data.get('vehicleModel'), year: data.get('vehicleYear') } });
       latestSubmittedBookingId = result.bookingId;
       if (result.booking) optimisticBookingRecords.set(result.bookingId, result.booking);
       rerenderCustomerBookings?.();

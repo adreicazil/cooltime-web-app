@@ -400,6 +400,7 @@ async function initialize() {
     if (adminIdentity) adminIdentity.textContent = `${access.profile?.name || actor.email} · ${role.replace('_', ' ')}`;
   }
   if (role === 'super_admin') document.querySelectorAll('.super-only').forEach((node) => { node.hidden = false; });
+  watchServiceCatalog();
   if (isDashboardPage) {
     // Start independent live reads together so overview, bookings, and POS do
     // not wait for the admin API's sequential collection export.
@@ -410,7 +411,6 @@ async function initialize() {
     }
   } else {
     await loadCoreData();
-    watchServiceCatalog();
   }
   $('#toolsLogout')?.addEventListener('click', () => logoutUser('login.html'));
   on('#closeDialog', 'click', () => $('#detailDialog')?.close());
@@ -423,11 +423,12 @@ async function initialize() {
   $('#createServiceToggle')?.addEventListener('click', (event) => {
     const accordion = $('#createServiceAccordion');
     if (!accordion) return;
-    const expanded = accordion.classList.toggle('expanded');
-    event.currentTarget.setAttribute('aria-expanded', String(expanded));
+    resetServiceForm($('#serviceForm'));
+    accordion.classList.add('expanded');
+    event.currentTarget.setAttribute('aria-expanded', 'true');
   });
   on('#cancelServiceEdit', 'click', () => {
-    $('#serviceForm')?.reset();
+    resetServiceForm($('#serviceForm'));
     $('#createServiceAccordion')?.classList.remove('expanded');
     $('#createServiceToggle')?.setAttribute('aria-expanded', 'false');
   });
@@ -1095,6 +1096,15 @@ function renderServiceCard(item) {
   return `<article id="service-card-${esc(item.id)}" class="tool-card service-card-item" data-id="${esc(item.id)}" data-editing="false"><div class="service-content-body"><h3 class="service-title">${esc(item.name || item.id)}</h3><strong class="service-price">${money(item.price)}</strong><p class="service-desc">${esc(item.description || '')}</p><p class="service-duration">${esc(formatServiceDuration(item.duration))}</p></div><div class="service-card-actions"><button type="button" class="btn-service-toggle-edit" data-id="${esc(item.id)}">Edit</button><button type="button" class="btn-service-remove" data-id="${esc(item.id)}">Remove</button></div></article>`;
 }
 
+function resetServiceForm(form) {
+  if (!form) return;
+  form.reset();
+  const idInput = form.elements.namedItem('id');
+  if (idInput) idInput.value = '';
+  const output = form.querySelector('output');
+  if (output) output.textContent = '';
+}
+
 function formatServiceDuration(value) {
   const digits = String(value ?? '').match(/\d+/)?.[0] || '';
   if (!digits) return '';
@@ -1104,11 +1114,16 @@ function formatServiceDuration(value) {
 
 async function saveService(event) {
   event.preventDefault(); const form = event.currentTarget; const data = Object.fromEntries(new FormData(form));
-  const id = data.id.trim() || data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-  if (!id || !Number.isFinite(Number(data.price)) || Number(data.price) <= 0) return showMessage(form, 'Enter a service name and a price above zero.');
+  const id = String(data.id || '').trim();
+  if (!data.name.trim() || !Number.isFinite(Number(data.price)) || Number(data.price) <= 0) return showMessage(form, 'Enter a service name and a price above zero.');
   try {
     await api('api/admin-workflow.php', { action: 'save_service', serviceId: id, name: data.name.trim(), price: Number(data.price), duration: data.duration.trim(), description: data.description.trim() });
-    form.reset(); showMessage(form, 'Service saved.'); await loadCoreData();
+    resetServiceForm(form);
+    $('#createServiceAccordion')?.classList.remove('expanded');
+    $('#createServiceToggle')?.setAttribute('aria-expanded', 'false');
+    await loadCoreData();
+    const output = form.querySelector('output');
+    if (output) output.textContent = id ? 'Service updated.' : 'Service created.';
   } catch (error) { showMessage(form, readableError(error)); }
 }
 
@@ -1122,10 +1137,7 @@ async function serviceAction(event) {
   } else if (button.classList.contains('btn-service-remove') && confirm(`Remove ${item.name} from the active catalog? Existing invoice snapshots will remain.`)) {
     try {
       await api('api/admin-workflow.php', { action: 'delete_service', serviceId: item.id });
-      services = services.filter((entry) => entry.id !== item.id);
-      delete servicesById[item.id];
-      document.getElementById(`service-card-${item.id}`)?.remove();
-      if (!services.length) $('#serviceResults').textContent = 'No services configured.';
+      await loadCoreData();
     } catch (error) { alert(readableError(error)); }
   }
 }

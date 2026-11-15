@@ -126,7 +126,9 @@ function adminWorkflowCommit(array $account, array $writes): void
     $formatted = [];
     foreach ($writes as $write) {
         $name = 'projects/' . $account['project_id'] . '/databases/(default)/documents/' . $write['collection'] . '/' . $write['id'];
-        $formatted[] = ['update' => ['name' => $name, 'fields' => $write['fields']], 'updateMask' => ['fieldPaths' => array_keys($write['fields'])]];
+        $formattedWrite = ['update' => ['name' => $name, 'fields' => $write['fields']], 'updateMask' => ['fieldPaths' => array_keys($write['fields'])]];
+        if (array_key_exists('exists', $write)) $formattedWrite['currentDocument'] = ['exists' => (bool) $write['exists']];
+        $formatted[] = $formattedWrite;
     }
     $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id']) . '/databases/(default)/documents:commit';
     $response = secureHttpRequest($url, 'POST', ["Authorization: Bearer " . firebaseAdminAccessToken(), 'Content-Type: application/json'],
@@ -405,8 +407,16 @@ try {
         $serviceId = trim((string) ($input['serviceId'] ?? ''));
         $name = trim((string) ($input['name'] ?? ''));
         $price = filter_var($input['price'] ?? null, FILTER_VALIDATE_FLOAT);
-        if (!preg_match('/^[A-Za-z0-9_-]{1,150}$/', $serviceId) || $name === '' || $name === '0' || $price === false || $price <= 0) {
+        if (($serviceId !== '' && !preg_match('/^[A-Za-z0-9_-]{1,150}$/', $serviceId)) || $name === '' || $name === '0' || $price === false || $price <= 0) {
             jsonResponse(['ok' => false, 'message' => 'Enter a valid service ID, name, and positive price.'], 422);
+        }
+        $isCreate = $serviceId === '';
+        if ($isCreate) {
+            do {
+                $serviceId = 'srv_' . gmdate('YmdHis') . '_' . bin2hex(random_bytes(6));
+            } while (adminWorkflowRead($account, 'services', $serviceId) !== null);
+        } elseif (!adminWorkflowRead($account, 'services', $serviceId)) {
+            jsonResponse(['ok' => false, 'message' => 'The selected service no longer exists. Refresh the list and try again.'], 404);
         }
         $now = gmdate('Y-m-d\TH:i:s\Z');
         $fields = [
@@ -415,9 +425,9 @@ try {
             'description' => ['stringValue' => substr(trim((string) ($input['description'] ?? '')), 0, 2000)],
             'status' => ['stringValue' => 'active'], 'updatedAt' => ['timestampValue' => $now],
         ];
-        if (!adminWorkflowRead($account, 'services', $serviceId)) $fields['createdAt'] = ['timestampValue' => $now];
-        adminWorkflowCommit($account, [['collection' => 'services', 'id' => $serviceId, 'fields' => $fields]]);
-        jsonResponse(['ok' => true, 'message' => 'Service saved.']);
+        if ($isCreate) $fields['createdAt'] = ['timestampValue' => $now];
+        adminWorkflowCommit($account, [['collection' => 'services', 'id' => $serviceId, 'fields' => $fields, 'exists' => !$isCreate]]);
+        jsonResponse(['ok' => true, 'serviceId' => $serviceId, 'message' => $isCreate ? 'Service created.' : 'Service updated.']);
     }
     if ($action === 'delete_service') {
         $serviceId = trim((string) ($input['serviceId'] ?? ''));

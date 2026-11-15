@@ -1,4 +1,4 @@
-import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+import { collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 import { auth, authReady, db } from './firebase-config.js';
 import { updateAvailableSlots } from './slot-availability.js';
 import { normalizeBranchLabel } from './branch-utils.js';
@@ -23,11 +23,6 @@ const serviceSelects = [
   document.getElementById('guest-service-select'),
   document.getElementById('serviceType'),
 ].filter(Boolean);
-const fallbackBookableServices = [
-  { id: 'svc_cleaning', name: 'General AC Cleaning' },
-  { id: 'svc_freon', name: 'Freon Charging' },
-];
-
 function populateBookableServiceSelects(services) {
   const bookableServices = services
     .filter((service) => ['active', 'available'].includes(String(service.status || '').trim().toLowerCase()))
@@ -37,35 +32,62 @@ function populateBookableServiceSelects(services) {
   serviceSelects.forEach((select) => {
     const selectedId = select.value;
     const options = [new Option('Select a Service', '')];
-    bookableServices.forEach((service) => options.push(new Option(service.name.trim(), service.id)));
+    bookableServices.forEach((service) => {
+      const price = Number(service.price) || 0;
+      const duration = String(service.duration || '').trim();
+      const label = `${service.name.trim()} — PHP ${new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price)}${duration ? ` · ${duration}` : ''}`;
+      const option = new Option(label, service.id);
+      option.dataset.serviceId = service.id;
+      option.dataset.serviceName = service.name.trim();
+      option.dataset.price = String(price);
+      option.title = String(service.description || '');
+      options.push(option);
+    });
     select.replaceChildren(...options);
     select.disabled = bookableServices.length === 0;
     if (bookableServices.some((service) => service.id === selectedId)) select.value = selectedId;
   });
 }
 
-const SERVICE_CATALOG_CACHE_KEY = 'cooltime.services.catalog.v1';
-const SERVICE_CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
-
-async function loadServiceCatalog() {
-  try {
-    const cached = JSON.parse(sessionStorage.getItem(SERVICE_CATALOG_CACHE_KEY) || 'null');
-    if (Array.isArray(cached?.services) && Date.now() - Number(cached.savedAt) < SERVICE_CATALOG_CACHE_TTL_MS) {
-      return cached.services;
-    }
-  } catch { /* Ignore unavailable or malformed session cache. */ }
-
-  const snapshot = await getDocs(collection(db, 'services'));
-  const services = snapshot.docs.map((serviceDoc) => ({ id: serviceDoc.id, ...serviceDoc.data() }));
-  try { sessionStorage.setItem(SERVICE_CATALOG_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), services })); }
-  catch { /* The catalog still works when session storage is unavailable. */ }
-  return services;
+function renderPublicServiceCards(services) {
+  const target = document.getElementById('publicServiceCatalog');
+  if (!target) return;
+  const bookable = services
+    .filter((service) => ['active', 'available'].includes(String(service.status || '').trim().toLowerCase()))
+    .filter((service) => typeof service.name === 'string' && service.name.trim() !== '')
+    .sort((a, b) => a.name.localeCompare(b.name));
+  if (!bookable.length) {
+    target.replaceChildren(Object.assign(document.createElement('p'), { textContent: 'No services are currently available.' }));
+    return;
+  }
+  target.replaceChildren(...bookable.map((service) => {
+    const card = document.createElement('article');
+    card.className = 'service-card package-card package-card-bg';
+    card.tabIndex = 0;
+    card.setAttribute('role', 'button');
+    card.dataset.serviceId = service.id;
+    card.dataset.serviceName = service.name.trim();
+    card.dataset.price = String(Number(service.price) || 0);
+    card.setAttribute('aria-label', `Book ${service.name.trim()}`);
+    const overlay = document.createElement('div'); overlay.className = 'package-overlay';
+    const title = document.createElement('h3'); title.textContent = service.name.trim();
+    const description = document.createElement('p'); description.textContent = service.description || '';
+    const duration = document.createElement('p'); duration.textContent = service.duration ? `Duration: ${service.duration}` : '';
+    const price = document.createElement('strong'); price.className = 'package-price';
+    price.textContent = `PHP ${new Intl.NumberFormat('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(service.price) || 0)}`;
+    overlay.append(title, description, duration, price); card.append(overlay); return card;
+  }));
 }
 
 if (serviceSelects.length) {
-  loadServiceCatalog().then(populateBookableServiceSelects).catch((error) => {
+  onSnapshot(collection(db, 'services'), (snapshot) => {
+    const services = snapshot.docs.map((serviceDoc) => ({ id: serviceDoc.id, ...serviceDoc.data() }));
+    populateBookableServiceSelects(services);
+    renderPublicServiceCards(services);
+  }, (error) => {
     console.error('CoolTime service catalog could not be loaded:', error);
-    populateBookableServiceSelects(fallbackBookableServices.map((service) => ({ ...service, status: 'active' })));
+    populateBookableServiceSelects([]);
+    renderPublicServiceCards([]);
   });
 }
 
@@ -97,25 +119,21 @@ if (bookingModalElement && bookingForm) {
     branchInput.addEventListener('change', () => updateAvailableSlots(dateInput, branchInput, slotSelect));
 
     const openForCard = (card) => {
-      const title = card.dataset.bookableService || card.querySelector('h3')?.textContent.trim();
-      const matchingService = [...serviceSelect.options].find((option) => option.textContent.trim() === title);
-      if (matchingService) serviceSelect.value = matchingService.value;
+      const selectedId = card.dataset.serviceId;
+      if (selectedId && [...serviceSelect.options].some((option) => option.value === selectedId)) serviceSelect.value = selectedId;
       document.getElementById('guest-booking-notice').textContent = '';
       bookingModal.show();
     };
 
-    document.querySelectorAll('.service-card, .package-card').forEach((card) => {
-      card.addEventListener('click', (event) => {
-        if (event.target.closest('a,button,input,select,textarea')) return;
-        openForCard(card);
-      });
-      card.addEventListener('keydown', (event) => {
-        if (event.target !== card || !['Enter', ' '].includes(event.key)) return;
-        event.preventDefault();
-        openForCard(card);
-      });
+    document.getElementById('publicServiceCatalog')?.addEventListener('click', (event) => {
+      const card = event.target.closest('.service-card[data-service-id]');
+      if (card) openForCard(card);
     });
-
+    document.getElementById('publicServiceCatalog')?.addEventListener('keydown', (event) => {
+      const card = event.target.closest('.service-card[data-service-id]');
+      if (!card || !['Enter', ' '].includes(event.key)) return;
+      event.preventDefault(); openForCard(card);
+    });
     bookingForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       const notice = document.getElementById('guest-booking-notice');
@@ -128,7 +146,8 @@ if (bookingModalElement && bookingForm) {
       if (security?.containsInappropriateContent(name)) { notice.textContent = 'Please enter a name without inappropriate language.'; bookingForm.elements.namedItem('name')?.focus(); return; }
       const submitButton = bookingForm.querySelector('[type="submit"]');
       const form = new FormData(bookingForm);
-      const payload = { name: form.get('name'), email: form.get('email'), service: form.get('service'), branch: normalizeBranchLabel(form.get('branch'), ''), date: form.get('date'), timeSlot: slotSelect.value, plateNumber: form.get('plateNumber'), vehicleMake: form.get('vehicleMake'), vehicleModel: form.get('vehicleModel'), vehicleYear: form.get('vehicleYear') };
+      const selectedService = serviceSelect.selectedOptions[0];
+      const payload = { name: form.get('name'), email: form.get('email'), service: selectedService?.dataset.serviceId || form.get('service'), serviceId: selectedService?.dataset.serviceId || form.get('service'), serviceName: selectedService?.dataset.serviceName || selectedService?.textContent.trim(), price: Number(selectedService?.dataset.price || 0), branch: normalizeBranchLabel(form.get('branch'), ''), date: form.get('date'), timeSlot: slotSelect.value, plateNumber: form.get('plateNumber'), vehicleMake: form.get('vehicleMake'), vehicleModel: form.get('vehicleModel'), vehicleYear: form.get('vehicleYear') };
       const phone = bookingForm.elements.namedItem('phone');
       if (phone?.value?.trim()) payload.phone = phone.value.trim();
       if (submitButton) submitButton.disabled = true;
