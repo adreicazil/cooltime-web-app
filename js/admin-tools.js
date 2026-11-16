@@ -290,11 +290,29 @@ function paidSettlement(transaction) {
   return String(transaction.paymentStatus || '').trim().toLowerCase() === 'paid' || status === 'paid';
 }
 
-function settlementAmount(transaction) {
-  const raw = Number(transaction.amountPaid ?? transaction.amount ?? transaction.total
+function linkedPesoPrice(transaction) {
+  const linkedInvoice = invoices.find((invoice) => invoice.id === transaction.invoiceId
+    || invoice.id === transaction.id || invoice.bookingId === transaction.bookingId);
+  const bookingId = transaction.bookingId || linkedInvoice?.bookingId;
+  const linkedBooking = bookings.find((booking) => booking.id === bookingId);
+  const priceRecord = linkedInvoice || linkedBooking;
+  if (!priceRecord) return null;
+  const price = Number(priceRecord.totalAmount ?? priceRecord.finalAmount ?? priceRecord.amountDue
+    ?? priceRecord.servicePrice ?? priceRecord.price);
+  if (!Number.isFinite(price)) return null;
+  return String(priceRecord.currencyUnit || priceRecord.amountUnit || '').trim().toLowerCase() === 'centavos'
+    ? price / 100 : price;
+}
+
+function kpiSettlementAmount(transaction) {
+  const raw = Number(transaction.amountCentavos ?? transaction.amountPaid ?? transaction.amount ?? transaction.total
     ?? transaction.totalAmount ?? transaction.finalAmount ?? transaction.runningTotal ?? 0);
   if (!Number.isFinite(raw)) return 0;
-  return String(transaction.amountUnit || '').toLowerCase() === 'centavos' ? raw / 100 : raw;
+  if (transaction.amountCentavos !== undefined && transaction.amountCentavos !== null
+      || String(transaction.currencyUnit || transaction.amountUnit || '').trim().toLowerCase() === 'centavos') return raw / 100;
+  const linkedPrice = linkedPesoPrice(transaction);
+  if (Number.isInteger(raw) && linkedPrice !== null && Math.abs(raw - linkedPrice * 100) <= 1) return raw / 100;
+  return raw;
 }
 
 function renderDashboardKpis() {
@@ -335,7 +353,6 @@ function renderDashboardKpis() {
     settlementGroups.get(key).push(transaction);
   });
   const transactions = [...settlementGroups.values()].flatMap((group) => {
-    if (group.some((transaction) => String(transaction.status || '').trim().toLowerCase() === 'voided')) return [];
     const paid = group.filter(paidSettlement);
     if (!paid.length) return [];
     // Prefer a POS settlement record when both its invoice and transaction exist.
@@ -344,7 +361,7 @@ function renderDashboardKpis() {
   const today = manilaDateKey(new Date());
   const todaySales = transactions.reduce((sum, transaction) => {
     const settledAt = transaction.paidAt || transaction.settledAt || transaction.updatedAt || transaction.createdAt;
-    return manilaDateKey(settledAt) === today ? sum + settlementAmount(transaction) : sum;
+    return manilaDateKey(settledAt) === today ? sum + kpiSettlementAmount(transaction) : sum;
   }, 0);
 
   setMetric('bookings', String(bookings.length));
