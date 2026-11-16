@@ -284,37 +284,6 @@ function manilaDateKey(value) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-function paidSettlement(transaction) {
-  const status = String(transaction.status || '').trim().toLowerCase();
-  if (status === 'voided') return false;
-  return String(transaction.paymentStatus || '').trim().toLowerCase() === 'paid' || status === 'paid';
-}
-
-function linkedPesoPrice(transaction) {
-  const linkedInvoice = invoices.find((invoice) => invoice.id === transaction.invoiceId
-    || invoice.id === transaction.id || invoice.bookingId === transaction.bookingId);
-  const bookingId = transaction.bookingId || linkedInvoice?.bookingId;
-  const linkedBooking = bookings.find((booking) => booking.id === bookingId);
-  const priceRecord = linkedInvoice || linkedBooking;
-  if (!priceRecord) return null;
-  const price = Number(priceRecord.totalAmount ?? priceRecord.finalAmount ?? priceRecord.amountDue
-    ?? priceRecord.servicePrice ?? priceRecord.price);
-  if (!Number.isFinite(price)) return null;
-  return String(priceRecord.currencyUnit || priceRecord.amountUnit || '').trim().toLowerCase() === 'centavos'
-    ? price / 100 : price;
-}
-
-function kpiSettlementAmount(transaction) {
-  const raw = Number(transaction.amountCentavos ?? transaction.amountPaid ?? transaction.amount ?? transaction.total
-    ?? transaction.totalAmount ?? transaction.finalAmount ?? transaction.runningTotal ?? 0);
-  if (!Number.isFinite(raw)) return 0;
-  if (transaction.amountCentavos !== undefined && transaction.amountCentavos !== null
-      || String(transaction.currencyUnit || transaction.amountUnit || '').trim().toLowerCase() === 'centavos') return raw / 100;
-  const linkedPrice = linkedPesoPrice(transaction);
-  if (Number.isInteger(raw) && linkedPrice !== null && Math.abs(raw - linkedPrice * 100) <= 1) return raw / 100;
-  return raw;
-}
-
 function renderDashboardKpis() {
   const setMetric = (name, value) => {
     document.querySelectorAll(`.admin-metric-value[data-metric="${name}"], .superadmin-metric-value[data-metric="${name}"]`)
@@ -343,25 +312,14 @@ function renderDashboardKpis() {
   const activeBranches = new Set(branches.filter(dashboardActive).map((branch) =>
     String(branch.id || branch.name || '').trim().toLowerCase()).filter(Boolean));
 
-  const settlementGroups = new Map();
-  [...invoices, ...legacyPosTransactions].forEach((transaction) => {
-    const key = String(transaction.invoiceId || (transaction._collection === 'pos_transactions'
-      ? transaction.bookingId || transaction.referenceNumber || transaction.id
-      : transaction.id || transaction.bookingId || transaction.referenceNumber) || '');
-    if (!key) return;
-    if (!settlementGroups.has(key)) settlementGroups.set(key, []);
-    settlementGroups.get(key).push(transaction);
-  });
-  const transactions = [...settlementGroups.values()].flatMap((group) => {
-    const paid = group.filter(paidSettlement);
-    if (!paid.length) return [];
-    // Prefer a POS settlement record when both its invoice and transaction exist.
-    return [paid.find((transaction) => transaction._collection === 'pos_transactions') || paid[0]];
-  });
   const today = manilaDateKey(new Date());
-  const todaySales = transactions.reduce((sum, transaction) => {
-    const settledAt = transaction.paidAt || transaction.settledAt || transaction.updatedAt || transaction.createdAt;
-    return manilaDateKey(settledAt) === today ? sum + kpiSettlementAmount(transaction) : sum;
+  const todaySales = buildPosTransactions().reduce((sum, transaction) => {
+    const status = String(transaction.status || '').trim().toLowerCase();
+    if (status !== 'paid' || normalizedPosStatus(transaction).toLowerCase() !== 'paid') return sum;
+    const timestamp = transaction.paidAt || transaction.settledAt || transaction.createdAt || transaction.updatedAt;
+    if (manilaDateKey(timestamp) !== today) return sum;
+    const payment = transaction._payment || paymentsByInvoice[transaction.invoiceId || transaction.id];
+    return sum + posTransactionTotal(transaction, payment);
   }, 0);
 
   setMetric('bookings', String(bookings.length));
@@ -1481,6 +1439,11 @@ function posTransactionAmount(transaction, payment) {
   return Number((transaction.amountUnit || payment?.amountUnit) === 'centavos' ? raw / 100 : raw);
 }
 
+function posTransactionTotal(transaction, payment) {
+  return Number(transaction.totalAmount ?? transaction.finalAmount ?? transaction.runningTotal
+    ?? posTransactionAmount(transaction, payment) ?? 0);
+}
+
 function renderPos() {
   const from = $('#pos-start-date')?.value || '', to = $('#pos-end-date')?.value || '';
   const method = $('#pos-method-filter')?.value || '';
@@ -1508,8 +1471,7 @@ function renderPos() {
     const statusKey = displayStatus.toLowerCase().replace(/[^a-z0-9-]/g, '-');
     const cashier = posCashier(transaction);
     const linkedBooking = bookings.find((booking) => booking.id === transaction.bookingId) || null;
-    const total = Number(transaction.totalAmount ?? transaction.finalAmount ?? transaction.runningTotal
-      ?? posTransactionAmount(transaction, payment) ?? 0);
+    const total = posTransactionTotal(transaction, payment);
     const storedLines = [transaction.serviceDetails, transaction.items, transaction.lineItems]
       .find((candidate) => Array.isArray(candidate) && candidate.length) || [];
     const fallbackServiceName = transaction.serviceName || linkedBooking?.serviceName || linkedBooking?.service_name || '';
