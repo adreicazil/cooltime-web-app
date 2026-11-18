@@ -2,7 +2,7 @@ import { getAuthenticatedProfile } from './auth-guard.js';
 
 const greetingContainer = document.getElementById('customerSharedGreeting');
 const greeting = document.getElementById('customer-greeting-text');
-const sidebarName = document.getElementById('customer-sidebar-name');
+const sidebarName = document.getElementById('sidebar-customer-name');
 
 function displayCustomerGreeting(profile = {}) {
   const fullName = profile.name
