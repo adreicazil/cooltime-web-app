@@ -5,7 +5,9 @@
 .public-page .brand-bar .tagline { color:#fff; font-size:clamp(1rem,2.5vw,1.75rem); text-align:center; }
 .public-page .main-nav { height:auto; min-height:42px; width:100%; padding:0 clamp(10px,2vw,30px); gap:2px; justify-content:flex-start; background:rgba(4,15,43,.45); border:0; color:#fff; font-size:clamp(.68rem,.9vw,.82rem); }
 .public-page .main-nav>a { min-height:40px; padding:7px clamp(6px,.8vw,13px); }
-.public-page .main-nav .auth-nav-container { flex-basis:160px; width:160px; min-width:160px; }
+.public-page .main-nav .auth-nav-container { flex:0 0 auto; width:auto; min-width:max-content; gap:24px; margin-left:auto; white-space:nowrap; }
+.public-page .main-nav .auth-nav-container > a { flex:0 0 auto; width:auto; min-width:max-content; white-space:nowrap; }
+.public-page .main-nav .customer-notification-dropdown { width:min(360px,calc(100vw - 20px)); }
 .public-page .main-nav a.active,.public-page .main-nav a:hover { color:#56c8ff; }
 .public-page .main-nav a:focus-visible { outline-color:#56c8ff; }
 .public-hero { position:relative; isolation:isolate; display:flex; align-items:flex-end; width:100%; min-height:clamp(150px,24vw,250px); padding:18px clamp(16px,4vw,64px); overflow:hidden; color:#fff; background-color:#063355; }
@@ -976,7 +978,7 @@ body.feedback-public .feedback-form .form-feedback { min-height:1.2em; margin:6p
   }
   body.public-page .main-nav::-webkit-scrollbar { display: none; }
   body.public-page .main-nav > a { flex: 0 0 auto; min-height: 42px; padding: 7px 11px; }
-  body.public-page .main-nav .auth-nav-container { flex: 0 0 auto; width: auto; min-width: max-content; margin-left: 0; }
+  body.public-page .main-nav .auth-nav-container { flex: 0 0 auto; width: auto; min-width: max-content; margin-left: auto; gap: 8px; white-space: nowrap; }
   body.public-page .main-nav .auth-nav-container > a { width: auto; min-width: max-content; padding-inline: 11px; }
   .home-public .hero-section .hero-copy { top: 5%; left: 8%; width: 84%; }
   .home-public .hero-section #homeSlogan {

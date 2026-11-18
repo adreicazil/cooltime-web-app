@@ -2007,6 +2007,29 @@ td {
   background: rgba(0, 122, 255, 0.15) !important;
 }
 
+#export-system-logs-pdf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  margin: 0;
+  background: transparent !important;
+  border: 1.5px solid #007aff !important;
+  color: #007aff !important;
+  font-weight: 700;
+  border-radius: 20px !important;
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+#export-system-logs-pdf:hover { background: rgba(0, 122, 255, 0.15) !important; }
+
+/* Keep Sales Monitor action controls and their handlers in place, but hide the action column. */
+.sales-monitor-hide-actions .pos-transaction-table thead tr > :last-child,
+.sales-monitor-hide-actions .pos-main-row > td:last-child {
+  display: none !important;
+}
+
 .customer-records-filters {
   margin-bottom: 16px;
 }

@@ -181,7 +181,7 @@ function notificationBookingTemplateDefaults(): array
 {
     return [
         'booking_confirmation' => ['CoolTime booking confirmed', 'Booking confirmation: Booking confirmed: your service appointment has been approved.'],
-        'appointment_cancellation' => ['CoolTime cancellation request update', 'Appointment cancellation: Your service appointment has been successfully cancelled!'],
+        'appointment_cancellation' => ['CoolTime Booking Cancellation', 'Appointment cancellation: Your service appointment has been successfully cancelled!'],
         'booking_submission' => ['CoolTime booking submitted', 'Booking submitted: your service appointment request has been received.'],
         'booking_reschedule' => ['CoolTime appointment rescheduled', 'Reschedule successful: your service appointment is successfully rescheduled!'],
         'payment_notice' => ['CoolTime payment received', 'Payment notice: payment for your service appointment has been confirmed.'],
@@ -264,7 +264,7 @@ function notificationBookingDetails(array $account, array $booking, ?array $invo
     $paymentStatus = (string) ($invoice['status'] ?? 'unbilled');
     $paymentBalance = (float) ($invoice['balance_due'] ?? $invoice['balanceDue'] ?? $invoice['runningTotal'] ?? 0);
     if (in_array(strtolower($paymentStatus), ['paid', 'cancelled', 'canceled'], true)) $paymentBalance = 0;
-    $customerName = trim((string) ($customer['name'] ?? ''));
+    $customerName = trim((string) ($customer['fullName'] ?? $customer['name'] ?? $customer['displayName'] ?? ''));
     if ($customerName === '') $customerName = trim((string) ($customer['username'] ?? ''));
     if ($customerName === '') $customerName = trim((string) ($booking['customerName'] ?? 'Customer'));
     $serviceName = trim((string) ($service['name'] ?? ''));
@@ -407,7 +407,29 @@ function notifyNewBooking(array $account, array $details): void
 function notifyBookingCancelled(array $account, array $booking, array $customer, array $details): bool
 {
     $message = 'Appointment cancellation: Your service appointment has been successfully cancelled!';
-    return notifyCustomerRecipient($account, 'booking_cancelled_' . (string) ($booking['id'] ?? ''), (string) ($booking['customerId'] ?? ''), (string) ($customer['email'] ?? ''), 'booking_cancelled', $message, $details, 'CoolTime appointment cancelled');
+    $email = '';
+    foreach ([$details['customerEmail'] ?? '', $booking['customerEmail'] ?? '', $booking['email'] ?? '', $customer['email'] ?? ''] as $emailCandidate) {
+        $emailCandidate = trim((string) $emailCandidate);
+        if ($emailCandidate !== '') { $email = $emailCandidate; break; }
+    }
+    $details['emailTemplateId'] = 'appointment_cancellation';
+    $record = array_merge($details, [
+        'type' => 'booking_cancelled', 'message' => $message, 'recipientRole' => 'customer',
+        'userId' => (string) ($booking['customerId'] ?? ''), 'createdAt' => gmdate('Y-m-d\\TH:i:s\\Z'),
+    ]);
+    try {
+        $persisted = notificationCreate($account, 'customer_' . (string) ($booking['customerId'] ?? '') . '_booking_cancelled_' . (string) ($booking['id'] ?? ''), $record);
+        if ($persisted === null) error_log('CoolTime cancellation notification persistence failed; continuing with email delivery.');
+        if ($persisted === false) return false;
+    } catch (Throwable $error) {
+        error_log('CoolTime cancellation notification persistence failed; continuing with email delivery: ' . $error->getMessage());
+    }
+    try {
+        return notificationEmail($email, 'CoolTime Booking Cancellation', $record);
+    } catch (Throwable $error) {
+        error_log('CoolTime booking cancellation email failed: ' . $error->getMessage());
+        return false;
+    }
 }
 
 function notifyBookingReminder(array $account, string $customerId, string $customerEmail, array $details): void

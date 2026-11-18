@@ -903,6 +903,11 @@ try {
         if (!in_array($bookingStatus, ['pending', 'confirmed'], true)) jsonResponse(['ok' => false, 'message' => 'Only pending or confirmed bookings can be cancelled.'], 409);
         if ($bookingPaymentStatus === 'paid') jsonResponse(['ok' => false, 'message' => 'This booking is marked paid. Verify its invoice before cancelling it.'], 409);
         $customer = adminWorkflowRead($account, 'users', (string) ($booking['customerId'] ?? ''));
+        $customerEmail = '';
+        foreach ([$booking['customerEmail'] ?? '', $booking['email'] ?? '', $customer['email'] ?? ''] as $emailCandidate) {
+            $emailCandidate = trim((string) $emailCandidate);
+            if (filter_var($emailCandidate, FILTER_VALIDATE_EMAIL)) { $customerEmail = $emailCandidate; break; }
+        }
         $now = gmdate('Y-m-d\TH:i:s\Z');
         $logId = 'cancel_' . bin2hex(random_bytes(8));
         $writes = [
@@ -953,7 +958,10 @@ try {
             error_log('Booking cancelled, but slot cache invalidation failed: ' . $cacheError->getMessage());
         }
         $booking['id'] = $bookingId;
+        $booking['customerEmail'] = $customerEmail;
         $details = notificationBookingDetails($account, $booking);
+        $details['customerEmail'] = $customerEmail;
+        $details['referenceNumber'] = (string) ($booking['referenceNumber'] ?? $booking['invoiceReference'] ?? $booking['walkInReferenceId'] ?? $invoice['referenceNumber'] ?? $invoice['invoiceNumber'] ?? $bookingId);
         $details['paymentBalance'] = 0;
         $details['bookingStatus'] = 'cancelled';
         $details['paymentStatus'] = $invoice ? 'cancelled' : 'unbilled';
@@ -965,7 +973,7 @@ try {
                 $details['bookingId'] = $bookingId;
                 $details['referenceNumber'] = (string) ($booking['referenceNumber'] ?? $booking['invoiceReference'] ?? '');
                 $details['customerName'] = (string) ($booking['customerName'] ?? 'Walk-in customer');
-                $details['customerEmail'] = (string) ($booking['customerEmail'] ?? '');
+                $details['customerEmail'] = $customerEmail;
                 notifyWalkInAdminEvent($account, 'cancelled_' . $bookingId, 'booking_cancelled',
                     $details['customerName'] . "'s walk-in booking was cancelled.", $details, $now);
                 $emailSent = notificationEmail($details['customerEmail'], 'CoolTime cancellation request update', $details);
@@ -976,7 +984,13 @@ try {
             error_log(sprintf('Booking cancelled, but customer notification failed at %s:%d: %s',
                 $notificationError->getFile(), $notificationError->getLine(), $notificationError->getMessage()));
         }
-        jsonResponse(['ok' => true, 'message' => $emailSent ? 'Booking cancelled, checkout closed, and confirmation email sent.' : 'Booking cancelled and its slot released. Checkout closed if active; email delivery was skipped or unavailable.', 'emailSent' => $emailSent]);
+        $hasCustomerEmail = filter_var($customerEmail, FILTER_VALIDATE_EMAIL) !== false;
+        $message = $emailSent
+            ? 'Booking cancelled, slot released, and cancellation email sent to customer.'
+            : ($hasCustomerEmail
+                ? 'Booking cancelled and slot released, but the cancellation email could not be delivered.'
+                : 'Booking cancelled and slot released. No customer email address is on file.');
+        jsonResponse(['ok' => true, 'message' => $message, 'emailSent' => $emailSent]);
     }
     if ($action === 'approve_booking') {
         $bookingId = trim((string) ($input['bookingId'] ?? ''));

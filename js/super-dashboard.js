@@ -1,6 +1,6 @@
 ﻿(() => {
   const greeting = document.getElementById('superadmin-username-display');
-  const setGreeting = (username) => { if (greeting) greeting.textContent = username || 'User'; };
+  const setGreeting = (username) => { if (greeting) greeting.textContent = `${username || 'User'}${/[sS]$/.test(username || '') ? "'" : "'s"} Dashboard`; };
   setGreeting(window.cooltimeDashboardIdentity);
   window.addEventListener('cooltime:dashboard-identity', (event) => setGreeting(event.detail?.username));
 

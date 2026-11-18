@@ -6,6 +6,27 @@ import { logoutUser } from './auth.js';
 
 const AUTH_NAV_CACHE_KEY = 'cooltimeAuthNavState';
 
+function displayName(profile, user) {
+  return String(profile?.fullName || profile?.name || profile?.displayName || profile?.username || user?.displayName || user?.email?.split('@')[0] || 'User').trim() || 'User';
+}
+
+function dashboardLabel(name) {
+  const cleanName = String(name || 'User').trim();
+  return `${cleanName}${/[sS]$/.test(cleanName) ? "'" : "'s"} Dashboard`;
+}
+
+function updateDashboardIdentity(name, signedIn) {
+  if (!signedIn || !name) return;
+  const label = dashboardLabel(name);
+  document.querySelectorAll('[data-auth-bookings]').forEach((link) => {
+    link.textContent = label;
+    link.href = 'customer-dashboard.html';
+  });
+  document.querySelectorAll('[data-auth-dashboard-heading]').forEach((heading) => { heading.textContent = label; });
+  const pageTitle = document.querySelector('[data-auth-dashboard-title]');
+  if (pageTitle) document.title = `${label} | CoolTime`;
+}
+
 function readCachedState() {
   for (const storageName of ['localStorage', 'sessionStorage']) {
     try {
@@ -34,8 +55,9 @@ const nav = document.querySelector('.main-nav');
 
 if (nav) {
   const loginLink = nav.querySelector('[data-auth-session]');
-  const bookingsLink = nav.querySelector('[data-auth-bookings]');
+  const bookingsLinks = [...document.querySelectorAll('[data-auth-bookings]')];
   const bookNowLink = nav.querySelector('a[href="book-now.html"]');
+  const bookingsLink = bookingsLinks[0];
   if (bookingsLink) bookingsLink.href = 'my-bookings.html';
   const cachedState = readCachedState();
   const currentPage = window.location.pathname.split('/').pop() || 'index.html';
@@ -56,7 +78,8 @@ if (nav) {
     }
     if (bookingsLink) {
       bookingsLink.href = cachedState.signedIn && cachedState.customer ? 'customer-dashboard.html' : 'my-bookings.html';
-      bookingsLink.hidden = !(cachedState.signedIn && cachedState.customer);
+      bookingsLinks.forEach((link) => { link.hidden = !(cachedState.signedIn && cachedState.customer); });
+      if (cachedState.customer) updateDashboardIdentity(cachedState.name, true);
     }
     nav.removeAttribute('data-auth-pending');
   }
@@ -86,26 +109,26 @@ if (nav) {
     // optional customer bookings link and must not delay the whole header.
     nav.removeAttribute('data-auth-pending');
     if (!signedIn || !hasOtpVerification(user)) {
-      if (bookingsLink) {
-        bookingsLink.href = 'my-bookings.html';
-        bookingsLink.hidden = true;
-      }
+      bookingsLinks.forEach((link) => { link.href = 'my-bookings.html'; link.hidden = true; });
       cacheState({ signedIn, customer: false });
       return;
     }
     let customer = false;
+    let name = displayName(null, user);
 
     try {
       const profile = await getUserProfile(user.uid);
       customer = normalizeRole(profile?.role) === 'customer';
+      name = displayName(profile, user);
     } catch (error) {
       console.error('CoolTime navigation profile lookup failed:', error);
     }
-    if (bookingsLink) {
-      bookingsLink.href = customer ? 'customer-dashboard.html' : 'my-bookings.html';
-      bookingsLink.hidden = !customer;
-    }
-    cacheState({ signedIn, customer });
+    bookingsLinks.forEach((link) => {
+      link.href = customer ? 'customer-dashboard.html' : 'my-bookings.html';
+      link.hidden = !customer;
+    });
+    if (customer) updateDashboardIdentity(name, true);
+    cacheState({ signedIn, customer, name });
   })).catch((error) => {
     nav.removeAttribute('data-auth-pending');
     console.error('CoolTime auth navigation initialization failed:', error);

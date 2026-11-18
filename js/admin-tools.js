@@ -556,14 +556,14 @@ async function initialize() {
       const openRow = openPanel.closest('tr')?.previousElementSibling;
       openRow?.classList.remove('is-expanded');
       const openButton = openRow?.querySelector('.pos-actions-button');
-      if (openButton) { openButton.setAttribute('aria-expanded', 'false'); openButton.textContent = 'Actions â–¾'; }
+      if (openButton) { openButton.setAttribute('aria-expanded', 'false'); openButton.textContent = 'Action'; }
       openRow?.nextElementSibling?.querySelector('.pos-audit-actions')?.removeAttribute('open');
     });
     if (expanded) {
       panel.classList.add('expanded');
       row.classList.add('is-expanded');
       const button = row.querySelector('.pos-actions-button');
-      if (button) { button.setAttribute('aria-expanded', 'true'); button.textContent = 'Actions â–´'; }
+      if (button) { button.setAttribute('aria-expanded', 'true'); button.textContent = 'Action'; }
     }
   });
   on('#reportForm', 'submit', generateReport);
@@ -969,7 +969,7 @@ function renderBookings() {
       ].filter(Boolean).join('');
       const actionColumnHtml = isCancelled
         ? '<div class="booking-actions-none" aria-hidden="true"></div>'
-        : `<details class="booking-actions-dropdown"><summary class="actions-dropdown-btn">Actions â–¾</summary><div class="booking-actions-menu">${menuItems || '<span>No actions available</span>'}</div></details>`;
+        : `<details class="booking-actions-dropdown"><summary class="actions-dropdown-btn">Action</summary><div class="booking-actions-menu">${menuItems || '<span>No actions available</span>'}</div></details>`;
       return `<article class="booking-item-row" data-booking-row data-id="${esc(booking.id)}" tabindex="0" aria-expanded="false" aria-controls="${expandedId}">
         <div class="booking-row-summary">
           <div class="booking-row-customer"><strong>${esc(customerName)}</strong></div>
@@ -1495,7 +1495,7 @@ function renderPos() {
     let rowAction = '—';
     if (role === 'admin') rowAction = isVoidRequested ? '<button type="button" disabled>Void Pending</button>'
       : isPaid ? `<button type="button" class="btn-pos-request-void" ${attrs}>Request Void</button>` : '—';
-    if (role === 'super_admin') rowAction = `${isVoidRequested ? `<button type="button" class="btn-pos-approve-void" ${attrs}>Approve Void</button><button type="button" class="btn-pos-reject-void" ${attrs}>Reject Void</button>` : ''}<details class="pos-audit-actions"><summary class="btn-super-pos-actions">Actions â–¾</summary><div class="pos-audit-actions-menu"><button type="button" data-super-pos-action="flag" ${attrs}>${transaction.isFlagged ? 'Remove Flag' : 'Flag'} transaction</button><button type="button" data-super-pos-action="void" ${attrs}${isPaid ? '' : ' disabled'}>Void transaction</button><button type="button" data-super-pos-action="export" ${attrs}>Export audit summary</button></div></details>`;
+    if (role === 'super_admin') rowAction = `${isVoidRequested ? `<button type="button" class="btn-pos-approve-void" ${attrs}>Approve Void</button><button type="button" class="btn-pos-reject-void" ${attrs}>Reject Void</button>` : ''}<details class="pos-audit-actions"><summary class="btn-super-pos-actions">Action</summary><div class="pos-audit-actions-menu"><button type="button" data-super-pos-action="flag" ${attrs}>${transaction.isFlagged ? 'Remove Flag' : 'Flag'} transaction</button><button type="button" data-super-pos-action="void" ${attrs}${isPaid ? '' : ' disabled'}>Void transaction</button><button type="button" data-super-pos-action="export" ${attrs}>Export audit summary</button></div></details>`;
     const requester = transaction.voidRequestedByName || usersById[transaction.voidRequestedBy]?.name || transaction.voidRequestedByEmail || 'Unknown admin';
     const requestDetails = isVoidRequested ? `<div class="pos-void-request-details"><strong>Void requested by ${esc(requester)}</strong><p>${esc(transaction.voidRequestReason || 'No reason provided.')}</p></div>` : '';
     const branchValue = transaction.branch || transaction.branchLocation || transaction.branchName

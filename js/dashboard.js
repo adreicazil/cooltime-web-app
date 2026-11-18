@@ -273,8 +273,11 @@ async function initializeDashboard(user) {
   if (!profile || String(profile.status || 'active').trim().toLowerCase() !== 'active'
     || !['admin', 'super_admin'].includes(role)
     || (requiredRoles.length && !requiredRoles.includes(role))) return denyAccess();
-  const username = String(profile.name || user.displayName || profile.username || user.email?.split('@')[0] || 'User').trim() || 'User';
+  const username = String(profile.fullName || profile.name || profile.displayName || profile.username || user.displayName || user.email?.split('@')[0] || 'User').trim() || 'User';
+  const dashboardLabel = `${username}${/[sS]$/.test(username) ? "'" : "'s"} Dashboard`;
   window.cooltimeDashboardIdentity = username;
+  document.querySelectorAll('[data-dashboard-header-label]').forEach((element) => { element.textContent = dashboardLabel; });
+  document.title = `${dashboardLabel} | CoolTime`;
   const greeting = document.getElementById(role === 'super_admin' ? 'superadmin-username-display' : 'admin-username-display');
   if (greeting) greeting.textContent = username;
   window.dispatchEvent(new CustomEvent('cooltime:dashboard-identity', { detail: { username } }));

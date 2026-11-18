@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-  <title>CoolTime Auto Aircon | Contact Us</title>
+  <title data-auth-dashboard-title>CoolTime Auto Aircon | Contact Us</title>
   <meta name="description" content="Contact CoolTime Auto Aircon to ask about service, repairs, or booking an appointment.">
   <link rel="canonical" href="https://cooltimeautoaircon.online/contact.html">
   <meta property="og:type" content="website">
@@ -45,7 +45,7 @@
       <a href="feedback.html">Feedback/Report</a>
       <a href="book-now.html">Book Now</a>
       
-      <div id="auth-nav-container" class="auth-nav-container"><a data-auth-bookings href="my-bookings.html" hidden>My Bookings</a><a class="nav-link-login" data-auth-session data-authenticated="false" href="login.html">Log in</a></div>
+      <div id="auth-nav-container" class="auth-nav-container dashboard-auth-links"><a data-auth-bookings data-auth-dashboard-title-link href="my-bookings.html" hidden>My Dashboard</a><div class="customer-notification-bell-wrap" id="customerNotificationBellWrap"><button class="customer-notification-bell" id="customerNotificationBell" type="button" aria-label="Open notifications" aria-expanded="false" aria-controls="customerNotificationDropdown" hidden><img src="assets/bell.png" alt=""><span class="customer-notification-dot" id="customerNotificationDot" aria-hidden="true" hidden></span></button><div class="customer-notification-dropdown" id="customerNotificationDropdown" role="region" aria-label="Recent notifications" hidden><div class="customer-notification-dropdown-heading">Recent notifications</div><div class="customer-notification-preview-list" id="customerNotificationPreviewList" aria-live="polite"></div><button class="customer-notification-view-all" id="customerNotificationViewAll" type="button">View all notifications</button></div></div><a class="nav-link-login" data-auth-session data-authenticated="false" href="login.html">Log in</a></div>
     </nav>
   </header>
 
@@ -128,6 +128,7 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
   <script type="module" src="js/main.js"></script>
   <script type="module" src="js/public-forms.js"></script>
+  <script type="module" src="js/auth-notifications.js"></script>
   <script type="module" src="js/auth-nav.js"></script>
   <script src="js/faq-chatbot.js" defer></script>
 </body>

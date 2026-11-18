@@ -1,6 +1,6 @@
 (() => {
   const greeting = document.getElementById('admin-username-display');
-  const setGreeting = (username) => { if (greeting) greeting.textContent = username || 'User'; };
+  const setGreeting = (username) => { if (greeting) greeting.textContent = `${username || 'User'}${/[sS]$/.test(username || '') ? "'" : "'s"} Dashboard`; };
   setGreeting(window.cooltimeDashboardIdentity);
   window.addEventListener('cooltime:dashboard-identity', (event) => setGreeting(event.detail?.username));
 
@@ -15,14 +15,10 @@
     bookings: ['Bookings', 'Review appointments and cancellation requests.'],
     customers: ['Customers', 'Review customer requests, records, and account access.'],
     reports: ['Reports', 'Generate operational reports and review report history.'],
-<<<<<<< HEAD
     'pos-transactions': ['POS Transactions', 'Review point of sale invoices and payments.'],
+    sales: ['Sales', 'Review point of sale invoices and payments.'],
     notifications: ['Notifications', 'Review current customer notifications.'],
     'system-view': ['System logs', 'Review recent system events and export the audit log.']
-=======
-    'sales': ['Sales', 'Review point of sale invoices and payments.'],
-    notifications: ['Notifications', 'Review current customer notifications.']
->>>>>>> 448d183a6bf695bfda3637d01b91b98dff57c8f0
   };
 
   function activateView(name, updateHistory = false) {
