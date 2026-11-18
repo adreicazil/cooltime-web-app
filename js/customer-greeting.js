@@ -2,14 +2,15 @@ import { getAuthenticatedProfile } from './auth-guard.js';
 
 const greetingContainer = document.getElementById('customerSharedGreeting');
 const greeting = document.getElementById('customer-greeting-text');
+const sidebarName = document.getElementById('customer-sidebar-name');
 
 function displayCustomerGreeting(profile = {}) {
-  if (!greeting) return;
   const fullName = profile.name
     || [profile.firstName, profile.lastName].filter(Boolean).join(' ')
     || profile.username
     || 'customer';
-  greeting.textContent = `Hello ${fullName}`;
+  if (greeting) greeting.textContent = `Hello ${fullName}`;
+  if (sidebarName) sidebarName.textContent = fullName;
   greetingContainer?.removeAttribute('hidden');
 }
 
