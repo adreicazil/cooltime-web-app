@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="css/register.css">
   <link rel="stylesheet" href="css/responsive.css">
   <link rel="stylesheet" href="css/customer-dashboard.css">
+  <link rel="stylesheet" href="css/customer-greeting.css">
   <script src="js/toast.js"></script>
   <script src="js/security-validator.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -41,11 +42,11 @@
       <small>© 2026 CoolTime. All rights reserved.</small>
     </aside>
     <div class="customer-dashboard-content">
+    <header class="user-greeting-header mb-4" aria-labelledby="customer-greeting-text">
+      <div class="customer-role-label">CUSTOMER</div>
+      <h2 id="customer-greeting-text">Hello customer</h2>
+    </header>
     <section id="customerHome" class="customer-view customer-home-view" aria-labelledby="customer-greeting-text">
-      <div class="user-greeting-header mb-4">
-        <div class="customer-role-label">CUSTOMER</div>
-        <h2 id="customer-greeting-text">Hello customer</h2>
-      </div>
       <div class="customer-metrics" aria-label="Account summary">
         <article><span>Upcoming booking appointments</span><strong id="upcomingBookingCount">—</strong></article>
         <article><span>Pending bills</span><strong id="pendingBillCount">—</strong></article>
@@ -137,6 +138,7 @@
   </dialog>
   <script src="js/copy-reference.js" defer></script><script type="module" src="js/booking.js"></script>
   <script type="module" src="js/customer-dashboard.js"></script>
+  <script type="module" src="js/customer-greeting.js"></script>
   <script type="module" src="js/auth-nav.js"></script>
   <script type="module">
     import { logoutUser } from './js/auth.js';

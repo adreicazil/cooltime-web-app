@@ -1,0 +1,29 @@
+.customer-shared-greeting,
+.user-greeting-header {
+  margin: 0 0 20px;
+  color: #fff;
+}
+
+.customer-role-label {
+  margin-bottom: 4px;
+  color: rgba(255, 255, 255, .65);
+  font-size: .75rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+#customer-greeting-text {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(1.35rem, 3vw, 2.2rem);
+  font-weight: 900;
+}
+
+.feedback-hero { flex-direction: column; align-items: flex-start; justify-content: flex-end; }
+.feedback-hero .customer-shared-greeting {
+  width: min(100% - 32px, 1100px);
+  margin: 0 0 16px;
+  text-align: left;
+}
+.feedback-hero .customer-role-label { color: rgba(255, 255, 255, .75); }
