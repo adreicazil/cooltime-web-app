@@ -68,6 +68,17 @@ function availabilityDateKey(array $value): string
     return '';
 }
 
+function availabilityDailyCapacity(array $account): int
+{
+    $url = 'https://firestore.googleapis.com/v1/projects/' . rawurlencode($account['project_id'])
+        . '/databases/(default)/documents/system_settings/general_daily_slot_capacity';
+    $response = secureHttpRequest($url, 'GET', ['Authorization: Bearer ' . firebaseAdminAccessToken()], null, 10);
+    if ($response['status'] < 200 || $response['status'] >= 300) return 10;
+    $document = json_decode($response['body'], true);
+    $value = $document['fields']['value']['stringValue'] ?? null;
+    return is_numeric($value) && (int) $value > 0 ? (int) $value : 10;
+}
+
 try {
     $data = requestData();
     $branch = availabilityNormalizeBranch((string) ($data['branchId'] ?? $data['branch'] ?? ''));
@@ -115,7 +126,7 @@ try {
     $branchFieldValues = $branch === 'santa_rosa'
         ? ['Santa Rosa', 'Santa Rosa Branch', 'Santa Rosa branch', 'santa rosa branch', 'santarosa', 'santa_rosa']
         : ['Cabuyao', 'Cabuyao Branch', 'Cabuyao branch', 'Cabuyao Main Branch', 'Cabuyao main branch', 'cabuyao branch', 'cabuyao', 'cabuyao_main'];
-    $occupied = [];
+    $bookings = [];
     foreach ([['branchId', $aliases], ['branch', $branchFieldValues]] as [$fieldName, $branchValues]) {
       foreach (['date', 'appointmentDate', 'preferredDate'] as $dateField) {
         foreach (availabilityFirestoreQuery($account, $fieldName, $branchValues, $dateField, $date) as $row) {
@@ -124,11 +135,24 @@ try {
             $status = strtolower(trim((string) ($fields['status']['stringValue'] ?? 'pending')));
             if (in_array($status, ['cancelled', 'canceled', 'archived', 'completed', 'expired', 'payment overdue'], true)) continue;
             $timeSlot = trim((string) ($fields['timeSlot']['stringValue'] ?? $fields['preferredTimeSlot']['stringValue'] ?? ''));
-            if ($timeSlot !== '') $occupied[$timeSlot] = true;
+            if ($timeSlot !== '') {
+                $documentName = (string) ($row['document']['name'] ?? $timeSlot . '|' . count($bookings));
+                $bookings[$documentName] = $timeSlot;
+            }
         }
       }
     }
-    $response = ['ok' => true, 'branchId' => $branch, 'date' => $date, 'occupiedSlots' => array_keys($occupied)];
+    $counts = [];
+    foreach ($bookings as $storedSlot) {
+        if (preg_match('/^\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/i', $storedSlot, $match)) {
+            $start = strtoupper(preg_replace('/\s+/', ' ', trim($match[1])));
+            $counts[$start] = ($counts[$start] ?? 0) + 1;
+        }
+    }
+    $dailyCapacity = availabilityDailyCapacity($account);
+    $response = ['ok' => true, 'branchId' => $branch, 'date' => $date,
+        'slotCounts' => $counts, 'dailyBookingCount' => count($bookings),
+        'slotCapacity' => $branch === 'cabuyao' ? 3 : 4, 'dailyCapacity' => $dailyCapacity];
     @file_put_contents($cacheFile, json_encode(['expiresAt' => time() + 15, 'response' => $response], JSON_THROW_ON_ERROR), LOCK_EX);
     jsonResponse($response);
 } catch (Throwable $error) {

@@ -76,12 +76,18 @@ export async function createBooking({ customerId, userId = customerId, email, cu
   const branchLabel = normalizeBranchLabel(branchId);
   const vehicleRef = doc(collection(db, 'vehicles'));
   const bookingRef = doc(collection(db, 'bookings'));
+  const plateNumber = required(vehicle?.plateNumber, 'Vehicle plate number').toUpperCase().replace(/\s+/g, ' ').trim();
+  if (!/^[A-Z]{3} ?[0-9]{3,4}$/.test(plateNumber)) throw new Error('Enter a valid Philippine plate number, such as ABC 1234 or ABC 123.');
+  if (!['single', 'dual'].includes(vehicle?.airconType)) throw new Error('Select a vehicle type and aircon classification.');
+  const year = String(required(vehicle?.year, 'Vehicle year'));
+  if (!/^\d{4}$/.test(year) || Number(year) < 1990 || Number(year) > new Date().getFullYear()) throw new Error('Select a valid vehicle year.');
   const vehicleData = {
     customerId,
     make: required(vehicle?.make, 'Vehicle make'),
     model: required(vehicle?.model, 'Vehicle model'),
-    plateNumber: required(vehicle?.plateNumber, 'Vehicle plate number').toUpperCase(),
-    year: required(vehicle?.year, 'Vehicle year'),
+    airconType: vehicle.airconType,
+    plateNumber,
+    year,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };

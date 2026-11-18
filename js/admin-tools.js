@@ -24,6 +24,7 @@ const dashboardUnsubscribers = [];
 const modulePaginators = {};
 const moduleRowsPerPage = 15;
 let allSystemLogs = [];
+let displayedSystemLogs = [];
 let currentAccountsPage = 1;
 const accountsPerPage = 15;
 
@@ -480,6 +481,7 @@ async function initialize() {
   }
   $('#toolsLogout')?.addEventListener('click', () => logoutUser('login.html'));
   on('#closeDialog', 'click', () => $('#detailDialog')?.close());
+  on('#export-system-logs-pdf', 'click', exportSystemLogsPdf);
   on('#booking-search-input', 'input', renderBookings);
   on('#booking-start-date', 'change', renderBookings);
   on('#booking-end-date', 'change', renderBookings);
@@ -930,13 +932,15 @@ function renderBookings() {
     const checkout = payments.find((item) => item.id === `paymongo_${sessionId}` || item.checkoutSessionId === sessionId);
     const activeCheckout = Boolean(sessionId && String(checkout?.status || '').toLowerCase() === 'pending');
     const invoicePaid = String(invoice?.status || '').toLowerCase() === 'paid';
-    const isClosed = ['cancelled', 'completed', 'paid'].includes(String(booking.status).toLowerCase()) || invoicePaid;
+    const paymentStatus = String(booking.paymentStatus || '').toLowerCase();
+    const isClosed = ['cancelled', 'completed', 'paid'].includes(String(booking.status).toLowerCase()) || invoicePaid || paymentStatus === 'paid';
     const canApprove = String(booking.status).toLowerCase() === 'pending';
     const canComplete = String(booking.status).toLowerCase() === 'confirmed';
     const normalizedStatus = normalizeBookingFilterStatus(booking.status || 'pending');
     const isCancelled = normalizedStatus === 'cancelled';
     const invoiceStatus = String(invoice?.status || '').toLowerCase();
     const bookingStatus = String(booking.status || 'pending').toLowerCase();
+    const canCancel = ['pending', 'confirmed'].includes(bookingStatus) && !isClosed && paymentStatus !== 'paid';
     const bookingStatusKey = bookingStatus.replace(/[^a-z0-9-]/g, '-');
     const invoiceStatusKey = invoiceStatus.replace(/[^a-z0-9-]/g, '-');
     const state = `<span class="status ${esc(bookingStatusKey)}">${esc(bookingStatus.replaceAll('_', ' '))}</span>${invoiceStatus && invoiceStatus !== bookingStatus ? ` <span class="status ${esc(invoiceStatusKey)}">invoice ${esc(invoiceStatus)}</span>` : ''}${activeCheckout ? ' <span class="status pending">checkout</span>' : ''}`;
@@ -958,7 +962,7 @@ function renderBookings() {
         ? `<div class="booking-detail-reason"><span>${label}</span><p>${esc(value)}</p></div>` : '';
       const menuItems = [
         bookingStatus === 'confirmed' ? `<button type="button" class="reschedule-booking" data-id="${esc(booking.id)}">Update appointment slot</button>` : '',
-        !isClosed && bookingStatus !== 'confirmed' ? `<button type="button" class="cancel-booking" data-id="${esc(booking.id)}">Expire checkout &amp; release slot</button>` : '',
+        canCancel ? `<button type="button" class="cancel-booking" data-id="${esc(booking.id)}">Cancel</button>` : '',
         canComplete ? `<button type="button" class="complete-booking" data-id="${esc(booking.id)}">Complete service</button>` : '',
         booking.bookingType === 'walk_in' && bookingStatus === 'completed' && String(booking.paymentStatus || '').toLowerCase() !== 'paid' ? `<button type="button" class="settle-walkin-payment" data-id="${esc(booking.id)}">Settle Walk-In Payment</button>` : '',
         canApprove ? `<button type="button" class="approve-booking" data-id="${esc(booking.id)}">Approve booking</button>` : ''
@@ -994,7 +998,7 @@ function renderBookings() {
       </article>`;
     }
 
-    return `<tr><td>${esc(user.name || user.username || booking.customerId)}</td><td>${esc(user.email)}</td><td>${esc(booking.date)} ${esc(booking.timeSlot)}</td><td>${esc(service)}</td><td>${esc(normalizeBranchLabel(branchesById[booking.branchId]?.name || booking.branchName || booking.branch || booking.branchId))}</td><td>${state}</td><td><button class="action-btn booking-details" data-id="${esc(booking.id)}">View</button>${canApprove ? ` <button class="action-btn approve-booking" data-id="${esc(booking.id)}">Approve booking</button>` : ''}${!isClosed ? `${bookingStatus !== 'confirmed' ? ` <button class="action-btn cancel-booking" data-id="${esc(booking.id)}">${activeCheckout ? 'Expire checkout & release slot' : 'Cancel booking / release slot'}</button>` : ''}` : ''}${bookingStatus === 'confirmed' ? ` <button class="action-btn reschedule-booking" data-id="${esc(booking.id)}">Update appointment slot</button>` : ''}${canComplete ? ` <button class="action-btn complete-booking" data-id="${esc(booking.id)}">Complete service</button>` : ''}${booking.bookingType === 'walk_in' && bookingStatus === 'completed' && String(booking.paymentStatus || '').toLowerCase() !== 'paid' ? ` <button class="action-btn settle-walkin-payment" data-id="${esc(booking.id)}">Settle Walk-In Payment</button>` : ''}</td></tr>`;
+    return `<tr><td>${esc(user.name || user.username || booking.customerId)}</td><td>${esc(user.email)}</td><td>${esc(booking.date)} ${esc(booking.timeSlot)}</td><td>${esc(service)}</td><td>${esc(normalizeBranchLabel(branchesById[booking.branchId]?.name || booking.branchName || booking.branch || booking.branchId))}</td><td>${state}</td><td><button class="action-btn booking-details" data-id="${esc(booking.id)}">View</button>${canApprove ? ` <button class="action-btn approve-booking" data-id="${esc(booking.id)}">Approve booking</button>` : ''}${canCancel ? ` <button class="action-btn cancel-booking" data-id="${esc(booking.id)}">Cancel</button>` : ''}${bookingStatus === 'confirmed' ? ` <button class="action-btn reschedule-booking" data-id="${esc(booking.id)}">Update appointment slot</button>` : ''}${canComplete ? ` <button class="action-btn complete-booking" data-id="${esc(booking.id)}">Complete service</button>` : ''}${booking.bookingType === 'walk_in' && bookingStatus === 'completed' && paymentStatus !== 'paid' ? ` <button class="action-btn settle-walkin-payment" data-id="${esc(booking.id)}">Settle Walk-In Payment</button>` : ''}</td></tr>`;
   });
   if (isDashboardPage && modulePaginators.bookings) {
     modulePaginators.bookings.setItems(renderedRows);
@@ -1134,7 +1138,7 @@ async function bookingAction(event) {
     $('#detailDialog')?.showModal(); return;
   }
   if (!button.classList.contains('cancel-booking')) return;
-  const reason = await prompt('Enter the cancellation reason. Any active PayMongo checkout will be expired and the slot released:');
+  const reason = await prompt('Enter the cancellation reason. Any unpaid checkout or invoice will be voided and the slot released:');
   if (!reason?.trim()) return;
   button.disabled = true;
   try { const result = await api('api/admin-workflow.php', { action: 'cancel_booking', bookingId: booking.id, reason }); alert(result.message); await loadCoreData(); }
@@ -1809,21 +1813,84 @@ function renderContinuousSystemLogs(logsData = null) {
     allSystemLogs = adminRows.system_logs || [];
     logsData = allSystemLogs;
   }
-  const timestampMs = (log) => {
+  const timestampDate = (log) => {
     const raw = log.createdAt ?? log.timestamp;
     const date = raw?.toDate?.() || (typeof raw === 'number' ? new Date(raw) : raw ? new Date(raw) : null);
-    return date && !Number.isNaN(date.getTime()) ? date.getTime() : 0;
+    return date && !Number.isNaN(date.getTime()) ? date : null;
   };
+  const timestampMs = (log) => timestampDate(log)?.getTime() || 0;
   const rows = [...logsData].sort((a, b) => timestampMs(b) - timestampMs(a));
+  displayedSystemLogs = rows;
+  const formatTimestamp = (log) => {
+    const date = timestampDate(log);
+    return date ? new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Manila', month: '2-digit', day: '2-digit', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
+    }).format(date) : 'Timestamp unavailable';
+  };
   const renderRow = (log) => {
-    const rawDate = log.createdAt ?? log.timestamp;
-    const date = rawDate?.toDate?.() || (typeof rawDate === 'number' ? new Date(rawDate) : rawDate ? new Date(rawDate) : null);
-    const time = date && !Number.isNaN(date.getTime()) ? date.toLocaleString('en-PH') : 'Timestamp unavailable';
+    const time = formatTimestamp(log);
     const event = log.event || log.type || 'System event';
     const details = log.details || log.message || '';
     return `<article class="system-log-row-item"><time class="system-log-time">${esc(time)}</time><strong class="system-log-event">${esc(event)}</strong><div class="system-log-details">${esc(details)}</div></article>`;
   };
   setHTML(list, rows.map(renderRow).join('') || '<div class="system-log-empty">No system logs recorded yet.</div>');
+}
+
+function exportSystemLogsPdf() {
+  if (!displayedSystemLogs.length) {
+    window.alert('No system logs available to export.');
+    return;
+  }
+  // jsPDF is not bundled with this project, so create a self-contained print report.
+  const dateParts = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date()).map(({ type, value }) => [type, value]));
+  const dateStamp = `${dateParts.year}-${dateParts.month}-${dateParts.day}`;
+  const exportedAt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Manila', month: '2-digit', day: '2-digit', year: 'numeric',
+    hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
+  }).format(new Date());
+  const roleLabel = role === 'super_admin' ? 'Super Admin' : 'Admin';
+  const generatedBy = `${adminDisplayName || actor?.displayName || actor?.email || roleLabel} (${roleLabel})`;
+  const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[character]));
+  const rows = displayedSystemLogs.map((log) => {
+    const raw = log.createdAt ?? log.timestamp;
+    const date = raw?.toDate?.() || (typeof raw === 'number' ? new Date(raw) : raw ? new Date(raw) : null);
+    const timestamp = date && !Number.isNaN(date.getTime()) ? new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Manila', month: '2-digit', day: '2-digit', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true,
+    }).format(date) : 'Timestamp unavailable';
+    return `<tr><td>${escapeHtml(timestamp)}</td><td>${escapeHtml(log.event || log.type || 'System event')}</td><td>${escapeHtml(log.details || log.message || '')}</td></tr>`;
+  }).join('');
+  const reportTitle = `cooltime-system-logs-${dateStamp}`;
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    window.alert('Allow pop-ups to open the print-ready System logs report.');
+    return;
+  }
+  printWindow.document.open();
+  printWindow.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${reportTitle}</title><style>
+    @page { size: landscape; margin: 12mm; }
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #172033; font: 10pt Arial, sans-serif; }
+    h1 { margin: 0 0 8px; font-size: 19pt; }
+    .meta { margin: 0 0 18px; color: #374151; font-size: 9pt; line-height: 1.6; }
+    table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    th, td { border: 1px solid #cbd5e1; padding: 7px 8px; text-align: left; vertical-align: top; overflow-wrap: anywhere; white-space: pre-wrap; }
+    th { background: #e8eef5; font-weight: 700; }
+    th:first-child, td:first-child { width: 22%; }
+    th:nth-child(2), td:nth-child(2) { width: 22%; }
+    th:last-child, td:last-child { width: 56%; }
+    tr { break-inside: avoid; }
+    @media screen { body { padding: 16mm; } }
+  </style></head><body><h1>CoolTime Auto Aircon — System Logs Report</h1>
+  <p class="meta"><strong>Generated By:</strong> ${escapeHtml(generatedBy)} &nbsp; <strong>Exported At:</strong> ${escapeHtml(exportedAt)} &nbsp; <strong>Total Logs:</strong> ${displayedSystemLogs.length}</p>
+  <table><thead><tr><th>Timestamp</th><th>Event</th><th>Details</th></tr></thead><tbody>${rows}</tbody></table>
+  <script>window.addEventListener('load', () => window.print());<\/script></body></html>`);
+  printWindow.document.close();
 }
 
 function notificationTimestamp(item) {

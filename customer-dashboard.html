@@ -86,10 +86,12 @@
             </div>
             <div class="booking-form-column">
               <label for="savedVehicleProfile">Saved vehicle (optional)</label><select id="savedVehicleProfile" name="savedVehicleProfile"><option value="">Enter vehicle details</option></select>
-              <label for="plateNumber">Vehicle Plate Number</label><input id="plateNumber" name="plateNumber" type="text" maxlength="20" required>
-              <label for="vehicleMake">Vehicle Make</label><input id="vehicleMake" name="vehicleMake" type="text" required>
-              <label for="vehicleModel">Vehicle Model</label><input id="vehicleModel" name="vehicleModel" type="text" required>
-              <label for="vehicleYear">Vehicle Year</label><input id="vehicleYear" name="vehicleYear" type="number" min="1900" max="2100" required>
+              <label for="plateNumber">Vehicle Plate Number</label><input id="plateNumber" name="plateNumber" type="text" maxlength="8" pattern="[A-Za-z]{3} ?[0-9]{3,4}" required>
+              <label for="vehicleType">Vehicle Type</label><select id="vehicleType" name="vehicleType" required><option value="">Select vehicle type</option><option value="single">Sedan / Pickup (Single Aircon)</option><option value="dual">SUV / Van (Dual Aircon)</option></select>
+              <label for="vehicleAirconLabel">Aircon Type</label><output id="vehicleAirconLabel">Select a vehicle type</output>
+              <label for="vehicleMake">Vehicle Brand</label><select id="vehicleMake" name="vehicleMake" required disabled><option value="">Select brand</option></select>
+              <label for="vehicleModel">Vehicle Model</label><select id="vehicleModel" name="vehicleModel" required disabled><option value="">Select model</option></select>
+              <label for="vehicleYear">Vehicle Year</label><select id="vehicleYear" name="vehicleYear" required><option value="">Select year</option></select>
             </div>
             <p id="availabilityNotice" class="availability-notice" role="status" aria-live="polite"></p>
             <p class="booking-form-help">Can't find an available time? <a href="contact.html#inquiryForm">Send us an inquiry</a> and our team will help arrange your appointment.</p>

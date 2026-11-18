@@ -90,16 +90,19 @@ export async function updateAvailableSlots(dateInput, branchInput, slotSelectEle
       if (runBySelect.get(slotSelectElement) !== run) return;
 
       const { date: today, minutes: nowMinutes } = manilaDateTime();
-      const occupied = new Set(result.occupiedSlots || []);
+      const counts = result.slotCounts || {};
+      const dailyFull = Number(result.dailyBookingCount || 0) >= Number(result.dailyCapacity || 10);
+      const slotCapacity = Number(result.slotCapacity || (currentBranchId === 'cabuyao' ? 3 : 4));
       const hasAvailable = STANDARD_SLOTS.some((slot) => {
         const expired = currentDate < today || (currentDate === today && nowMinutes >= slotEndMinutes(slot));
-        return !expired && !occupied.has(slot);
+        return !expired && !dailyFull && Number(counts[slot.split(' - ')[0]] || 0) < slotCapacity;
       });
       const options = [new Option('Select a time', '')];
       STANDARD_SLOTS.forEach((slot) => {
         const expired = currentDate < today || (currentDate === today && nowMinutes >= slotEndMinutes(slot));
-        const unavailable = expired || occupied.has(slot);
-        const option = new Option(`${slot}${unavailable ? ' (Unavailable)' : ''}`, slot);
+        const unavailable = expired || dailyFull || Number(counts[slot.split(' - ')[0]] || 0) >= slotCapacity;
+        const startLabel = slot.split(' - ')[0].replace(/^0(?=\d:)/, '');
+        const option = new Option(`${startLabel}${unavailable ? ' (Unavailable)' : ''}`, slot);
         option.disabled = unavailable;
         if (unavailable) {
           option.style.color = '#9ca3af';

@@ -16,6 +16,36 @@ let customerProfile = null;
 let savedVehiclesById = {};
 
 const serviceTypeSelect = document.getElementById('serviceType');
+const vehicleTypeSelect = document.getElementById('vehicleType');
+const vehicleMakeSelect = document.getElementById('vehicleMake');
+const vehicleModelSelect = document.getElementById('vehicleModel');
+const vehicleYearSelect = document.getElementById('vehicleYear');
+const vehicleCatalog = {
+  single: { Toyota: ['Vios', 'Altis', 'Camry', 'Hilux', 'Others'], Mitsubishi: ['Mirage', 'Lancer EX', 'Strada', 'Others'], Honda: ['Civic', 'City', 'Brio', 'Others'], Nissan: ['Navara', 'Juke', 'Others'], Isuzu: ['D-Max', 'Others'], Others: ['Others'] },
+  dual: { Toyota: ['Innova', 'Fortuner', 'Avanza', 'Hiace', 'Veloz', 'Others'], Mitsubishi: ['Montero', 'Xpander', 'L300', 'Others'], Honda: ['CR-V', 'Mobilio', 'BR-V', 'Others'], Nissan: ['Terra', 'NV350', 'Others'], Isuzu: ['mu-X', 'Traviz', 'Crosswind', 'Alterra', 'Others'], Others: ['Others'] },
+};
+const currentYear = new Date().getFullYear();
+if (vehicleYearSelect) vehicleYearSelect.replaceChildren(new Option('Select year', ''), ...Array.from({ length: currentYear - 1989 }, (_, index) => new Option(String(currentYear - index), String(currentYear - index))));
+function refreshVehicleChoices() {
+  const brands = vehicleCatalog[vehicleTypeSelect?.value] || {};
+  vehicleMakeSelect.replaceChildren(new Option('Select brand', ''), ...Object.keys(brands).map((brand) => new Option(brand, brand)));
+  vehicleMakeSelect.disabled = !vehicleTypeSelect?.value;
+  vehicleModelSelect.replaceChildren(new Option('Select model', ''));
+  vehicleModelSelect.disabled = true;
+  const aircon = document.getElementById('vehicleAirconLabel');
+  if (aircon) aircon.textContent = vehicleTypeSelect?.value === 'single' ? 'Single Aircon' : vehicleTypeSelect?.value === 'dual' ? 'Dual Aircon' : 'Select a vehicle type';
+  const match = [...(serviceTypeSelect?.options || [])].find((option) => vehicleTypeSelect?.value === 'single'
+    ? /single/i.test(option.dataset.serviceName || '')
+    : /dual|double/i.test(option.dataset.serviceName || ''));
+  if (match) serviceTypeSelect.value = match.value;
+}
+vehicleTypeSelect?.addEventListener('change', refreshVehicleChoices);
+vehicleMakeSelect?.addEventListener('change', () => {
+  const models = vehicleCatalog[vehicleTypeSelect.value]?.[vehicleMakeSelect.value] || [];
+  vehicleModelSelect.replaceChildren(new Option('Select model', ''), ...models.map((model) => new Option(model, model)));
+  vehicleModelSelect.disabled = !vehicleMakeSelect.value;
+  vehicleModelSelect.required = true;
+});
 async function loadServiceCatalog() {
   const snapshot = await getDocsFromServer(collection(db, 'services'));
   return snapshot.docs.map((item) => ({ id: item.id, ...item.data() }));
@@ -140,7 +170,8 @@ onSnapshot(collection(db, 'services'), (snapshot) => {
     const selectedId = serviceTypeSelect.value;
     const options = activeServices.map((service) => {
       const price = Number(service.price) || 0;
-      const option = new Option(service.name.trim(), service.id);
+      const duration = Number(service.duration ?? service.estimatedDuration) || (/basic|single/i.test(service.name) ? 2 : /dual|double/i.test(service.name) ? 3 : 2);
+      const option = new Option(`${service.name.trim()} — ${duration} hrs`, service.id);
       option.dataset.serviceId = service.id;
       option.dataset.serviceName = service.name.trim();
       option.dataset.price = String(price);
@@ -800,9 +831,15 @@ if (form) {
     const saved = savedVehiclesById[vehicle.value];
     if (!saved) return;
     form.elements.namedItem('plateNumber').value = saved.plateNumber || saved.plate_number || saved.vehiclePlate || saved.vehicle_plate || saved.plate || '';
-    form.elements.namedItem('vehicleMake').value = saved.make || saved.vehicleMake || saved.vehicle_make || '';
-    form.elements.namedItem('vehicleModel').value = saved.model || saved.vehicleModel || saved.vehicle_model || '';
-    form.elements.namedItem('vehicleYear').value = saved.year || saved.vehicleYear || saved.vehicle_year || '';
+    const savedType = saved.airconType === 'dual' ? 'dual' : saved.airconType === 'single' ? 'single' : '';
+    vehicleTypeSelect.value = savedType;
+    refreshVehicleChoices();
+    const knownBrand = saved.make || saved.vehicleMake || saved.vehicle_make || '';
+    vehicleMakeSelect.value = Object.hasOwn(vehicleCatalog[savedType] || {}, knownBrand) ? knownBrand : (knownBrand ? 'Others' : '');
+    vehicleMakeSelect.dispatchEvent(new Event('change'));
+    const knownModel = saved.model || saved.vehicleModel || saved.vehicle_model || '';
+    vehicleModelSelect.value = [...vehicleModelSelect.options].some((option) => option.value === knownModel) ? knownModel : (knownModel ? 'Others' : '');
+    vehicleYearSelect.value = String(saved.year || saved.vehicleYear || saved.vehicle_year || '');
   });
   newBookingButton?.addEventListener('click', () => {
     const currentCount = document.querySelectorAll('#customerBookings .customer-booking-row').length;
@@ -842,9 +879,17 @@ if (form) {
     submitButton.disabled = true;
     try {
       const data = new FormData(form);
+      const plateInput = form.elements.namedItem('plateNumber');
+      plateInput.value = plateInput.value.toUpperCase().replace(/\s+/g, ' ').trim();
+      if (!/^[A-Z]{3} ?[0-9]{3,4}$/.test(plateInput.value)) throw new Error('Enter a valid Philippine plate number, such as ABC 1234 or ABC 123.');
+      const brand = vehicleMakeSelect.value;
+      const model = vehicleModelSelect.value;
+      if (!vehicleTypeSelect.value || !brand || !model || !/^\d{4}$/.test(String(data.get('vehicleYear')))) throw new Error('Complete vehicle type, brand, model, and four-digit year.');
       const bookingEmail = String(access.user.email || '').trim().toLowerCase();
       const selectedService = serviceTypeSelect.selectedOptions[0];
-      const result = await createBooking({ customerId: access.user.uid, userId: access.user.uid, email: bookingEmail, customerEmail: bookingEmail, branchId: normalizeBranchId(data.get('branchId')), serviceId: selectedService?.dataset.serviceId || data.get('serviceType'), serviceName: selectedService?.dataset.serviceName || selectedService?.textContent.trim(), servicePrice: Number(selectedService?.dataset.price || 0), date: data.get('appointmentDate'), timeSlot: data.get('timeSlot'), vehicle: { plateNumber: data.get('plateNumber'), make: data.get('vehicleMake'), model: data.get('vehicleModel'), year: data.get('vehicleYear') } });
+      const serviceName = selectedService?.dataset.serviceName || '';
+      if ((vehicleTypeSelect.value === 'dual' && /single/i.test(serviceName)) || (vehicleTypeSelect.value === 'single' && /dual|double/i.test(serviceName))) throw new Error('The selected service package does not match this vehicle’s aircon type. Choose the matching Single or Dual Aircon package.');
+      const result = await createBooking({ customerId: access.user.uid, userId: access.user.uid, email: bookingEmail, customerEmail: bookingEmail, branchId: normalizeBranchId(data.get('branchId')), serviceId: selectedService?.dataset.serviceId || data.get('serviceType'), serviceName: selectedService?.dataset.serviceName || selectedService?.textContent.trim(), servicePrice: Number(selectedService?.dataset.price || 0), date: data.get('appointmentDate'), timeSlot: data.get('timeSlot'), vehicle: { plateNumber: data.get('plateNumber'), airconType: vehicleTypeSelect.value, make: brand, model, year: data.get('vehicleYear') } });
       latestSubmittedBookingId = result.bookingId;
       if (result.booking) optimisticBookingRecords.set(result.bookingId, result.booking);
       rerenderCustomerBookings?.();

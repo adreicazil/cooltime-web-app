@@ -44,9 +44,10 @@ try {
     $date = walkinInput($input, 'date', 'appointmentDate', 'appointment_date');
     $time = strtoupper(walkinInput($input, 'timeSlot', 'time_slot', 'time'));
     $plate = strtoupper(walkinInput($input, 'plateNumber', 'plate_number', 'plateNo', 'plate_no'));
-    $make = walkinInput($input, 'vehicleMake', 'vehicle_make', 'make');
+    $make = walkinInput($input, 'vehicleMake', 'vehicle_make', 'make', 'brand');
     $model = walkinInput($input, 'vehicleModel', 'vehicle_model', 'model');
     $year = walkinInput($input, 'vehicleYear', 'vehicle_year', 'year');
+    $vehicleType = walkinInput($input, 'vehicleType', 'airconType', 'aircon_type');
     $phone = walkinInput($input, 'phone', 'contact', 'contactNumber', 'contact_number');
 
     $invalid = [];
@@ -58,10 +59,11 @@ try {
     if ($branchId === '') $invalid[]='branch';
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/',$date)) $invalid[]='date';
     if (!preg_match('/^\d{1,2}:\d{2}\s?(AM|PM)\s*-\s*\d{1,2}:\d{2}\s?(AM|PM)$/i',$time)) $invalid[]='timeSlot';
-    if ($plate === '') $invalid[]='plateNumber';
+    if (!preg_match('/^[A-Z]{3} ?[0-9]{3,4}$/', $plate)) $invalid[]='plateNumber';
+    if (!in_array($vehicleType, ['single', 'dual'], true)) $invalid[]='vehicleType';
     if ($make === '') $invalid[]='vehicleMake';
     if ($model === '') $invalid[]='vehicleModel';
-    if (!preg_match('/^\d{4}$/',$year) || (int)$year<1950 || (int)$year>2100) $invalid[]='vehicleYear';
+    if (!preg_match('/^\d{4}$/',$year) || (int)$year<1990 || (int)$year>(int)date('Y')) $invalid[]='vehicleYear';
     if ($phone !== '' && !preg_match('/^[+0-9() .-]{7,25}$/',$phone)) $invalid[]='phone';
     if ($invalid) jsonResponse(['ok'=>false,'message'=>'Invalid or missing field(s): '.implode(', ',$invalid).'.'],422);
 
@@ -103,6 +105,10 @@ try {
     if (isset($service['status']) && !in_array(strtolower((string)$service['status']),['active','available'],true)) {
         jsonResponse(['ok'=>false,'message'=>'Invalid field: service is currently unavailable.'],422);
     }
+    if (($vehicleType === 'dual' && preg_match('/single/i', $serviceName))
+        || ($vehicleType === 'single' && preg_match('/dual|double/i', $serviceName))) {
+        jsonResponse(['ok'=>false,'message'=>'The selected service package does not match the vehicle aircon type.'],422);
+    }
     $price=(float)($service['price']??0);
     if (!is_finite($price) || $price<=0) jsonResponse(['ok'=>false,'message'=>'Invalid field: service price is not configured.'],422);
 
@@ -121,11 +127,12 @@ try {
       'serviceId'=>['stringValue'=>$serviceId],'serviceName'=>['stringValue'=>$serviceName],'branchId'=>['stringValue'=>$branchId],'branch'=>['stringValue'=>$branchLabel],
       'date'=>['stringValue'=>$date],'timeSlot'=>['stringValue'=>$time],'plateNumber'=>['stringValue'=>$plate],
       'vehiclePlate'=>['stringValue'=>$plate],'vehicle_plate'=>['stringValue'=>$plate],
+      'vehicleType'=>['stringValue'=>$vehicleType],'airconType'=>['stringValue'=>$vehicleType],
       'vehicleMake'=>['stringValue'=>$make],'vehicleModel'=>['stringValue'=>$model],'vehicleYear'=>['integerValue'=>$year],
       'plate_number'=>['stringValue'=>$plate],'vehicle_make'=>['stringValue'=>$make],'vehicle_model'=>['stringValue'=>$model],'vehicle_year'=>['integerValue'=>$year],
       'vehicle'=>['mapValue'=>['fields'=>[
         'plateNumber'=>['stringValue'=>$plate],'plate'=>['stringValue'=>$plate],'make'=>['stringValue'=>$make],
-        'model'=>['stringValue'=>$model],'year'=>['integerValue'=>$year],
+        'model'=>['stringValue'=>$model],'year'=>['integerValue'=>$year],'airconType'=>['stringValue'=>$vehicleType],
       ]]],
       'source'=>['stringValue'=>'walk_in_pos'],'bookingType'=>['stringValue'=>'walk_in'],'is_guest'=>['booleanValue'=>true],'status'=>['stringValue'=>'confirmed'],
       'paymentStatus'=>['stringValue'=>$paymentStatus],'paymentMethod'=>['stringValue'=>$methodName],

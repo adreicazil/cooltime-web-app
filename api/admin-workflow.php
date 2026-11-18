@@ -897,9 +897,11 @@ try {
         if (!preg_match('/^[A-Za-z0-9_-]{1,150}$/', $bookingId) || $reason === '') jsonResponse(['ok' => false, 'message' => 'Booking and cancellation reason are required.'], 422);
         $booking = adminWorkflowRead($account, 'bookings', $bookingId);
         if (!$booking) jsonResponse(['ok' => false, 'message' => 'Booking was not found.'], 404);
-        if (strtolower((string) ($booking['status'] ?? '')) === 'confirmed' && strtolower((string) ($booking['bookingType'] ?? '')) !== 'walk_in') jsonResponse(['ok' => false, 'message' => 'Confirmed bookings cannot be cancelled.'], 409);
-        if (strtolower((string) ($booking['status'] ?? '')) === 'paid') jsonResponse(['ok' => false, 'message' => 'This booking is marked paid. Verify its invoice before cancelling it.'], 409);
-        if (strtolower((string) ($booking['status'] ?? '')) === 'cancelled') jsonResponse(['ok' => true, 'alreadyCancelled' => true, 'message' => 'Booking was already cancelled.']);
+        $bookingStatus = strtolower(trim((string) ($booking['status'] ?? '')));
+        $bookingPaymentStatus = strtolower(trim((string) ($booking['paymentStatus'] ?? $booking['payment_status'] ?? '')));
+        if ($bookingStatus === 'cancelled' || $bookingStatus === 'canceled') jsonResponse(['ok' => true, 'alreadyCancelled' => true, 'message' => 'Booking was already cancelled.']);
+        if (!in_array($bookingStatus, ['pending', 'confirmed'], true)) jsonResponse(['ok' => false, 'message' => 'Only pending or confirmed bookings can be cancelled.'], 409);
+        if ($bookingPaymentStatus === 'paid') jsonResponse(['ok' => false, 'message' => 'This booking is marked paid. Verify its invoice before cancelling it.'], 409);
         $customer = adminWorkflowRead($account, 'users', (string) ($booking['customerId'] ?? ''));
         $now = gmdate('Y-m-d\TH:i:s\Z');
         $logId = 'cancel_' . bin2hex(random_bytes(8));

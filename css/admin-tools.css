@@ -26,3 +26,7 @@
 .report-bar { min-width: 24px; flex: 1; background: #0874d1; color: #fff; text-align: center; font-size: 12px; }
 .admin-tools-shell .dashboard-topbar { max-width: 1500px; margin: 0 auto 18px; }
 @media (max-width: 680px) { .admin-tools-shell { padding: 8px; } .admin-tools-main .panel { padding: 12px; } .tool-filters input, .tool-filters select, .tool-form input, .tool-form select { flex: 1 1 100%; } }
+.system-logs-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:16px; }
+.system-logs-heading h2 { margin:0; }
+.system-logs-heading .btn-generate-report { flex:0 0 auto; }
+@media (max-width:520px) { .system-logs-heading { align-items:flex-start; flex-wrap:wrap; } }

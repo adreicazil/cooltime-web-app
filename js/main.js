@@ -34,7 +34,8 @@ function populateBookableServiceSelects(services) {
     const options = [new Option('Select a Service', '')];
     bookableServices.forEach((service) => {
       const price = Number(service.price) || 0;
-      const option = new Option(service.name.trim(), service.id);
+      const duration = Number(service.duration ?? service.estimatedDuration) || (/basic|single/i.test(service.name) ? 2 : /dual|double/i.test(service.name) ? 3 : 2);
+      const option = new Option(`${service.name.trim()} — ${duration} hrs`, service.id);
       option.dataset.serviceId = service.id;
       option.dataset.serviceName = service.name.trim();
       option.dataset.price = String(price);
@@ -77,6 +78,36 @@ if (bookingModalElement && bookingForm) {
   const dateInput = document.getElementById('guest-date');
   const branchInput = document.getElementById('guest-branch-select');
   const slotSelect = document.getElementById('guest-time-slot');
+  const vehicleType = document.getElementById('guest-vehicle-type');
+  const vehicleMake = document.getElementById('guest-vehicle-make');
+  const vehicleModel = document.getElementById('guest-vehicle-model');
+  const vehicleYear = document.getElementById('guest-vehicle-year');
+  const vehicleCatalog = {
+    single: { Toyota: ['Vios', 'Altis', 'Camry', 'Hilux', 'Others'], Mitsubishi: ['Mirage', 'Lancer EX', 'Strada', 'Others'], Honda: ['Civic', 'City', 'Brio', 'Others'], Nissan: ['Navara', 'Juke', 'Others'], Isuzu: ['D-Max', 'Others'], Others: ['Others'] },
+    dual: { Toyota: ['Innova', 'Fortuner', 'Avanza', 'Hiace', 'Veloz', 'Others'], Mitsubishi: ['Montero', 'Xpander', 'L300', 'Others'], Honda: ['CR-V', 'Mobilio', 'BR-V', 'Others'], Nissan: ['Terra', 'NV350', 'Others'], Isuzu: ['mu-X', 'Traviz', 'Crosswind', 'Alterra', 'Others'], Others: ['Others'] },
+  };
+  const currentYear = new Date().getFullYear();
+  vehicleYear.replaceChildren(new Option('Select year', ''), ...Array.from({ length: currentYear - 1989 }, (_, index) => new Option(String(currentYear - index), String(currentYear - index))));
+  vehicleType.addEventListener('change', () => {
+    const brands = vehicleCatalog[vehicleType.value] || {};
+    vehicleMake.replaceChildren(new Option('Select brand', ''), ...Object.keys(brands).map((brand) => new Option(brand, brand)));
+    vehicleMake.disabled = !vehicleType.value;
+    vehicleModel.replaceChildren(new Option('Select model', ''));
+    vehicleModel.disabled = true;
+    document.getElementById('guest-aircon-type').textContent = vehicleType.value === 'single' ? 'Single Aircon' : vehicleType.value === 'dual' ? 'Dual Aircon' : 'Select a vehicle type';
+    const matchingService = [...serviceSelect.options].find((option) => vehicleType.value === 'single'
+      ? /single/i.test(option.dataset.serviceName || '')
+      : /dual|double/i.test(option.dataset.serviceName || ''));
+    if (matchingService) serviceSelect.value = matchingService.value;
+  });
+  vehicleMake.addEventListener('change', () => {
+    const models = vehicleCatalog[vehicleType.value]?.[vehicleMake.value] || [];
+    vehicleModel.replaceChildren(new Option('Select model', ''), ...models.map((model) => new Option(model, model)));
+    vehicleModel.disabled = !vehicleMake.value;
+  });
+  bookingForm.elements.namedItem('plateNumber').addEventListener('input', (event) => {
+    event.target.value = event.target.value.toUpperCase();
+  });
 
   if (bookingModal) {
     dateInput.min = new Date().toLocaleDateString('en-CA');
@@ -111,12 +142,17 @@ if (bookingModalElement && bookingForm) {
       const security = window.SecurityValidator;
       const email = bookingForm.elements.namedItem('email')?.value?.trim() || '';
       const name = bookingForm.elements.namedItem('name')?.value?.trim() || '';
+      const plateInput = bookingForm.elements.namedItem('plateNumber');
+      plateInput.value = plateInput.value.trim().toUpperCase().replace(/\s+/g, ' ');
+      if (!/^[A-Z]{3} ?[0-9]{3,4}$/.test(plateInput.value)) { notice.textContent = 'Enter a valid Philippine plate number, such as ABC 1234 or ABC 123.'; plateInput.focus(); return; }
+      const selectedName = serviceSelect.selectedOptions[0]?.dataset.serviceName || '';
+      if ((vehicleType.value === 'dual' && /single/i.test(selectedName)) || (vehicleType.value === 'single' && /dual|double/i.test(selectedName))) { notice.textContent = 'This service package does not match the vehicle aircon type. Choose a matching Single or Dual Aircon package.'; serviceSelect.focus(); return; }
       if (security?.isDisposableEmail(email)) { notice.textContent = 'Please use a permanent email address.'; bookingForm.elements.namedItem('email')?.focus(); return; }
       if (security?.containsInappropriateContent(name)) { notice.textContent = 'Please enter a name without inappropriate language.'; bookingForm.elements.namedItem('name')?.focus(); return; }
       const submitButton = bookingForm.querySelector('[type="submit"]');
       const form = new FormData(bookingForm);
       const selectedService = serviceSelect.selectedOptions[0];
-      const payload = { name: form.get('name'), email: form.get('email'), service: selectedService?.dataset.serviceId || form.get('service'), serviceId: selectedService?.dataset.serviceId || form.get('service'), serviceName: selectedService?.dataset.serviceName || selectedService?.textContent.trim(), price: Number(selectedService?.dataset.price || 0), branch: normalizeBranchLabel(form.get('branch'), ''), date: form.get('date'), timeSlot: slotSelect.value, plateNumber: form.get('plateNumber'), vehicleMake: form.get('vehicleMake'), vehicleModel: form.get('vehicleModel'), vehicleYear: form.get('vehicleYear') };
+      const payload = { name: form.get('name'), email: form.get('email'), service: selectedService?.dataset.serviceId || form.get('service'), serviceId: selectedService?.dataset.serviceId || form.get('service'), serviceName: selectedService?.dataset.serviceName || selectedService?.textContent.trim(), price: Number(selectedService?.dataset.price || 0), branch: normalizeBranchLabel(form.get('branch'), ''), date: form.get('date'), timeSlot: slotSelect.value, plateNumber: plateInput.value, vehicleType: vehicleType.value, airconType: vehicleType.value, vehicleMake: form.get('vehicleMake'), make: form.get('vehicleMake'), vehicleModel: form.get('vehicleModel'), model: form.get('vehicleModel'), vehicleYear: form.get('vehicleYear'), year: form.get('vehicleYear') };
       const phone = bookingForm.elements.namedItem('phone');
       if (phone?.value?.trim()) payload.phone = phone.value.trim();
       if (submitButton) submitButton.disabled = true;
