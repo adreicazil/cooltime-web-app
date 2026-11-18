@@ -373,7 +373,7 @@ function ensureAuditTrailUI() {
   const section = document.createElement('section');
   section.className = 'panel pos-audit-trail-card super-only';
   section.id = 'posAuditTrail';
-  setHTML(section, `<h3>Audit Trail</h3><p>Recorded administrator actions across bookings, customer requests, and POS transactions.</p><div class="pos-audit-trail-filters"><input type="search" id="posAuditSearch" class="form-control" placeholder="Search reference id or admin" aria-label="Search audit trail by reference or administrator"></div><div class="table-scroll pos-audit-trail-scroll"><table class="pos-audit-trail-table"><tbody id="posAuditResults"><tr class="pos-audit-row"><td class="pos-audit-empty" colspan="4">Loading audit trail...</td></tr></tbody></table></div><div class="table-pagination-footer"><button type="button" class="btn-pagination-chevron btn-prev-page" title="Previous Page" aria-label="Previous page">&lt;</button><span class="pagination-page-display">Page <span class="current-page-num" title="Click to jump to page">1</span> of <span class="total-pages-num">1</span></span><button type="button" class="btn-pagination-chevron btn-next-page" title="Next Page" aria-label="Next page">&gt;</button></div>`);
+  setHTML(section, `<h3>Audit Trail</h3><p>Recorded administrator actions across bookings, customer requests, and Sales.</p><div class="pos-audit-trail-filters"><input type="search" id="posAuditSearch" class="form-control" placeholder="Search reference id or admin" aria-label="Search audit trail by reference or administrator"></div><div class="table-scroll pos-audit-trail-scroll"><table class="pos-audit-trail-table"><tbody id="posAuditResults"><tr class="pos-audit-row"><td class="pos-audit-empty" colspan="4">Loading audit trail...</td></tr></tbody></table></div><div class="table-pagination-footer"><button type="button" class="btn-pagination-chevron btn-prev-page" title="Previous Page" aria-label="Previous page">&lt;</button><span class="pagination-page-display">Page <span class="current-page-num" title="Click to jump to page">1</span> of <span class="total-pages-num">1</span></span><button type="button" class="btn-pagination-chevron btn-next-page" title="Next Page" aria-label="Next page">&gt;</button></div>`);
   monitor.append(section);
   on('#posAuditSearch', 'input', renderAuditTrail);
 }
@@ -447,7 +447,7 @@ async function initialize() {
     });
     modulePaginators.pos = setupModulePagination({
       cardContainerId: 'posMonitoring', listContainerId: 'posResults',
-      emptyHtml: '<tr><td colspan="7" class="pos-empty-state">No POS transactions match these filters.</td></tr>'
+      emptyHtml: '<tr><td colspan="7" class="pos-empty-state">No Sales match these filters.</td></tr>'
     });
     if (role === 'super_admin') {
       ensureAuditTrailUI();
@@ -554,14 +554,14 @@ async function initialize() {
       const openRow = openPanel.closest('tr')?.previousElementSibling;
       openRow?.classList.remove('is-expanded');
       const openButton = openRow?.querySelector('.pos-actions-button');
-      if (openButton) { openButton.setAttribute('aria-expanded', 'false'); openButton.textContent = 'Actions ▾'; }
+      if (openButton) { openButton.setAttribute('aria-expanded', 'false'); openButton.textContent = 'Actions â–¾'; }
       openRow?.nextElementSibling?.querySelector('.pos-audit-actions')?.removeAttribute('open');
     });
     if (expanded) {
       panel.classList.add('expanded');
       row.classList.add('is-expanded');
       const button = row.querySelector('.pos-actions-button');
-      if (button) { button.setAttribute('aria-expanded', 'true'); button.textContent = 'Actions ▴'; }
+      if (button) { button.setAttribute('aria-expanded', 'true'); button.textContent = 'Actions â–´'; }
     }
   });
   on('#reportForm', 'submit', generateReport);
@@ -965,7 +965,7 @@ function renderBookings() {
       ].filter(Boolean).join('');
       const actionColumnHtml = isCancelled
         ? '<div class="booking-actions-none" aria-hidden="true"></div>'
-        : `<details class="booking-actions-dropdown"><summary class="actions-dropdown-btn">Actions ▾</summary><div class="booking-actions-menu">${menuItems || '<span>No actions available</span>'}</div></details>`;
+        : `<details class="booking-actions-dropdown"><summary class="actions-dropdown-btn">Actions â–¾</summary><div class="booking-actions-menu">${menuItems || '<span>No actions available</span>'}</div></details>`;
       return `<article class="booking-item-row" data-booking-row data-id="${esc(booking.id)}" tabindex="0" aria-expanded="false" aria-controls="${expandedId}">
         <div class="booking-row-summary">
           <div class="booking-row-customer"><strong>${esc(customerName)}</strong></div>
@@ -1491,7 +1491,7 @@ function renderPos() {
     let rowAction = '—';
     if (role === 'admin') rowAction = isVoidRequested ? '<button type="button" disabled>Void Pending</button>'
       : isPaid ? `<button type="button" class="btn-pos-request-void" ${attrs}>Request Void</button>` : '—';
-    if (role === 'super_admin') rowAction = `${isVoidRequested ? `<button type="button" class="btn-pos-approve-void" ${attrs}>Approve Void</button><button type="button" class="btn-pos-reject-void" ${attrs}>Reject Void</button>` : ''}<details class="pos-audit-actions"><summary class="btn-super-pos-actions">Actions ▾</summary><div class="pos-audit-actions-menu"><button type="button" data-super-pos-action="flag" ${attrs}>${transaction.isFlagged ? 'Remove Flag' : 'Flag'} transaction</button><button type="button" data-super-pos-action="void" ${attrs}${isPaid ? '' : ' disabled'}>Void transaction</button><button type="button" data-super-pos-action="export" ${attrs}>Export audit summary</button></div></details>`;
+    if (role === 'super_admin') rowAction = `${isVoidRequested ? `<button type="button" class="btn-pos-approve-void" ${attrs}>Approve Void</button><button type="button" class="btn-pos-reject-void" ${attrs}>Reject Void</button>` : ''}<details class="pos-audit-actions"><summary class="btn-super-pos-actions">Actions â–¾</summary><div class="pos-audit-actions-menu"><button type="button" data-super-pos-action="flag" ${attrs}>${transaction.isFlagged ? 'Remove Flag' : 'Flag'} transaction</button><button type="button" data-super-pos-action="void" ${attrs}${isPaid ? '' : ' disabled'}>Void transaction</button><button type="button" data-super-pos-action="export" ${attrs}>Export audit summary</button></div></details>`;
     const requester = transaction.voidRequestedByName || usersById[transaction.voidRequestedBy]?.name || transaction.voidRequestedByEmail || 'Unknown admin';
     const requestDetails = isVoidRequested ? `<div class="pos-void-request-details"><strong>Void requested by ${esc(requester)}</strong><p>${esc(transaction.voidRequestReason || 'No reason provided.')}</p></div>` : '';
     const branchValue = transaction.branch || transaction.branchLocation || transaction.branchName
@@ -1502,7 +1502,7 @@ function renderPos() {
     return `<tr class="pos-main-row" tabindex="0"><td><strong class="pos-invoice-id">${esc(reference)}</strong><span class="pos-invoice-time">${esc(stamp)}</span></td><td>${esc(branch)}</td><td>${esc(cashier)}</td><td>${esc(transactionMethod(transaction, payment))}</td><td><span class="pos-status-text ${esc(statusKey)}">${esc(displayStatus)}</span></td><td class="pos-amount">${money(total)}</td><td>${rowAction}</td></tr><tr class="pos-detail-row"><td colspan="7"><div class="pos-accordion-panel"><p class="pos-accordion-summary">Reference ID: ${esc(reference)} <button type="button" class="btn btn-secondary btn-sm" data-copy-reference="${esc(reference)}">Copy</button></p><p>Customer: ${esc(customer)} · Cashier: ${esc(cashier)} · Branch: ${esc(branch)}</p>${requestDetails}<div class="pos-detail-table-scroll"><table class="pos-detail-table"><thead><tr><th>Service</th><th>Qty</th><th>Unit</th><th>Line total</th></tr></thead><tbody>${serviceRows}</tbody></table></div><strong class="pos-total-summary">Total ${money(total)}</strong></div></td></tr>`;
   });
   if (modulePaginators.pos) modulePaginators.pos.setItems(renderedItems);
-  else setHTML($('#posResults'), renderedItems.join('') || '<tr><td class="pos-empty-state" colspan="7">No POS transactions match these filters.</td></tr>');
+  else setHTML($('#posResults'), renderedItems.join('') || '<tr><td class="pos-empty-state" colspan="7">No Sales match these filters.</td></tr>');
 }
 
 function findPosTransaction(id, collectionName) {

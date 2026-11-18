@@ -1,4 +1,4 @@
-﻿(() => {
+(() => {
   const greeting = document.getElementById('admin-username-display');
   const setGreeting = (username) => { if (greeting) greeting.textContent = username || 'User'; };
   setGreeting(window.cooltimeDashboardIdentity);
@@ -15,7 +15,7 @@
     bookings: ['Bookings', 'Review appointments and cancellation requests.'],
     customers: ['Customers', 'Review customer requests, records, and account access.'],
     reports: ['Reports', 'Generate operational reports and review report history.'],
-    'pos-transactions': ['POS Transactions', 'Review point of sale invoices and payments.'],
+    'sales': ['Sales', 'Review point of sale invoices and payments.'],
     notifications: ['Notifications', 'Review current customer notifications.']
   };
 

@@ -2452,7 +2452,7 @@ td {
   .super-dashboard-body #reportManagement .tool-filters > input[type="date"] { flex: 1; min-width: 0; }
 }
 
-/* Super Admin POS transaction monitor */
+/* Super Admin Sales monitor */
 .super-dashboard-body #posMonitoring.pos-card-container {
   box-sizing: border-box;
   margin-bottom: 24px;
@@ -3536,7 +3536,7 @@ div[style*="overflow"]::-webkit-scrollbar {
 .admin-dashboard-body #bookings-view, .super-dashboard-body #bookings-view,
 .admin-dashboard-body #customers-view, .super-dashboard-body #customers-view,
 .admin-dashboard-body #reports-view, .super-dashboard-body #reports-view,
-.admin-dashboard-body #pos-transactions-view, .super-dashboard-body #pos-transactions-view,
+.admin-dashboard-body #sales-view, .super-dashboard-body #sales-view,
 .admin-dashboard-body #notifications-view, .super-dashboard-body #notifications-view,
 .admin-dashboard-body .main-content-wrapper, .super-dashboard-body .main-content-wrapper,
 .admin-dashboard-body .section-container, .super-dashboard-body .section-container,
@@ -3620,8 +3620,8 @@ body.admin-dashboard-body #customers-view #customerManagement,
 body.super-dashboard-body #customers-view #customerManagement,
 body.admin-dashboard-body #reports-view #reportManagement,
 body.super-dashboard-body #reports-view #reportManagement,
-body.admin-dashboard-body #pos-transactions-view #posMonitoring,
-body.super-dashboard-body #pos-transactions-view #posMonitoring,
+body.admin-dashboard-body #sales-view #posMonitoring,
+body.super-dashboard-body #sales-view #posMonitoring,
 body.admin-dashboard-body #notifications-view .notifications-card-container,
 body.super-dashboard-body #notifications-view .notifications-card-container,
 body.admin-dashboard-body .admin-dashboard-view > .panel,
@@ -3666,8 +3666,8 @@ body.admin-dashboard-body #reports-view #reportHistory,
 body.super-dashboard-body #reports-view #reportHistory,
 body.admin-dashboard-body #reports-view .report-history-scroll-wrapper,
 body.super-dashboard-body #reports-view .report-history-scroll-wrapper,
-body.admin-dashboard-body #pos-transactions-view .pos-table-scroll,
-body.super-dashboard-body #pos-transactions-view .pos-table-scroll,
+body.admin-dashboard-body #sales-view .pos-table-scroll,
+body.super-dashboard-body #sales-view .pos-table-scroll,
 body.admin-dashboard-body #notifications-view .notification-list,
 body.super-dashboard-body #notifications-view .notification-list,
 body.admin-dashboard-body #notifications-view .notification-list-item,
@@ -3702,7 +3702,7 @@ body.super-dashboard-body #notifications-view .notifications-card-container {
   transition: transform .25s ease, box-shadow .25s ease !important;
 }
 
-/* Unified POS transaction monitor and Super Admin audit trail controls. */
+/* Unified Sales monitor and Super Admin audit trail controls. */
 body.admin-dashboard-body #posMonitoring .btn-pos-request-void,
 body.super-dashboard-body #posMonitoring .btn-pos-request-void,
 body.admin-dashboard-body #posMonitoring .btn-pos-approve-void,
