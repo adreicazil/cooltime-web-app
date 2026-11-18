@@ -133,6 +133,27 @@ body.customer-dashboard-page .main-nav a:hover {
   font-size: 1.2rem;
 }
 
+.customer-sidebar-profile {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0 0 4px;
+  padding: 0 8px 12px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+}
+
+.sidebar-customer-name {
+  display: block;
+  min-width: 0;
+  color: #111827;
+  font-size: .9rem;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
 .customer-sidebar .customer-side-label {
   margin: 0 8px 2px;
   color: #858b96;
@@ -540,6 +561,7 @@ body.customer-dashboard-page .main-nav a:hover {
   }
 
   .customer-sidebar > strong,
+  .customer-sidebar-profile,
   .customer-sidebar .customer-side-label,
   .customer-sidebar small,
   .customer-sidebar a span { display: none; }
@@ -768,6 +790,7 @@ body.customer-dashboard-page div[style*="overflow"]::-webkit-scrollbar {
     box-shadow: 0 -5px 20px rgba(7, 17, 46, .16);
   }
   .customer-sidebar > strong,
+  .customer-sidebar-profile,
   .customer-sidebar .customer-side-label,
   .customer-sidebar > small { display: none; }
   .customer-sidebar a,

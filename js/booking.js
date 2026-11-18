@@ -857,9 +857,15 @@ if (form) {
   requireRole(['customer']).then((access) => {
     if (!access) return;
     customerProfile = access.profile;
+    const customerName = customerProfile?.name
+      || [customerProfile?.firstName, customerProfile?.lastName].filter(Boolean).join(' ')
+      || customerProfile?.username
+      || 'Customer';
+    const sidebarName = document.getElementById('sidebar-customer-name');
+    if (sidebarName) sidebarName.textContent = customerName;
     window.dispatchEvent(new CustomEvent('customer:profile', { detail: {
-      name: customerProfile?.name || customerProfile?.username || 'Customer',
-      username: customerProfile?.username || customerProfile?.name || 'customer'
+      name: customerName,
+      username: customerProfile?.username || customerName
     } }));
     document.querySelector('.customer-dashboard')?.removeAttribute('hidden');
     form.removeAttribute('hidden');

@@ -507,5 +507,9 @@ window.addEventListener('customer:invoices', (event) => { invoices = event.detai
 window.addEventListener('customer:bookings', (event) => { bookings = event.detail || []; renderBookingSummary(); });
 window.addEventListener('customer:profile', (event) => {
   const greeting = document.getElementById('customer-greeting-text');
-  if (greeting) greeting.textContent = `Hello ${event.detail?.username || event.detail?.name || 'customer'}`;
+  const sidebarNameEl = document.getElementById('sidebar-customer-name');
+  const profile = event.detail || {};
+  const fullName = profile.name || [profile.firstName, profile.lastName].filter(Boolean).join(' ') || profile.username || 'customer';
+  if (greeting) greeting.textContent = `Hello ${fullName}`;
+  if (sidebarNameEl) sidebarNameEl.textContent = fullName;
 });
